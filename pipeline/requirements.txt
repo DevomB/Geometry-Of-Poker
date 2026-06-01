@@ -1,0 +1,9 @@
+# Geometry of Poker — Python embedding pipeline
+numpy>=2.0
+pandas>=2.2
+scikit-learn>=1.6
+umap-learn>=0.5
+hdbscan>=0.8
+joblib>=1.4
+pyarrow>=19.0
+fastparquet>=2024.11.0

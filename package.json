@@ -1,0 +1,26 @@
+{
+  "name": "geometry-of-poker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Research-grade interactive 3D visualization of Texas Hold'em state space",
+  "scripts": {
+    "dev": "pnpm --filter @geometry-of-poker/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "generate": "pnpm --filter @geometry-of-poker/dataset-generator generate",
+    "generate:all": "pnpm generate -- --all --seed 42 --mode compact",
+    "pipeline:extract": "pnpm --filter @geometry-of-poker/feature-engine extract",
+    "pipeline:generate": "pnpm generate -- --all --seed 42 --mode compact",
+    "pipeline:embed": "python pipeline/embed/run_umap.py --all",
+    "pipeline:embed:demo": "python pipeline/embed/run_umap.py --all --demo --seed 42",
+    "pipeline:cluster": "python pipeline/analyze/cluster.py",
+    "benchmark": "node scripts/benchmark-performance.mjs"
+  },
+  "engines": {
+    "node": ">=22 <23",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

@@ -1,0 +1,12 @@
+artifacts/datasets/**
+artifacts/embeddings/**
+artifacts/models/**
+pipeline/**
+**/__pycache__/**
+**/.pytest_cache/**
+**/.mypy_cache/**
+**/*.pyc
+node_modules/**
+.pnpm-store/**
+docs/**/*.png
+docs/**/*.mp4

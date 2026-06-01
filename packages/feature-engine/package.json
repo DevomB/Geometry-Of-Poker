@@ -1,0 +1,30 @@
+{
+  "name": "@geometry-of-poker/feature-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Poker state feature extraction using poker-calculations",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "extract": "node --import tsx src/cli/extract-features.ts"
+  },
+  "dependencies": {
+    "@geometry-of-poker/shared": "workspace:*",
+    "poker-calculations": "2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.4",
+    "typescript": "~5.8.3"
+  }
+}

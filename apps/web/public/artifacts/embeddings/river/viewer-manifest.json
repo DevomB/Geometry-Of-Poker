@@ -1,0 +1,148 @@
+{
+  "version": "1.0.0",
+  "street": "river",
+  "pointCount": 2500,
+  "embeddingMethod": "StandardScaler → PCA → UMAP → HDBSCAN",
+  "retainedFeatures": [
+    "equityVsRandom",
+    "categoryIndex",
+    "streetIndex",
+    "categoryHighCard",
+    "categoryPair",
+    "categoryTwoPair",
+    "categoryThreeOfAKind",
+    "categoryStraight",
+    "categoryFlush",
+    "categoryFullHouse",
+    "categoryFourOfAKind",
+    "categoryStraightFlush",
+    "categoryRoyalFlush",
+    "equityMean",
+    "equityVariance",
+    "equityP05",
+    "equityP50",
+    "equityP95",
+    "equityRunoutAvailable",
+    "pNuts",
+    "pDominated",
+    "runoutVulnerabilityAvailable",
+    "boardRankDistinctCount",
+    "boardPairCount",
+    "boardTripsFlag",
+    "boardQuadsFlag",
+    "boardPairednessScore",
+    "boardMaxSuitCount",
+    "boardDistinctSuitCount",
+    "boardRainbowFlag",
+    "boardTwoToneFlag",
+    "boardMonotoneFlag",
+    "boardConnectivityScore",
+    "boardBroadwayDensity",
+    "boardHighCardNormalized",
+    "boardLowCardNormalized",
+    "boardFeaturesAvailable",
+    "flushOutCount",
+    "backdoorFlushFlag",
+    "straightOutCount",
+    "openEndedStraightDrawFlag",
+    "gutshotFlag",
+    "doubleGutshotFlag",
+    "comboDrawFlag",
+    "improvementOutCount",
+    "cleanImprovementOutCount",
+    "improvementProbabilityNextCard",
+    "drawFeaturesAvailable",
+    "removalGradientMean",
+    "removalGradientStdDev",
+    "removalGradientMin",
+    "removalGradientMax",
+    "removalGradientL1",
+    "removalGradientL2",
+    "removalGradientPositiveMass",
+    "removalGradientNegativeMass",
+    "removalGradientAvailable",
+    "transitionEntropy",
+    "transitionMaxProbability",
+    "transitionStdDev",
+    "transitionDiagonalMass",
+    "transitionUpgradeMass",
+    "transitionDowngradeMass",
+    "transitionRiverPairOrBetterMass",
+    "transitionRiverFlushOrBetterMass",
+    "categoryTransitionAvailable"
+  ],
+  "retainedDimension": 66,
+  "originalDimension": 66,
+  "pcaDimensions": 50,
+  "pcaVariance": 0.807,
+  "umap": {},
+  "hdbscan": {
+    "clusters": 6,
+    "noiseFraction": 0.784
+  },
+  "trustworthiness": 0.6363,
+  "knnOverlap": 0.0702,
+  "categories": [
+    "highCard"
+  ],
+  "clusters": [
+    {
+      "id": 0,
+      "size": 82,
+      "centroid": [
+        6.009076409223603,
+        2.859482705593109,
+        4.372279774851915
+      ]
+    },
+    {
+      "id": 1,
+      "size": 55,
+      "centroid": [
+        6.878451624783603,
+        2.587985225157304,
+        3.7780797351490367
+      ]
+    },
+    {
+      "id": 2,
+      "size": 78,
+      "centroid": [
+        6.845775665381016,
+        1.6589694565687425,
+        3.8826524905669384
+      ]
+    },
+    {
+      "id": 3,
+      "size": 101,
+      "centroid": [
+        5.770930809549766,
+        2.37370773353199,
+        2.7710792971129465
+      ]
+    },
+    {
+      "id": 4,
+      "size": 50,
+      "centroid": [
+        5.6699159049987795,
+        2.4339046621322633,
+        5.16
+      ]
+    },
+    {
+      "id": 5,
+      "size": 175,
+      "centroid": [
+        5.099541549682617,
+        2.7044421543393815,
+        4.016324544634138
+      ]
+    }
+  ],
+  "artifacts": {
+    "pointsBin": "browser-points.bin",
+    "metadataJson": "browser-metadata.json"
+  }
+}

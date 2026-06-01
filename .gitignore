@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+out/
+*.tsbuildinfo
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Artifacts (large generated files — keep structure, ignore data)
+artifacts/datasets/*
+artifacts/models/*
+artifacts/embeddings/*
+!artifacts/**/.gitkeep
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+*.log
+.vercel

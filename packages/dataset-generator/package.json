@@ -1,0 +1,26 @@
+{
+  "name": "@geometry-of-poker/dataset-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reproducible Texas Hold'em state dataset generation for Geometry of Poker",
+  "type": "module",
+  "bin": {
+    "gop-generate": "./dist/cli/generate.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "generate": "node --import tsx src/cli/generate.ts"
+  },
+  "dependencies": {
+    "@geometry-of-poker/feature-engine": "workspace:*",
+    "parquetjs": "^0.11.2",
+    "poker-calculations": "2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.4",
+    "typescript": "~5.8.3"
+  }
+}

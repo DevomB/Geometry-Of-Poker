@@ -44,7 +44,13 @@ cd visualizer
 pnpm install
 ```
 
-### 2. Build shared packages
+### 2. Build workspace packages (or use production build)
+
+```bash
+pnpm --filter @geometry-of-poker/web... build
+```
+
+Or build packages individually before `pnpm dev`:
 
 ```bash
 pnpm --filter @geometry-of-poker/shared build

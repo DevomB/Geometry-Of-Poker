@@ -13,8 +13,10 @@ pnpm install --frozen-lockfile
 Build command:
 
 ```bash
-pnpm --filter @geometry-of-poker/web build
+pnpm --filter @geometry-of-poker/web... build
 ```
+
+The trailing `...` tells pnpm to build `@geometry-of-poker/web` **and its workspace dependencies** (`shared`, `feature-engine`) first. Those packages publish `dist/` via `tsc` (gitignored); `next build` alone cannot resolve them without that step.
 
 The Next.js app lives in `apps/web`; shared TypeScript packages are resolved through the pnpm workspace.
 

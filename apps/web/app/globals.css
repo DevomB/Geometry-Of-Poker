@@ -1,14 +1,203 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #e8e8ef;
-  --accent: #6ee7b7;
-  --muted: #71717a;
+  /* Surface tokens */
+  --surface-base: #08080c;
+  --surface-1: #0d0d13;
+  --surface-2: #11111a;
+  --surface-3: #181822;
+  --surface-glass: rgba(15, 15, 22, 0.72);
+  --surface-glass-strong: rgba(10, 10, 16, 0.86);
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --text-primary: #e8e8ef;
+  --text-secondary: #a0a0ac;
+  --text-tertiary: #6b6b78;
+  --text-muted: #4a4a55;
+
+  /* Accents — restrained, scientific */
+  --accent-cyan: #5eead4;
+  --accent-amber: #fbbf24;
+  --accent-rose: #fb7185;
+  --accent-violet: #a78bfa;
+  --accent-emerald: #34d399;
+
+  /* Status */
+  --status-ok: #22c55e;
+  --status-warn: #f59e0b;
+  --status-error: #ef4444;
+
+  /* Manifold-specific */
+  --selection-color: #fef3c7;
+  --hover-color: #f1f5f9;
+  --neighbor-color: #5eead4;
+
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family:
+    "Inter",
+    "SF Pro Display",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-feature-settings:
+    "ss01" on,
+    "cv11" on;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(at 12% 8%, rgba(94, 234, 212, 0.04) 0, transparent 42%),
+    radial-gradient(at 88% 92%, rgba(167, 139, 250, 0.04) 0, transparent 45%);
+  background-attachment: fixed;
+}
+
+/* Subtle scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Focus rings — visible without being shouty */
+:focus-visible {
+  outline: 1px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reusable micro-classes */
+.gop-panel {
+  background: var(--surface-glass);
+  border-color: var(--border-default);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+.gop-mono {
+  font-family:
+    "JetBrains Mono",
+    "SF Mono",
+    ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  font-feature-settings:
+    "ss02" on,
+    "calt" off;
+}
+
+.gop-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-default) 18%,
+    var(--border-default) 82%,
+    transparent
+  );
+}
+
+.gop-pulse-soft {
+  animation: gop-pulse-soft 2.4s ease-in-out infinite;
+}
+
+@keyframes gop-pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.gop-fade-in {
+  animation: gop-fade-in 240ms ease-out;
+}
+
+@keyframes gop-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gop-slide-in-left {
+  animation: gop-slide-in-left 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gop-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.gop-slide-in-right {
+  animation: gop-slide-in-right 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gop-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.gop-grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .gop-pulse-soft {
+    animation: none;
+    opacity: 0.85;
+  }
 }

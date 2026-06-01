@@ -65,25 +65,43 @@ const DISTINCTIONS = [
   { label: "Interpretive observations", example: "human cluster descriptions — not theorems" },
 ];
 
-export function AboutResearchContent() {
+interface AboutResearchContentProps {
+  /** When true, render without the page header (suitable for modal embedding). */
+  embed?: boolean;
+}
+
+export function AboutResearchContent({ embed = false }: AboutResearchContentProps = {}) {
+  const containerClass = embed
+    ? "space-y-8 text-sm leading-relaxed text-zinc-300"
+    : "mx-auto max-w-3xl space-y-10 px-6 py-10 text-sm leading-relaxed text-zinc-300";
+
   return (
-    <article className="mx-auto max-w-3xl space-y-10 px-6 py-10 text-sm leading-relaxed text-zinc-300">
-      <header className="space-y-3 border-b border-white/10 pb-8">
-        <Link
-          href="/"
-          className="text-xs text-zinc-500 transition hover:text-zinc-300"
-        >
-          ← Back to viewer
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
-          About this research
-        </h1>
+    <article className={containerClass}>
+      {!embed && (
+        <header className="space-y-3 border-b border-white/10 pb-8">
+          <Link
+            href="/"
+            className="text-xs text-zinc-500 transition hover:text-zinc-300"
+          >
+            ← Back to viewer
+          </Link>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+            About this research
+          </h1>
+          <p className="text-zinc-400">
+            Geometry of Poker is a computational research visualization. It maps poker states to
+            feature vectors, embeds them in three dimensions, and renders an explorable point cloud.
+            This page summarizes methodology without overstating conclusions.
+          </p>
+        </header>
+      )}
+      {embed && (
         <p className="text-zinc-400">
           Geometry of Poker is a computational research visualization. It maps poker states to
           feature vectors, embeds them in three dimensions, and renders an explorable point cloud.
-          This page summarizes methodology without overstating conclusions.
+          The summary below outlines methodology without overstating conclusions.
         </p>
-      </header>
+      )}
 
       {SECTIONS.map((section) => (
         <section key={section.title} className="space-y-3">

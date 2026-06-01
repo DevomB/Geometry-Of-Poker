@@ -86,3 +86,57 @@ export function streetFromBoardCount(count: number): Street | null {
   if (count === 5) return "river";
   return null;
 }
+
+export type PickerTarget = "hero" | "board";
+
+/** Place a card into the next available slot of a target zone. */
+export function placeCardInZone(
+  state: CardPickerState,
+  card: string,
+  target: PickerTarget,
+  maxBoard = 5,
+): CardPickerState {
+  if (cardsUsed(state).has(card)) return state;
+  const next: CardPickerState = {
+    hero: [...state.hero] as [string | null, string | null],
+    board: [...state.board],
+  };
+  if (target === "hero") {
+    const slot = next.hero.findIndex((c) => c === null);
+    if (slot === -1) return state;
+    next.hero[slot] = card;
+  } else {
+    const filled = next.board.filter(Boolean).length;
+    if (filled >= maxBoard) return state;
+    const slot = next.board.findIndex((c) => c === null);
+    if (slot === -1) return state;
+    next.board[slot] = card;
+  }
+  return next;
+}
+
+/** Remove a specific card from anywhere in the picker. */
+export function removeCard(state: CardPickerState, card: string): CardPickerState {
+  return {
+    hero: state.hero.map((c) => (c === card ? null : c)) as [string | null, string | null],
+    board: state.board.map((c) => (c === card ? null : c)),
+  };
+}
+
+/** Whether picker is fully ready for projection (2 hero + valid board count). */
+export function pickerReady(state: CardPickerState): boolean {
+  const hero = state.hero.filter(Boolean).length;
+  const board = state.board.filter(Boolean).length;
+  if (hero !== 2) return false;
+  return [0, 3, 4, 5].includes(board);
+}
+
+export function inferredStreet(state: CardPickerState): Street | null {
+  const board = state.board.filter(Boolean).length;
+  return streetFromBoardCount(board);
+}
+
+export function nextTargetZone(state: CardPickerState): PickerTarget {
+  if (state.hero.some((c) => c === null)) return "hero";
+  return "board";
+}

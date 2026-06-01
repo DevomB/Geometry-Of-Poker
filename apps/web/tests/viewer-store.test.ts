@@ -3,6 +3,11 @@ import { create } from "zustand";
 import type { Street } from "@geometry-of-poker/shared";
 import type { ColorMode, ViewerFilters } from "@/lib/types";
 import { DEFAULT_FILTERS } from "@/lib/types";
+import {
+  POINT_SIZES,
+  SELECTION_COLOR,
+  HOVER_COLOR,
+} from "@/lib/visualization-theme";
 
 interface TestViewerState {
   street: Street;
@@ -44,5 +49,22 @@ describe("selection state", () => {
     expect(store.getState().selection).toEqual({ index: 10, locked: true });
     store.getState().clearSelection();
     expect(store.getState().selection).toBeNull();
+  });
+});
+
+describe("visualization theme constants", () => {
+  it("selected and hover colors contrast with the base point size", () => {
+    expect(POINT_SIZES.selected).toBeGreaterThan(POINT_SIZES.hover);
+    expect(POINT_SIZES.hover).toBeGreaterThan(POINT_SIZES.base);
+  });
+
+  it("selection color is high-luminance for visibility against any palette", () => {
+    const luminance =
+      0.2126 * SELECTION_COLOR[0] + 0.7152 * SELECTION_COLOR[1] + 0.0722 * SELECTION_COLOR[2];
+    expect(luminance).toBeGreaterThan(0.85);
+  });
+
+  it("hover color is distinct from selection color", () => {
+    expect(HOVER_COLOR).not.toEqual(SELECTION_COLOR);
   });
 });

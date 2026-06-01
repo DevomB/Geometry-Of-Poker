@@ -12,8 +12,9 @@ export function HoverTooltip() {
   const index = selection?.locked ? selection.index : hoverIndex;
   if (index === null || !dataset) return null;
 
-  const point = dataset.metadata[index]!;
-  const locked = selection?.locked && selection.index === index;
+  const point = dataset.metadata[index];
+  if (!point) return null;
+  const locked = !!(selection?.locked && selection.index === index);
 
   return (
     <Html
@@ -23,26 +24,36 @@ export function HoverTooltip() {
       style={{ pointerEvents: "none", transform: "translateY(-24px)" }}
     >
       <div
-        className={`min-w-[180px] rounded border px-3 py-2 text-xs shadow-lg backdrop-blur ${
+        role="status"
+        aria-live="polite"
+        className={`min-w-[180px] max-w-[240px] rounded-md border px-3 py-2 text-xs shadow-2xl backdrop-blur-md gop-fade-in ${
           locked
-            ? "border-emerald-400/40 bg-emerald-950/80"
-            : "border-white/15 bg-black/75"
+            ? "border-amber-300/40 bg-amber-500/5"
+            : "border-[var(--border-default)] bg-[var(--surface-glass-strong)]"
         }`}
       >
         <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="font-medium text-zinc-100">{point.category}</span>
-          <span className="tabular-nums text-zinc-400">
+          <span className="text-zinc-100">{humanCategory(point.category)}</span>
+          <span className="gop-mono tabular-nums text-zinc-400">
             {(point.equityVsRandom * 100).toFixed(1)}%
           </span>
         </div>
         <div className="flex flex-wrap gap-1">
           <CardDisplay cards={point.hero} label="Hero" compact />
-          {point.board.length > 0 && <CardDisplay cards={point.board} label="Board" compact />}
+          {point.board.length > 0 && (
+            <CardDisplay cards={point.board} label="Board" compact />
+          )}
         </div>
         {locked && (
-          <p className="mt-1 text-[10px] uppercase tracking-wider text-emerald-300/80">Selected</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-amber-300/80">
+            Selected
+          </p>
         )}
       </div>
     </Html>
   );
+}
+
+function humanCategory(name: string): string {
+  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }

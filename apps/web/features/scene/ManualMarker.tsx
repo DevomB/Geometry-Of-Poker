@@ -1,31 +1,60 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useViewerStore } from "@/stores/viewer-store";
+import {
+  MANUAL_MARKER_COLOR,
+  MANUAL_MARKER_CORE,
+} from "@/lib/visualization-theme";
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mql.matches);
+    update();
+    mql.addEventListener?.("change", update);
+    return () => mql.removeEventListener?.("change", update);
+  }, []);
+  return reduced;
+}
 
 export function ManualMarkerMesh() {
   const marker = useViewerStore((s) => s.manualMarker);
-  const ref = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const reducedMotion = useReducedMotion();
 
   useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const s = 1 + Math.sin(clock.elapsedTime * 3) * 0.15;
-    ref.current.scale.setScalar(s);
+    if (!ringRef.current || reducedMotion) return;
+    const t = clock.elapsedTime;
+    const s = 1 + Math.sin(t * 2.4) * 0.08;
+    ringRef.current.scale.setScalar(s);
+    ringRef.current.rotation.y = t * 0.4;
   });
 
   if (!marker) return null;
 
   return (
     <group position={marker.position}>
-      <mesh ref={ref}>
-        <octahedronGeometry args={[0.35, 0]} />
-        <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.6} wireframe />
+      <mesh ref={ringRef}>
+        <octahedronGeometry args={[0.34, 0]} />
+        <meshStandardMaterial
+          color={MANUAL_MARKER_COLOR}
+          emissive={MANUAL_MARKER_COLOR}
+          emissiveIntensity={0.55}
+          wireframe
+        />
       </mesh>
       <mesh>
-        <sphereGeometry args={[0.12, 16, 16]} />
-        <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={1.2} />
+        <sphereGeometry args={[0.11, 16, 16]} />
+        <meshStandardMaterial
+          color={MANUAL_MARKER_CORE}
+          emissive={MANUAL_MARKER_CORE}
+          emissiveIntensity={1.1}
+        />
       </mesh>
     </group>
   );

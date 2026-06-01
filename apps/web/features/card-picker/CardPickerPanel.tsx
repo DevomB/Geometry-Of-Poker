@@ -1,89 +1,132 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   RANKS,
   SUITS,
-  SUIT_COLORS,
-  emptyPickerState,
-  cardsUsed,
+  SUIT_SYMBOLS,
   cardKey,
-  pickerToInput,
+  cardsUsed,
+  emptyPickerState,
+  inferredStreet,
+  nextTargetZone,
+  pickerReady,
+  placeCardInZone,
+  removeCard,
   type CardPickerState,
+  type PickerTarget,
 } from "@/lib/cards/card-picker";
 import { validateHandInput } from "@/lib/cards/validate-hand";
 import { useViewerStore } from "@/stores/viewer-store";
-import type { ApiErrorResponse, ProjectResponse } from "@geometry-of-poker/shared";
+import type { ApiErrorResponse, ProjectResponse, Street } from "@geometry-of-poker/shared";
 
-type SlotTarget = { zone: "hero"; index: 0 | 1 } | { zone: "board"; index: number };
+const SUIT_TONE: Record<string, string> = {
+  s: "text-zinc-100",
+  c: "text-emerald-300",
+  h: "text-rose-300",
+  d: "text-sky-300",
+};
+
+const STREET_LABEL: Record<Street, string> = {
+  preflop: "Preflop",
+  flop: "Flop",
+  turn: "Turn",
+  river: "River",
+};
 
 export function CardPickerPanel() {
   const street = useViewerStore((s) => s.street);
+  const setStreet = useViewerStore((s) => s.setStreet);
   const setManualMarker = useViewerStore((s) => s.setManualMarker);
   const selectPoint = useViewerStore((s) => s.selectPoint);
   const dataset = useViewerStore((s) => s.dataset);
 
   const [picker, setPicker] = useState<CardPickerState>(emptyPickerState());
-  const [activeSlot, setActiveSlot] = useState<SlotTarget | null>(null);
+  const [target, setTarget] = useState<PickerTarget | "auto">("auto");
   const [errors, setErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const used = cardsUsed(picker);
-  const boardSlots = street === "preflop" ? 0 : street === "flop" ? 3 : street === "turn" ? 4 : 5;
+  const used = useMemo(() => cardsUsed(picker), [picker]);
+  const heroFilled = picker.hero.filter(Boolean).length;
+  const boardFilled = picker.board.filter(Boolean).length;
+  const inferred = inferredStreet(picker);
+  const ready = pickerReady(picker);
 
-  const placeCard = (rank: string, suit: string) => {
-    if (!activeSlot) return;
-    const card = cardKey(rank, suit);
-    if (used.has(card)) return;
+  const activeTarget: PickerTarget =
+    target === "auto" ? nextTargetZone(picker) : target;
 
-    setPicker((prev) => {
-      const next = { ...prev, hero: [...prev.hero] as CardPickerState["hero"], board: [...prev.board] };
-      if (activeSlot.zone === "hero") next.hero[activeSlot.index] = card;
-      else next.board[activeSlot.index] = card;
-      return next;
-    });
-    setActiveSlot(null);
+  const handleCardClick = (card: string) => {
+    if (used.has(card)) {
+      setPicker((prev) => removeCard(prev, card));
+      setErrors([]);
+      return;
+    }
+    setPicker((prev) => placeCardInZone(prev, card, activeTarget));
     setErrors([]);
   };
 
-  const clearPicker = () => {
+  const clearAll = () => {
     setPicker(emptyPickerState());
-    setActiveSlot(null);
+    setTarget("auto");
     setErrors([]);
+  };
+
+  const removeFromHero = (i: 0 | 1) => {
+    setPicker((p) => {
+      const hero = [...p.hero] as [string | null, string | null];
+      hero[i] = null;
+      return { ...p, hero };
+    });
+  };
+
+  const removeFromBoard = (i: number) => {
+    setPicker((p) => {
+      const board = [...p.board];
+      board[i] = null;
+      return { ...p, board };
+    });
   };
 
   const submit = async () => {
-    const { hero, board, expectedBoard } = pickerToInput(picker, street);
-    const validation = validateHandInput(hero as [string, string], board, street);
-    if (!validation.valid) {
-      setErrors(validation.errors);
+    if (!ready || !inferred) {
+      const msgs: string[] = [];
+      if (heroFilled !== 2) msgs.push("Pick exactly two hero cards.");
+      if (![0, 3, 4, 5].includes(boardFilled))
+        msgs.push("Board must have 0, 3, 4, or 5 cards.");
+      setErrors(msgs);
       return;
     }
-    if (board.length !== expectedBoard) {
-      setErrors([`Board must have ${expectedBoard} cards for ${street}.`]);
+    const hero = picker.hero.filter(Boolean) as [string, string];
+    const board = picker.board.filter(Boolean) as string[];
+    const validation = validateHandInput(hero, board);
+    if (!validation.valid) {
+      setErrors(validation.errors);
       return;
     }
 
     setIsSubmitting(true);
     setErrors([]);
     try {
-      const heroCards = validation.normalizedState!.heroHoleCards;
-      const boardCards = validation.normalizedState!.communityCards;
-
       const res = await fetch("/api/project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hero: heroCards, board: boardCards, street }),
+        body: JSON.stringify({
+          hero: validation.normalizedState!.heroHoleCards,
+          board: validation.normalizedState!.communityCards,
+          street: inferred,
+        }),
       });
       const data = (await res.json()) as ProjectResponse | ApiErrorResponse;
       if (!res.ok) {
         const error = (data as ApiErrorResponse).error;
-        throw new Error(error?.message ?? "Projection failed");
+        throw new Error(error?.message ?? `Projection failed (${res.status})`);
       }
 
       const projection = data as ProjectResponse;
-      const neighborIds = projection.nearestNeighbors.map((neighbor) => neighbor.id);
-      const neighborDistances = projection.nearestNeighbors.map((neighbor) => neighbor.distance);
+      const neighborIds = projection.nearestNeighbors.map((n) => n.id);
+      const neighborDistances = projection.nearestNeighbors.map((n) => n.distance);
+
+      if (street !== inferred) setStreet(inferred);
 
       setManualMarker({
         id: `manual-${Date.now()}`,
@@ -116,83 +159,114 @@ export function CardPickerPanel() {
   };
 
   return (
-    <section className="border-t border-white/10 pt-4">
-      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
-        Manual hand input
-      </h2>
-      <p className="mb-2 text-[10px] text-zinc-500">
-        Select a slot, then pick cards. Street: <span className="capitalize text-zinc-300">{street}</span>
-      </p>
-
-      <div className="mb-2 space-y-2">
-        <SlotRow
-          label="Hero"
-          slots={[
-            { card: picker.hero[0], target: { zone: "hero", index: 0 } },
-            { card: picker.hero[1], target: { zone: "hero", index: 1 } },
-          ]}
-          activeSlot={activeSlot}
-          onSelect={setActiveSlot}
-          onClear={(t) => {
-            setPicker((p) => {
-              const hero = [...p.hero] as CardPickerState["hero"];
-              if (t.zone === "hero") hero[t.index] = null;
-              return { ...p, hero };
-            });
-          }}
-        />
-        {boardSlots > 0 && (
-          <SlotRow
-            label="Board"
-            slots={Array.from({ length: boardSlots }, (_, i) => ({
-              card: picker.board[i] ?? null,
-              target: { zone: "board" as const, index: i },
-            }))}
-            activeSlot={activeSlot}
-            onSelect={setActiveSlot}
-            onClear={(t) => {
-              setPicker((p) => {
-                const board = [...p.board];
-                if (t.zone === "board") board[t.index] = null;
-                return { ...p, board };
-              });
-            }}
-          />
+    <section
+      aria-labelledby="picker-heading"
+      className="border-t border-[var(--border-subtle)] pt-4"
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2
+          id="picker-heading"
+          className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500"
+        >
+          Manual hand input
+        </h2>
+        {inferred && (
+          <span className="gop-mono rounded border border-[var(--border-subtle)] bg-white/[0.02] px-1.5 py-0.5 text-[10px] text-zinc-400">
+            {STREET_LABEL[inferred]}
+          </span>
         )}
       </div>
 
-      {activeSlot && (
-        <div className="mb-2 rounded border border-white/10 bg-black/40 p-2">
-          <p className="mb-1 text-[10px] text-zinc-500">Pick a card</p>
-          <div className="grid grid-cols-4 gap-0.5">
-            {RANKS.map((rank) =>
-              SUITS.map((suit) => {
-                const card = cardKey(rank, suit);
-                const disabled = used.has(card);
-                return (
-                  <button
-                    key={card}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => placeCard(rank, suit)}
-                    className={`rounded px-1 py-0.5 font-mono text-[10px] ${
-                      disabled
-                        ? "cursor-not-allowed opacity-20"
-                        : `${SUIT_COLORS[suit]} hover:bg-white/10`
-                    }`}
-                  >
-                    {rank}
-                    {suit}
-                  </button>
-                );
-              }),
-            )}
-          </div>
+      <p className="mb-3 text-[10px] text-zinc-500">
+        Click cards to place them. Selected cards toggle off on click. Street is
+        inferred from the number of board cards.
+      </p>
+
+      <div className="mb-3 space-y-2" role="group" aria-label="Selected cards">
+        <SlotsRow
+          label="Hero"
+          maxFilled={2}
+          filled={heroFilled}
+          slots={picker.hero.map((card, i) => ({ card, key: `hero-${i}` }))}
+          onClickSlot={(i) => removeFromHero(i as 0 | 1)}
+          isActive={activeTarget === "hero"}
+          onSetActive={() => setTarget("hero")}
+          accent="cyan"
+        />
+        <SlotsRow
+          label="Board"
+          maxFilled={5}
+          filled={boardFilled}
+          slots={picker.board.map((card, i) => ({ card, key: `board-${i}` }))}
+          onClickSlot={(i) => removeFromBoard(i)}
+          isActive={activeTarget === "board"}
+          onSetActive={() => setTarget("board")}
+          accent="amber"
+        />
+      </div>
+
+      <div
+        className="mb-3 rounded border border-[var(--border-subtle)] bg-black/30 p-2"
+        aria-label="Card grid"
+      >
+        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wider text-zinc-500">
+          <span>Deck</span>
+          <span className="gop-mono text-zinc-400">{used.size}/52</span>
         </div>
-      )}
+        <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-[3px]" role="grid">
+          {SUITS.map((suit) =>
+            RANKS.map((rank) => {
+              const card = cardKey(rank, suit);
+              const taken = used.has(card);
+              const usedHere = picker.hero.includes(card)
+                ? "hero"
+                : picker.board.includes(card)
+                  ? "board"
+                  : null;
+              return (
+                <button
+                  key={card}
+                  type="button"
+                  role="gridcell"
+                  aria-label={`${rank} of ${SUIT_SYMBOLS[suit]} ${
+                    usedHere ? `(in ${usedHere})` : "available"
+                  }`}
+                  onClick={() => handleCardClick(card)}
+                  className={`relative flex h-7 flex-col items-center justify-center gop-mono rounded text-[9px] leading-none transition ${
+                    usedHere === "hero"
+                      ? "border border-cyan-300/50 bg-cyan-500/15 ring-1 ring-cyan-300/30"
+                      : usedHere === "board"
+                        ? "border border-amber-300/50 bg-amber-500/15 ring-1 ring-amber-300/30"
+                        : "border border-[var(--border-subtle)] bg-white/[0.02] hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
+                  } ${taken && !usedHere ? "cursor-not-allowed opacity-25" : ""} ${SUIT_TONE[suit]}`}
+                  disabled={taken && !usedHere}
+                  title={`${rank}${SUIT_SYMBOLS[suit]}`}
+                >
+                  <span className="text-[10px] font-semibold">{rank}</span>
+                  <span className="text-[10px]">{SUIT_SYMBOLS[suit]}</span>
+                </button>
+              );
+            }),
+          )}
+        </div>
+        <div className="mt-2 flex items-center gap-3 text-[9px] text-zinc-500">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm border border-cyan-300/60 bg-cyan-500/20" />
+            hero
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm border border-amber-300/60 bg-amber-500/20" />
+            board
+          </span>
+          <span className="ml-auto">click again to remove</span>
+        </div>
+      </div>
 
       {errors.length > 0 && (
-        <ul className="mb-2 space-y-0.5 text-[11px] text-rose-400">
+        <ul
+          role="alert"
+          className="mb-2 space-y-0.5 rounded border border-rose-500/30 bg-rose-950/20 p-2 text-[11px] text-rose-200"
+        >
           {errors.map((e) => (
             <li key={e}>{e}</li>
           ))}
@@ -203,64 +277,96 @@ export function CardPickerPanel() {
         <button
           type="button"
           onClick={submit}
-          disabled={isSubmitting}
-          className="flex-1 rounded bg-emerald-700/80 px-2 py-1.5 text-xs font-medium hover:bg-emerald-600/80 disabled:opacity-50"
+          disabled={isSubmitting || !ready}
+          className="flex-1 rounded border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/60 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-busy={isSubmitting}
         >
           {isSubmitting ? "Projecting…" : "Project into geometry"}
         </button>
         <button
           type="button"
-          onClick={clearPicker}
-          className="rounded border border-white/10 px-2 py-1.5 text-xs text-zinc-400 hover:bg-white/5"
+          onClick={clearAll}
+          disabled={used.size === 0 || isSubmitting}
+          className="rounded border border-[var(--border-default)] px-2.5 py-1.5 text-xs text-zinc-300 transition hover:bg-white/5 disabled:opacity-30"
         >
           Clear
         </button>
       </div>
+
     </section>
   );
 }
 
-function SlotRow({
+function SlotsRow({
   label,
+  filled,
+  maxFilled,
   slots,
-  activeSlot,
-  onSelect,
-  onClear,
+  onClickSlot,
+  isActive,
+  onSetActive,
+  accent,
 }: {
   label: string;
-  slots: { card: string | null; target: SlotTarget }[];
-  activeSlot: SlotTarget | null;
-  onSelect: (t: SlotTarget) => void;
-  onClear: (t: SlotTarget) => void;
+  filled: number;
+  maxFilled: number;
+  slots: { card: string | null; key: string }[];
+  onClickSlot: (i: number) => void;
+  isActive: boolean;
+  onSetActive: () => void;
+  accent: "cyan" | "amber";
 }) {
-  const isActive = (t: SlotTarget) =>
-    activeSlot &&
-    activeSlot.zone === t.zone &&
-    activeSlot.index === t.index;
-
+  const accentBorder = accent === "cyan" ? "border-cyan-300/40" : "border-amber-300/40";
+  const accentRing = accent === "cyan" ? "ring-cyan-300/40" : "ring-amber-300/40";
   return (
     <div>
-      <p className="mb-1 text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <div className="flex flex-wrap gap-1">
-        {slots.map(({ card, target }) => (
-          <button
-            key={`${target.zone}-${target.index}`}
-            type="button"
-            onClick={() => onSelect(target)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onClear(target);
-            }}
-            className={`min-w-[2.5rem] rounded border px-2 py-1 font-mono text-xs ${
-              isActive(target)
-                ? "border-emerald-400/60 bg-emerald-950/40"
-                : "border-white/10 bg-white/5 hover:border-white/20"
-            }`}
-            title="Right-click to clear"
-          >
-            {card ?? "—"}
-          </button>
-        ))}
+      <div className="mb-1 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onSetActive}
+          className={`text-[10px] uppercase tracking-[0.18em] transition ${
+            isActive ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+          }`}
+          aria-pressed={isActive}
+        >
+          {label}{" "}
+          <span className="gop-mono ml-1 tabular-nums text-zinc-500">
+            {filled}/{maxFilled}
+          </span>
+        </button>
+      </div>
+      <div className={`flex flex-wrap gap-1 rounded border p-1 transition ${
+        isActive ? `${accentBorder} bg-white/[0.03] ring-1 ${accentRing}` : "border-[var(--border-subtle)] bg-transparent"
+      }`}>
+        {slots.map(({ card, key }, i) => {
+          const suit = card ? card.slice(-1) : null;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onClickSlot(i)}
+              disabled={!card}
+              className={`gop-mono min-w-[2.4rem] rounded border px-2 py-1 text-xs transition ${
+                card
+                  ? `border-[var(--border-default)] bg-white/[0.05] hover:bg-white/[0.1] ${
+                      suit ? SUIT_TONE[suit] : ""
+                    }`
+                  : "border-dashed border-[var(--border-subtle)] text-zinc-600"
+              }`}
+              aria-label={card ? `Remove ${card} from ${label}` : `${label} slot ${i + 1} empty`}
+              title={card ? "Click to remove" : "Empty slot"}
+            >
+              {card ? (
+                <>
+                  {card.slice(0, -1)}
+                  {SUIT_SYMBOLS[suit ?? ""] ?? ""}
+                </>
+              ) : (
+                "—"
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

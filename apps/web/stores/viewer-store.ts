@@ -13,6 +13,7 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_FILTERS as DEFAULT_FILTER_VALUES } from "@/lib/types";
 import { GridSpatialIndex } from "@/lib/spatial/grid-index";
+import { HOVER_COLOR, POINT_SIZES, SELECTION_COLOR } from "@/lib/visualization-theme";
 
 interface ViewerState {
   street: Street;
@@ -59,23 +60,32 @@ function rebuildVisualization(state: ViewerState): Partial<ViewerState> {
   applyFilters(dataset, state.filters, dataset.visible, dataset.colors);
 
   for (let i = 0; i < dataset.count; i++) {
-    dataset.sizes[i] = state.lodSampleRate < 1 && i % Math.floor(1 / state.lodSampleRate) !== 0 ? 0 : 1.5;
+    dataset.sizes[i] = state.lodSampleRate < 1 && i % Math.floor(1 / state.lodSampleRate) !== 0 ? 0 : POINT_SIZES.base;
     if (!dataset.visible[i]) dataset.sizes[i] = 0;
+  }
+
+  // Highlight projected manual neighbors so they stay visible against any palette.
+  if (state.manualMarker && dataset.idToIndex.size > 0) {
+    for (const id of state.manualMarker.neighborIds) {
+      const idx = dataset.idToIndex.get(id);
+      if (idx === undefined) continue;
+      dataset.sizes[idx] = Math.max(dataset.sizes[idx]!, POINT_SIZES.manualNeighbor);
+    }
   }
 
   if (state.selection?.locked) {
     const idx = state.selection.index;
-    dataset.colors[idx * 3] = 1;
-    dataset.colors[idx * 3 + 1] = 1;
-    dataset.colors[idx * 3 + 2] = 1;
-    dataset.sizes[idx] = 3.5;
+    dataset.colors[idx * 3] = SELECTION_COLOR[0];
+    dataset.colors[idx * 3 + 1] = SELECTION_COLOR[1];
+    dataset.colors[idx * 3 + 2] = SELECTION_COLOR[2];
+    dataset.sizes[idx] = POINT_SIZES.selected;
   }
   if (state.hoverIndex !== null && state.hoverIndex !== state.selection?.index) {
     const idx = state.hoverIndex;
-    dataset.colors[idx * 3] = 0.95;
-    dataset.colors[idx * 3 + 1] = 0.95;
-    dataset.colors[idx * 3 + 2] = 0.98;
-    dataset.sizes[idx] = 2.8;
+    dataset.colors[idx * 3] = HOVER_COLOR[0];
+    dataset.colors[idx * 3 + 1] = HOVER_COLOR[1];
+    dataset.colors[idx * 3 + 2] = HOVER_COLOR[2];
+    dataset.sizes[idx] = POINT_SIZES.hover;
   }
 
   return { dataset: { ...dataset } };

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { useViewerStore } from "@/stores/viewer-store";
+import { NEIGHBOR_LINK_COLOR } from "@/lib/visualization-theme";
 
 export function NeighborLinks() {
   const show = useViewerStore((s) => s.showNnLinks);
@@ -67,7 +68,7 @@ export function NeighborLinks() {
 
   return (
     <lineSegments geometry={geometry}>
-      <lineBasicMaterial color="#5eead4" transparent opacity={0.35} />
+      <lineBasicMaterial color={NEIGHBOR_LINK_COLOR} transparent opacity={0.4} />
     </lineSegments>
   );
 }

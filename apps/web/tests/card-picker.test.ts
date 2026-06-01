@@ -4,6 +4,12 @@ import {
   validateCardPicker,
   cardKey,
   boardLengthForStreet,
+  placeCardInZone,
+  removeCard,
+  pickerReady,
+  inferredStreet,
+  nextTargetZone,
+  cardsUsed,
 } from "@/lib/cards/card-picker";
 
 describe("card picker validation", () => {
@@ -50,5 +56,79 @@ describe("card picker validation", () => {
 
   it("builds stable card keys", () => {
     expect(cardKey("A", "s")).toBe("As");
+  });
+});
+
+describe("card picker zone-based placement", () => {
+  it("places into next available hero slot", () => {
+    let state = emptyPickerState();
+    state = placeCardInZone(state, "As", "hero");
+    expect(state.hero).toEqual(["As", null]);
+    state = placeCardInZone(state, "Kh", "hero");
+    expect(state.hero).toEqual(["As", "Kh"]);
+  });
+
+  it("ignores placement into a full hero zone", () => {
+    let state = emptyPickerState();
+    state.hero = ["As", "Kh"];
+    state = placeCardInZone(state, "Qd", "hero");
+    expect(state.hero).toEqual(["As", "Kh"]);
+  });
+
+  it("does not place duplicate cards", () => {
+    let state = emptyPickerState();
+    state.hero = ["As", null];
+    state = placeCardInZone(state, "As", "board");
+    expect(state.board.filter(Boolean)).toEqual([]);
+  });
+
+  it("removes a card by value from any zone", () => {
+    let state = emptyPickerState();
+    state.hero = ["As", "Kh"];
+    state.board = ["2c", "3d", "4s", null, null];
+    state = removeCard(state, "Kh");
+    expect(state.hero).toEqual(["As", null]);
+    state = removeCard(state, "3d");
+    expect(state.board.filter(Boolean)).toEqual(["2c", "4s"]);
+  });
+
+  it("infers street from board count", () => {
+    const state = emptyPickerState();
+    expect(inferredStreet(state)).toBe("preflop");
+    state.board = ["2c", "3d", "4s", null, null];
+    expect(inferredStreet(state)).toBe("flop");
+    state.board = ["2c", "3d", "4s", "5h", null];
+    expect(inferredStreet(state)).toBe("turn");
+    state.board = ["2c", "3d", "4s", "5h", "6d"];
+    expect(inferredStreet(state)).toBe("river");
+    state.board = ["2c", null, null, null, null];
+    expect(inferredStreet(state)).toBeNull();
+  });
+
+  it("readiness requires 2 hero + valid board count", () => {
+    const state = emptyPickerState();
+    expect(pickerReady(state)).toBe(false);
+    state.hero = ["As", "Kh"];
+    expect(pickerReady(state)).toBe(true);
+    state.board = ["2c", null, null, null, null];
+    expect(pickerReady(state)).toBe(false);
+    state.board = ["2c", "3d", "4s", null, null];
+    expect(pickerReady(state)).toBe(true);
+  });
+
+  it("auto target switches from hero to board when hero filled", () => {
+    let state = emptyPickerState();
+    expect(nextTargetZone(state)).toBe("hero");
+    state = placeCardInZone(state, "As", "hero");
+    expect(nextTargetZone(state)).toBe("hero");
+    state = placeCardInZone(state, "Kh", "hero");
+    expect(nextTargetZone(state)).toBe("board");
+  });
+
+  it("cardsUsed reflects every populated slot", () => {
+    const state = emptyPickerState();
+    state.hero = ["As", "Kh"];
+    state.board = ["2c", "3d", "4s", null, null];
+    expect(cardsUsed(state)).toEqual(new Set(["As", "Kh", "2c", "3d", "4s"]));
   });
 });

@@ -8,7 +8,7 @@ import { MobileFallback } from "@/components/MobileFallback";
 
 export default function HomePage() {
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#0a0a0f]">
+    <main className="relative h-screen w-screen overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)]">
       <MobileFallback />
 
       <div className="hidden h-full md:flex">

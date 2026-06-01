@@ -2,23 +2,34 @@
 
 ## Project Settings
 
-Use the `visualizer` directory as the Vercel Root Directory. If this repository is imported from the parent `Poker-Calculator` folder, set Root Directory to `visualizer`.
+### Root Directory (required)
 
-Install command:
+Set **Root Directory** to the Next.js app folder, **not** the monorepo root:
+
+| Git repository root | Vercel Root Directory |
+| --- | --- |
+| `visualizer/` only | `apps/web` |
+| `Poker-Calculator/` (full monorepo) | `visualizer/apps/web` |
+
+If Root Directory is `visualizer` (parent), Vercel treats the project as a static site and fails with **“No Output Directory named public found”**. The Next.js app and `vercel.json` live in `apps/web`.
+
+Enable **Include source files outside of the Root Directory in the Build Step** if prompted (pnpm workspace needs `pnpm-workspace.yaml` and `packages/` at the parent).
+
+### Framework and output
+
+- **Framework preset:** Next.js (`framework: "nextjs"` in `apps/web/vercel.json`)
+- **Output Directory:** leave empty / default — do **not** set `public` (that override is for static sites only)
+
+### Install and build
+
+Configured in `apps/web/vercel.json` (commands run from the workspace root via `pnpm -C ../..`):
 
 ```bash
 pnpm install --frozen-lockfile
-```
-
-Build command:
-
-```bash
 pnpm --filter @geometry-of-poker/web... build
 ```
 
-The trailing `...` tells pnpm to build `@geometry-of-poker/web` **and its workspace dependencies** (`shared`, `feature-engine`) first. Those packages publish `dist/` via `tsc` (gitignored); `next build` alone cannot resolve them without that step.
-
-The Next.js app lives in `apps/web`; shared TypeScript packages are resolved through the pnpm workspace.
+The trailing `...` builds `@geometry-of-poker/web` **and workspace dependencies** (`shared`, `feature-engine`) before `next build`. Their `dist/` output is gitignored and must be compiled on the build machine.
 
 ## Runtime
 

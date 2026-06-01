@@ -1,0 +1,17 @@
+.git
+.next
+**/.next
+node_modules
+**/node_modules
+dist
+**/dist
+artifacts
+apps/web/public/artifacts
+.venv
+**/__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+.next-smoke.log
+.next-smoke.err

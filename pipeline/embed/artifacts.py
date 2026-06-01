@@ -11,7 +11,20 @@ from .load import metadata_frame, parse_board, summary_metrics_row
 
 
 BINARY_MAGIC = b"GOPK"
+CHANNEL_MAGIC = b"GOPC"
 BINARY_VERSION = 1
+CATEGORY_INDEX = {
+    "highCard": 0,
+    "pair": 1,
+    "twoPair": 2,
+    "threeOfAKind": 3,
+    "straight": 4,
+    "flush": 5,
+    "fullHouse": 6,
+    "fourOfAKind": 7,
+    "straightFlush": 8,
+    "royalFlush": 9,
+}
 
 
 def write_browser_points(path: Path, coords: np.ndarray) -> None:
@@ -21,6 +34,28 @@ def write_browser_points(path: Path, coords: np.ndarray) -> None:
     header = struct.pack("<4sIII", BINARY_MAGIC, BINARY_VERSION, count, dim)
     body = coords.astype(np.float32).tobytes(order="C")
     path.write_bytes(header + body)
+
+
+def write_browser_channels(path: Path, embedding_df: pd.DataFrame) -> None:
+    """Compact scalar sidecar for first paint, colors, and filters."""
+    count = len(embedding_df)
+    header = struct.pack("<4sIII", CHANNEL_MAGIC, BINARY_VERSION, count, 10)
+    fields = [
+        embedding_df["equity_vs_random"].to_numpy(dtype=np.float32).tobytes(order="C"),
+        embedding_df["cluster_id"].to_numpy(dtype=np.int16).tobytes(order="C"),
+        np.array(
+            [CATEGORY_INDEX.get(str(v), 0) for v in embedding_df["category"]],
+            dtype=np.uint8,
+        ).tobytes(order="C"),
+        embedding_df.get("summary_pNuts", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32).tobytes(order="C"),
+        embedding_df.get("summary_equityVariance", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32).tobytes(order="C"),
+        embedding_df.get("summary_boardConnectivityScore", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32).tobytes(order="C"),
+        (embedding_df.get("summary_boardRainbowFlag", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32) > 0.5).astype(np.uint8).tobytes(order="C"),
+        (embedding_df.get("summary_boardTwoToneFlag", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32) > 0.5).astype(np.uint8).tobytes(order="C"),
+        (embedding_df.get("summary_boardMonotoneFlag", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32) > 0.5).astype(np.uint8).tobytes(order="C"),
+        embedding_df.get("summary_boardPairednessScore", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32).tobytes(order="C"),
+    ]
+    path.write_bytes(header + b"".join(fields))
 
 
 def build_embedding_dataframe(
@@ -101,6 +136,7 @@ def save_artifacts(
 
     embedding_df.to_parquet(output_dir / "embedding.parquet", index=False)
     write_browser_points(output_dir / "browser-points.bin", coords)
+    write_browser_channels(output_dir / "browser-channels.bin", embedding_df)
     write_browser_metadata(output_dir / "browser-metadata.json", embedding_df, street)
 
     return embedding_df

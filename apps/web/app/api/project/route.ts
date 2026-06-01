@@ -3,7 +3,7 @@ import { extractGeometryFeatures } from "@geometry-of-poker/feature-engine";
 import type { ProjectNeighbor, ProjectResponse } from "@geometry-of-poker/shared";
 import { projectIntoGeometry } from "@/lib/projection/project-point";
 import { apiError } from "@/lib/server/api-errors";
-import { loadStreetDatasetSync, streetArtifactsExist } from "@/lib/server/artifacts";
+import { loadStreetDatasetForApi, streetArtifactsExist } from "@/lib/server/artifacts";
 import {
   isValidationFailure,
   readProjectBody,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     const warnings: string[] = [];
-    const dataset = loadStreetDatasetSync(validated.street);
+    const dataset = await loadStreetDatasetForApi(validated.street);
     let featureVector: number[] | undefined;
     let featureNames: string[] | undefined;
 

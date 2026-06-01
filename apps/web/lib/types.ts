@@ -81,6 +81,7 @@ export interface StreetManifest {
   clusters: ClusterCentroid[];
   artifacts: {
     pointsBin: string;
+    channelsBin?: string;
     metadataJson: string;
   };
 }

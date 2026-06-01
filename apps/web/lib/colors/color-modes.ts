@@ -1,5 +1,10 @@
 import type { ColorMode, StreetDataset, ViewerFilters } from "@/lib/types";
 import { CATEGORY_PALETTE, CLUSTER_PALETTE } from "@/lib/types";
+import { CATEGORY_INDEX } from "@/lib/artifacts/load-street";
+
+const INDEX_CATEGORY = Object.fromEntries(
+  Object.entries(CATEGORY_INDEX).map(([name, index]) => [index, name]),
+) as Record<number, string>;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -45,7 +50,7 @@ export function applyColorMode(
   colors: Float32Array,
   lodIndices?: number[],
 ) {
-  const { count, metadata, channels } = dataset;
+  const { count, channels } = dataset;
   const indices = lodIndices ?? Array.from({ length: count }, (_, i) => i);
 
   if (mode === "equity") {
@@ -60,7 +65,7 @@ export function applyColorMode(
 
   if (mode === "category") {
     for (const i of indices) {
-      const cat = metadata[i]!.category;
+      const cat = INDEX_CATEGORY[channels.categoryIndex[i]!] ?? "highCard";
       const [r, g, b] = CATEGORY_PALETTE[cat] ?? [0.6, 0.6, 0.6];
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
@@ -130,7 +135,7 @@ export function applyFilters(
   visible: Uint8Array,
   colors: Float32Array,
 ) {
-  const { count, metadata, channels } = dataset;
+  const { count, channels } = dataset;
   const categorySet =
     filters.categories.length > 0 ? new Set(filters.categories) : null;
   const clusterSet = filters.clusters.length > 0 ? new Set(filters.clusters) : null;
@@ -160,7 +165,8 @@ export function applyFilters(
     let show = true;
     const eq = channels.equity[i]!;
     if (eq < filters.equityMin || eq > filters.equityMax) show = false;
-    if (categorySet && !categorySet.has(metadata[i]!.category)) show = false;
+    if (categorySet && !categorySet.has(INDEX_CATEGORY[channels.categoryIndex[i]!] ?? "highCard"))
+      show = false;
     if (clusterSet && !clusterSet.has(channels.clusterId[i]!)) show = false;
     if (filters.boardRainbow !== null && channels.boardRainbow[i] !== (filters.boardRainbow ? 1 : 0))
       show = false;

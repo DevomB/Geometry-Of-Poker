@@ -58,7 +58,7 @@ function ContinuousBar({
 }
 
 function CategoricalSwatches({ dataset }: { dataset: StreetDataset | null }) {
-  const present = new Set(dataset?.metadata.map((p) => p.category) ?? []);
+  const present = new Set(dataset?.manifest.categories ?? []);
   const entries = Object.entries(CATEGORY_PALETTE).filter(([name]) =>
     present.size === 0 ? true : present.has(name),
   );

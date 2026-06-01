@@ -143,6 +143,7 @@
   ],
   "artifacts": {
     "pointsBin": "browser-points.bin",
+    "channelsBin": "browser-channels.bin",
     "metadataJson": "browser-metadata.json"
   }
 }

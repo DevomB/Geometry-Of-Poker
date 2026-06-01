@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { loadStreetDataset } from "@/lib/artifacts/load-street";
+import { loadStreetDatasetProgressive } from "@/lib/artifacts/load-street";
 import { applyColorMode, applyFilters, buildLodIndices } from "@/lib/colors/color-modes";
 import { computeBounds } from "@/lib/artifacts/parse-points-bin";
 import type { Street } from "@geometry-of-poker/shared";
@@ -145,7 +145,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectPoint: (index, locked = true) => {
     const { dataset, bounds } = get();
     if (!dataset) return;
-    const p = dataset.metadata[index]!;
+    const p = dataset.metadata[index];
+    if (!p) return;
     const offset = bounds?.radius ? bounds.radius * 0.35 : 2;
     set({
       selection: { index, locked },
@@ -199,7 +200,25 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     if (isLoading) return;
     set({ isLoading: true, loadError: null });
     try {
-      const dataset = await loadStreetDataset(street);
+      const dataset = await loadStreetDatasetProgressive(street, (partial) => {
+        const bounds = computeBounds(partial.positions, partial.count);
+        const spatialIndex = new GridSpatialIndex(bounds.radius / 20);
+        spatialIndex.build(partial.positions, partial.count);
+        set({
+          dataset: partial,
+          spatialIndex,
+          bounds,
+          cameraFlyTarget: {
+            position: [
+              bounds.center[0],
+              bounds.center[1],
+              bounds.center[2] + bounds.radius * 2.2,
+            ],
+            target: bounds.center,
+          },
+        });
+        set(rebuildVisualization(get()));
+      });
       const bounds = computeBounds(dataset.positions, dataset.count);
 
       const spatialIndex = new GridSpatialIndex(bounds.radius / 20);

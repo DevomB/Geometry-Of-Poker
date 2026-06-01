@@ -6,6 +6,7 @@ import type {
   StreetManifest,
 } from "@/lib/types";
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";
+import { parseChannelsBin, type BrowserChannels } from "@/lib/artifacts/parse-channels-bin";
 
 const CATEGORY_INDEX: Record<string, number> = {
   highCard: 0,
@@ -56,7 +57,15 @@ export async function fetchBrowserMetadata(street: Street): Promise<BrowserMetad
   return res.json() as Promise<BrowserMetadata>;
 }
 
-function buildChannels(metadata: BrowserPointMeta[], count: number) {
+export async function fetchChannelsBin(street: Street): Promise<ArrayBuffer | null> {
+  const manifest = await fetchStreetManifest(street);
+  if (!manifest.artifacts.channelsBin) return null;
+  const res = await fetch(manifest.artifacts.channelsBin);
+  if (!res.ok) throw new Error(`Failed to load channels for ${street}: ${res.status}`);
+  return res.arrayBuffer();
+}
+
+export function buildChannels(metadata: BrowserPointMeta[], count: number): BrowserChannels {
   const equity = new Float32Array(count);
   const clusterId = new Int16Array(count);
   const categoryIndex = new Uint8Array(count);
@@ -96,11 +105,33 @@ function buildChannels(metadata: BrowserPointMeta[], count: number) {
   };
 }
 
+function buildEmptyChannels(count: number): BrowserChannels {
+  return {
+    equity: new Float32Array(count),
+    clusterId: new Int16Array(count),
+    categoryIndex: new Uint8Array(count),
+    pNuts: new Float32Array(count),
+    equityVariance: new Float32Array(count),
+    boardConnectivity: new Float32Array(count),
+    boardRainbow: new Uint8Array(count),
+    boardTwoTone: new Uint8Array(count),
+    boardMonotone: new Uint8Array(count),
+    boardPairedness: new Float32Array(count),
+  };
+}
+
+function idToIndex(metadata: BrowserPointMeta[]) {
+  const map = new Map<string, number>();
+  metadata.forEach((p, i) => map.set(p.id, i));
+  return map;
+}
+
 export async function loadStreetDataset(street: Street): Promise<StreetDataset> {
-  const [manifest, binBuffer, metadataPayload] = await Promise.all([
+  const [manifest, binBuffer, metadataPayload, channelsBuffer] = await Promise.all([
     fetchStreetManifest(street),
     fetchPointsBin(street),
     fetchBrowserMetadata(street),
+    fetchChannelsBin(street),
   ]);
 
   const parsed = parsePointsBin(binBuffer);
@@ -113,15 +144,13 @@ export async function loadStreetDataset(street: Street): Promise<StreetDataset> 
     );
   }
 
+  const channels = channelsBuffer ? parseChannelsBin(channelsBuffer).channels : buildChannels(metadata, count);
   const colors = new Float32Array(count * 3);
   colors.fill(0.75);
   const sizes = new Float32Array(count);
   sizes.fill(1.5);
   const visible = new Uint8Array(count);
   visible.fill(1);
-
-  const idToIndex = new Map<string, number>();
-  metadata.forEach((p, i) => idToIndex.set(p.id, i));
 
   return {
     street,
@@ -132,30 +161,44 @@ export async function loadStreetDataset(street: Street): Promise<StreetDataset> 
     visible,
     count,
     metadata,
-    channels: buildChannels(metadata, count),
-    idToIndex,
+    channels,
+    idToIndex: idToIndex(metadata),
   };
 }
 
 /** Progressive loader: positions first, metadata second */
 export async function loadStreetDatasetProgressive(
   street: Street,
-  onPartial?: (partial: Pick<StreetDataset, "street" | "manifest" | "positions" | "count">) => void,
+  onPartial?: (partial: StreetDataset) => void,
 ): Promise<StreetDataset> {
-  const [manifest, binBuffer] = await Promise.all([
+  const [manifest, binBuffer, channelsBuffer] = await Promise.all([
     fetchStreetManifest(street),
     fetchPointsBin(street),
+    fetchChannelsBin(street),
   ]);
   const parsed = parsePointsBin(binBuffer);
-  onPartial?.({
+  const count = parsed.count;
+  const channels = channelsBuffer ? parseChannelsBin(channelsBuffer).channels : buildEmptyChannels(count);
+  const partial: StreetDataset = {
     street,
     manifest,
     positions: parsed.positions,
-    count: parsed.count,
-  });
+    colors: new Float32Array(count * 3),
+    sizes: new Float32Array(count),
+    visible: new Uint8Array(count),
+    count,
+    metadata: [],
+    channels,
+    idToIndex: new Map(),
+  };
+  partial.colors.fill(0.75);
+  partial.sizes.fill(1.5);
+  partial.visible.fill(1);
+  onPartial?.(partial);
+
   const metadataPayload = await fetchBrowserMetadata(street);
   const metadata = metadataPayload.points;
-  const count = parsed.count;
+  const finalChannels = channelsBuffer ? channels : buildChannels(metadata, count);
 
   const colors = new Float32Array(count * 3);
   colors.fill(0.75);
@@ -163,9 +206,6 @@ export async function loadStreetDatasetProgressive(
   sizes.fill(1.5);
   const visible = new Uint8Array(count);
   visible.fill(1);
-
-  const idToIndex = new Map<string, number>();
-  metadata.forEach((p, i) => idToIndex.set(p.id, i));
 
   return {
     street,
@@ -176,8 +216,8 @@ export async function loadStreetDatasetProgressive(
     visible,
     count,
     metadata,
-    channels: buildChannels(metadata, count),
-    idToIndex,
+    channels: finalChannels,
+    idToIndex: idToIndex(metadata),
   };
 }
 

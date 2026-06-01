@@ -13,7 +13,20 @@ const PUBLIC_ROOT = join(__dirname, "../public/artifacts/embeddings");
 
 const STREETS = ["preflop", "flop", "turn", "river"];
 const BINARY_MAGIC = Buffer.from("GOPK");
+const CHANNEL_MAGIC = Buffer.from("GOPC");
 const BINARY_VERSION = 1;
+const CATEGORY_INDEX = {
+  highCard: 0,
+  pair: 1,
+  twoPair: 2,
+  threeOfAKind: 3,
+  straight: 4,
+  flush: 5,
+  fullHouse: 6,
+  fourOfAKind: 7,
+  straightFlush: 8,
+  royalFlush: 9,
+};
 
 function writeBrowserPoints(outPath, coords) {
   const count = coords.length;
@@ -29,6 +42,58 @@ function writeBrowserPoints(outPath, coords) {
     body.writeFloatLE(coords[i][2], i * 12 + 8);
   }
   writeFileSync(outPath, Buffer.concat([header, body]));
+}
+
+function writeBrowserChannels(outPath, points) {
+  const count = points.length;
+  const header = Buffer.alloc(16);
+  CHANNEL_MAGIC.copy(header, 0);
+  header.writeUInt32LE(BINARY_VERSION, 4);
+  header.writeUInt32LE(count, 8);
+  header.writeUInt32LE(10, 12);
+
+  const equity = Buffer.alloc(count * 4);
+  const clusterId = Buffer.alloc(count * 2);
+  const categoryIndex = Buffer.alloc(count);
+  const pNuts = Buffer.alloc(count * 4);
+  const equityVariance = Buffer.alloc(count * 4);
+  const boardConnectivity = Buffer.alloc(count * 4);
+  const boardRainbow = Buffer.alloc(count);
+  const boardTwoTone = Buffer.alloc(count);
+  const boardMonotone = Buffer.alloc(count);
+  const boardPairedness = Buffer.alloc(count * 4);
+
+  for (let i = 0; i < count; i++) {
+    const point = points[i];
+    const summary = point.summary ?? {};
+    equity.writeFloatLE(point.equityVsRandom ?? 0, i * 4);
+    clusterId.writeInt16LE(point.clusterId ?? -1, i * 2);
+    categoryIndex.writeUInt8(CATEGORY_INDEX[point.category] ?? 0, i);
+    pNuts.writeFloatLE(summary.pNuts ?? 0, i * 4);
+    equityVariance.writeFloatLE(summary.equityVariance ?? 0, i * 4);
+    boardConnectivity.writeFloatLE(summary.boardConnectivityScore ?? 0, i * 4);
+    boardRainbow.writeUInt8((summary.boardRainbowFlag ?? 0) > 0.5 ? 1 : 0, i);
+    boardTwoTone.writeUInt8((summary.boardTwoToneFlag ?? 0) > 0.5 ? 1 : 0, i);
+    boardMonotone.writeUInt8((summary.boardMonotoneFlag ?? 0) > 0.5 ? 1 : 0, i);
+    boardPairedness.writeFloatLE(summary.boardPairednessScore ?? 0, i * 4);
+  }
+
+  writeFileSync(
+    outPath,
+    Buffer.concat([
+      header,
+      equity,
+      clusterId,
+      categoryIndex,
+      pNuts,
+      equityVariance,
+      boardConnectivity,
+      boardRainbow,
+      boardTwoTone,
+      boardMonotone,
+      boardPairedness,
+    ]),
+  );
 }
 
 function parseAnalysisReport(text) {
@@ -103,6 +168,7 @@ function syncStreet(street) {
   const metadata = JSON.parse(readFileSync(join(srcDir, "browser-metadata.json"), "utf8"));
   const coords = metadata.points.map((p) => [p.x, p.y, p.z]);
   writeBrowserPoints(join(dstDir, "browser-points.bin"), coords);
+  writeBrowserChannels(join(dstDir, "browser-channels.bin"), metadata.points);
 
   const retained = existsSync(join(srcDir, "retained-features.json"))
     ? JSON.parse(readFileSync(join(srcDir, "retained-features.json"), "utf8"))
@@ -128,6 +194,7 @@ function syncStreet(street) {
     clusters,
     artifacts: {
       pointsBin: "browser-points.bin",
+      channelsBin: "browser-channels.bin",
       metadataJson: "browser-metadata.json",
     },
   };

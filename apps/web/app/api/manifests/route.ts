@@ -9,6 +9,11 @@ import {
 
 export const runtime = "nodejs";
 
+function isArtifactUnavailable(err: unknown) {
+  if (!(err instanceof Error)) return false;
+  return /Failed to fetch .*viewer-manifest\.json: (403|404|500|502|503|504)/.test(err.message);
+}
+
 export async function GET() {
   try {
     const entries = await Promise.all(
@@ -24,6 +29,14 @@ export async function GET() {
       streets,
     });
   } catch (err) {
+    if (isArtifactUnavailable(err)) {
+      return apiError(
+        503,
+        "ARTIFACTS_UNAVAILABLE",
+        err instanceof Error ? err.message : "Artifact release is unavailable.",
+      );
+    }
+
     return apiError(
       500,
       "MANIFEST_LOAD_FAILED",

@@ -30,7 +30,14 @@ let manifestCache: Promise<ManifestsResponse> | null = null;
 
 function loadManifests() {
   manifestCache ??= fetch("/api/manifests").then(async (res) => {
-    if (!res.ok) throw new Error(`Failed to load artifact manifests: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      const message =
+        typeof body?.error?.message === "string"
+          ? body.error.message
+          : `Failed to load artifact manifests: ${res.status}`;
+      throw new Error(message);
+    }
     return res.json() as Promise<ManifestsResponse>;
   });
   return manifestCache;

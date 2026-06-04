@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "sync-artifacts": "node scripts/sync-artifacts.mjs",
     "predev": "pnpm --filter @geometry-of-poker/shared build && pnpm --filter @geometry-of-poker/feature-engine build && node scripts/sync-artifacts.mjs",
-    "prebuild": "pnpm --filter @geometry-of-poker/shared build && pnpm --filter @geometry-of-poker/feature-engine build && node scripts/sync-artifacts.mjs",
+    "prebuild": "node scripts/prebuild.mjs",
     "test": "vitest run"
   },
   "dependencies": {

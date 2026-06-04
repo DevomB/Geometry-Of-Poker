@@ -1,172 +1,74 @@
-# Limitations — Geometry of Poker
+# Limitations - Geometry of Poker
 
 Explicit boundaries on claims, data, and methodology. Read this before citing the project in talks, interviews, or writing.
 
----
-
-## 1. Epistemic limitations (what we cannot claim)
+## Claim Boundaries
 
 | Claim | Status |
 | --- | --- |
-| "Clusters show optimal poker strategy" | **False** — clusters are unsupervised density regions in an embedding |
-| "Distance in the 3D viewer equals strategic distance" | **False** — UMAP distorts global geometry |
-| "UMAP preserves all feature relationships" | **False** — only local structure is approximate |
-| "Equity vs random equals EV in real games" | **False** — villain is uniform random, not a range or GTO opponent |
-| "The manifold shape is theoretically predicted" | **False** — shape is emergent and data-dependent |
+| "Clusters show optimal poker strategy" | False: clusters are unsupervised density regions in an embedding. |
+| "Distance in the 3D viewer equals strategic distance" | False: UMAP distorts global geometry. |
+| "UMAP preserves all feature relationships" | False: only local structure is approximate. |
+| "Equity vs random equals EV in real games" | False: villain is uniform random, not a range or GTO opponent. |
+| "The manifold shape is theoretically predicted" | False: shape is emergent and data-dependent. |
 
-Always label:
+Always distinguish exact native combinatorial output, deterministic engineered features, embedding artifacts, and human observations.
 
-- **Exact** — native combinatorial output
-- **Engineered** — deterministic feature design
-- **Embedding artifact** — UMAP/HDBSCAN output
-- **Observation** — human interpretation
+## Data And Model Limits
 
----
+- Default equity uses a uniform random villain hand.
+- No bet sizing, position, stack depth, multiway pots, opponent modeling, ICM, or policy trajectory modeling.
+- Postflop samples retain full suits, so strategically duplicate suit permutations may appear as distinct points.
+- Preflop default enumerates 1,326 ordered hole-card combinations, not only 169 canonical classes.
+- Random postflop sampling is not exhaustive; rare states are undersampled at fixed N.
+- Cross-street comparisons use different effective feature subspaces because unavailable groups are zeroed with availability flags.
 
-## 2. Villain and game model
+## Embedding Limits
 
-- Default equity: **uniform random villain hand** (consistent with `poker-calculations` defaults).
-- No bet sizing, position, stack depth, or multiway pots.
-- No opponent modeling, range parsing, or ICM.
-- Features describe **hero-centric static states**, not policies or trajectories.
+- UMAP is nonlinear and non-metric in 3D.
+- Results are sensitive to `n_neighbors`, `min_dist`, and `random_state`.
+- PCA is lossy and may discard nonlinear structure before UMAP.
+- HDBSCAN `-1` means low density in UMAP space, not a bad hand.
+- High noise fraction can reflect parameter choice, sample size, or genuine strategic overlap.
 
----
-
-## 3. Suit isomorphism and sampling bias
-
-- Postflop samples retain **full suits** — strategically duplicate suit permutations may appear as distinct points.
-- Preflop default enumerates **1,326** ordered hole pairs, not 169 canonical classes.
-- Random postflop sampling is **not stratified** by category or equity decile unless explicitly configured.
-- Rare states (quads boards, specific blocker combos) are undersampled at fixed N.
-
----
-
-## 4. Feature availability by street
-
-Several feature groups are **intentionally zero** on some streets:
-
-| Group | Missing on |
-| --- | --- |
-| Runout quantiles | turn, river |
-| Vulnerability | preflop, river |
-| Draw enumeration | preflop, turn, river |
-| Category transitions | preflop, turn, river |
-
-Cross-street comparisons compare **different effective feature subspaces**, even at fixed 66-dim width.
-
----
-
-## 5. Dimensionality reduction limitations
-
-### UMAP
-
-- Nonlinear; **non-metric** in 3D
-- Sensitive to `n_neighbors`, `min_dist`, `random_state` (demo: **seed-sensitive**, mean 3D kNN overlap ~0.12)
-- Out-of-sample transform unreliable → kNN interpolation fallback
-
-### PCA
-
-- Linear; may discard nonlinear structure before UMAP
-- 95% variance target may retain 50 dims at D=66 — still lossy
-
-### HDBSCAN
-
-- `-1` noise label is not "bad hand" — it means low density in **UMAP space**
-- High noise fraction (demo flop: ~78%) may reflect parameter choice or genuine overlap
-
----
-
-## 6. Out-of-sample projection limitations
+## Manual Projection Limits
 
 | Method | Limitation |
 | --- | --- |
-| UMAP `.transform()` | Often unstable far from training support |
-| kNN interpolation | Biased toward training density; fails for novel feature combos |
-| Browser fallback (summary kNN) | Uses partial feature subset when full bundle unavailable |
-| Exact card match | Only works for states in the dataset |
+| Exact card match | Only works for states already in the dataset. |
+| PCA kNN interpolation | Biased toward training density; less reliable far from sampled support. |
+| Missing projection index | Manual projection fails closed rather than using partial summary features. |
 
-Manual hand markers must display **method + neighbor distances**.
+Manual hand markers must display method and neighbor distances.
 
----
+## Production Artifact Requirement
 
-## 7. Demo vs real data
+Viewer artifacts are expected to come from real feature-engine datasets generated with the native `poker-calculations` binding. Synthetic artifact generation has been removed from the production pipeline so fake manifolds cannot be published accidentally.
 
-Current viewer artifacts may be generated from **`--demo` synthetic Gaussian features**:
+## Engineering Limits
 
-- **No strategic content**
-- Category labels may not correlate with features
-- Cluster analysis in demo reports is **pipeline validation only**
-
-Do not present demo embeddings as poker discoveries. Regenerate with `pnpm generate:all` + real native binding.
-
----
-
-## 8. Engineering and scale limitations
-
-| Area | Current limit | Consequence |
+| Area | Current Limit | Consequence |
 | --- | --- | --- |
-| Metadata JSON | ~2 MB / 2.5k points | ~75 MB at 100k — needs binary index |
-| Hover picking | O(n) ray scan | Degrades above ~25k points |
-| Mobile | Blocked below 768px / low memory | No full fidelity on phones |
-| Native binding | Platform-specific prebuild | Dataset generation blocked if addon fails |
-| Cross-language scaler | sklearn fit vs TS normalize | Requires parity tests |
+| Metadata JSON | Grows linearly with point count | Large releases need compact sidecars and lazy detail fetch. |
+| Hover picking | Uses Three.js point hit index with throttled fallback scan | Very large releases may need GPU picking. |
+| Mobile | Full viewer is blocked below desktop breakpoints | No full-fidelity phone experience yet. |
+| Native binding | Platform-specific prebuild | Dataset generation and non-exact manual projection require native availability. |
+| Cross-language scaler | sklearn fit consumed by TypeScript | Requires projection-index parity tests. |
 
----
+When native extraction is unavailable, dataset generation fails and non-exact API projection returns a structured error. Exact card matches can still be resolved from artifacts.
 
-## 9. Native dependency limitations
+## Appropriate Use
 
-`poker-calculations` prebuilds may fail on some Node/OS combinations (observed: Node 22 win32-x64 `Invalid argument` on dlopen).
-
-When native is unavailable:
-
-- Feature extraction in Node fails
-- Dataset generation fails
-- API projection falls back to card match / summary kNN
-
----
-
-## 10. Statistical and evaluation limitations
-
-- kNN overlap in demo runs is **low (~0.07)** — 3D view is a lossy summary
-- No held-out strategic labels for supervised validation
-- Ablation experiments compare embedding metrics, not win-rate or human expert agreement
-- Multiple comparisons across streets/seeds without formal correction
-
----
-
-## 11. Ethical and data limitations
-
-- No scraped hand histories or commercial datasets
-- All states combinatorially generated — no privacy issues, but also no empirical poker population
-- Research visualization, not gambling advice
-
----
-
-## 12. Appropriate use statements
-
-**Appropriate:**
+Appropriate:
 
 - "We embed 66-dimensional hero-centric features into 3D for exploration."
 - "Exact equity powers the feature vector; UMAP provides a navigable view."
-- "Cluster 2 groups states with similar equity and texture **in this sample**."
+- "Cluster observations are local to this sampled release."
 
-**Inappropriate:**
+Inappropriate:
 
 - "The geometry proves GTO."
 - "Points far apart are strategically unrelated."
 - "This cluster is where you should fold."
-
----
-
-## 13. Mitigation roadmap
-
-| Limitation | Mitigation |
-| --- | --- |
-| UMAP instability | Multi-seed ensembles; report ranges |
-| Out-of-sample error | kNN confidence bands; show neighbors |
-| Demo data | Gate viewer with `dataSource` in manifest |
-| Metadata scale | `browser-index.bin` compact sidecar |
-| Removal cost | C++ batch API; worker pool |
-| Villain model | Optional range-conditioned feature mode |
 
 See [performance-analysis.md](./performance-analysis.md) and [research-methodology.md](./research-methodology.md).

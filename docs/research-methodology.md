@@ -2,7 +2,7 @@
 
 This document describes how Texas Hold'em states are represented, featurized, embedded, and visualized. It is written for technical review (C++Con, quant interviews, portfolio) and assumes familiarity with basic poker notation.
 
-**Scope:** methodology and reproducibility. Interpretive claims about strategy belong in [manifold-findings.md](./manifold-findings.md) and must be labeled as observations, not theorems.
+**Scope:** methodology and reproducibility. Interpretive claims about strategy must be labeled as observations, not theorems.
 
 ---
 
@@ -153,7 +153,7 @@ Outputs: `artifacts/datasets/{street}/records.parquet`, `vectors.f32.bin`, `mani
 | Target variance | 95% |
 | Max components | 50 |
 
-PCA reduces collinearity (e.g. category one-hots, correlated equity stats) before UMAP. Retained dimension recorded in `analysis-report.md` (demo flop: 50 components, ~80.7% variance — see report for exact run).
+PCA reduces collinearity (e.g. category one-hots, correlated equity stats) before UMAP. Retained dimension is recorded in `analysis-report.md` for each real artifact release.
 
 PCA coordinates are **not** directly visualized; they precondition UMAP and kNN projection.
 
@@ -187,7 +187,7 @@ PCA coordinates are **not** directly visualized; they precondition UMAP and kNN 
 
 **Output:** cluster label per point; `-1` = noise/outlier.
 
-Clusters are **density regions in UMAP space**, not ground-truth strategic classes. High noise fraction (demo flop: ~78%) indicates overlapping regimes or embedding hyperparameter sensitivity — not necessarily "no structure."
+Clusters are **density regions in UMAP space**, not ground-truth strategic classes. High noise fraction can indicate overlapping regimes, insufficient sample size, or embedding parameter sensitivity; it does not necessarily mean "no structure."
 
 ---
 
@@ -195,15 +195,16 @@ Clusters are **density regions in UMAP space**, not ground-truth strategic class
 
 Manual hand entry must map unseen states into the learned geometry.
 
-**Pipeline (Python, `pipeline/embed/project.py`):**
+**Pipeline (`apps/web/lib/projection/project-point.ts`):**
 
 1. Align feature vector to `retained_features` order
-2. `scaler.transform` → `pca.transform`
-3. Try `umap.transform(x_pca)` when finite
-4. **Fallback:** kNN in PCA space, interpolate 3D coords from training embeddings (inverse-distance weights)
-5. Cluster label via plurality vote among neighbors
+2. Apply saved scaler parameters
+3. Apply saved PCA mean/components
+4. Run bounded top-k nearest-neighbor search in PCA space
+5. Interpolate 3D coordinates from training embeddings with inverse-distance weights
+6. Assign the cluster label by plurality vote among neighbors
 
-**Browser/API (current):** when `projection_bundle.joblib` is unavailable, uses exact card match in metadata or summary-feature kNN — see [limitations.md](./limitations.md).
+**Browser/API:** exact card matches use metadata coordinates; non-exact hands use the server-readable `projection-index.bin` sidecar for PCA-space kNN interpolation.
 
 Always report **projection method** and **neighbor distances** alongside a projected point.
 
@@ -219,21 +220,23 @@ Always report **projection method** and **neighbor distances** alongside a proje
 | UMAP/HDBSCAN seed | `analysis-report.md`, `viewer-manifest.json` |
 | Embedding params | `viewer-manifest.json` → `umap`, `pcaDimensions` |
 
-**Commands (full offline reproduction):**
+**Commands (production reproduction):**
+
+Run production reproduction inside the AWS Batch release worker, not on a laptop. Local runs should use tiny smoke datasets only.
 
 ```bash
 cd visualizer
 pnpm install
-pnpm generate:all                    # requires native poker-calculations
+pnpm generate:all                    # AWS Batch release worker
 cd pipeline && pip install -r requirements.txt
-python -m embed.run --all            # real data
-# or smoke test:
-python -m embed.run --all --demo --seed 42
+python -m embed.run --all            # AWS Batch release worker
 pnpm --filter @geometry-of-poker/web sync-artifacts
 pnpm dev
 ```
 
-**Seed stability:** pipeline runs UMAP seeds {42, 43, 44} and reports pairwise kNN overlap. Demo flop assessment: **sensitive** (mean 3D kNN overlap ~0.12). Always disclose seed when presenting figures.
+**Local smoke variant:** use counts such as `--count 20` and do not publish those artifacts.
+
+**Seed stability:** pipeline runs UMAP seeds {42, 43, 44} and reports pairwise kNN overlap. Always disclose seed when presenting figures.
 
 ---
 
@@ -262,7 +265,7 @@ These measure **embedding fidelity**, not strategic correctness.
 | Dataset generation | TypeScript | `@geometry-of-poker/dataset-generator` |
 | Scaling / PCA / UMAP / HDBSCAN | Python | `pipeline/embed/` |
 | Artifact export | Python | `pipeline/embed/artifacts.py` |
-| Static serving | Next.js | `apps/web/public/artifacts/` |
+| Artifact serving | S3/CloudFront | `releases/<release-id>/embeddings/<street>/` |
 | GPU point cloud | TypeScript / WebGL | `apps/web` React Three Fiber |
 
 See [performance-analysis.md](./performance-analysis.md) for throughput benchmarks.
@@ -274,7 +277,7 @@ See [performance-analysis.md](./performance-analysis.md) for throughput benchmar
 - Clusters **do not** prove optimal strategy or exploitative play
 - UMAP distances **are not** perfect strategic distances
 - Uniform-villain equity **is not** game-theoretic EV against realistic ranges
-- Demo/synthetic embeddings **do not** represent real strategic structure
+- Small sampled embeddings **do not** cover the full strategic state space
 
 Distinguish always:
 

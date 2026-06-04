@@ -11,7 +11,8 @@ export interface ApiErrorResponse {
 }
 
 export interface HealthResponse {
-  ok: true;
+  ok: boolean;
+  status: "ready" | "degraded" | "misconfigured";
   version: string;
   artifactMode: ArtifactMode;
   availableStreets: Street[];
@@ -49,7 +50,6 @@ export interface ProjectNeighbor {
 }
 
 export type ProjectionMethod =
-  | "saved-umap-transform"
   | "pca-knn-interpolation"
   | "precomputed-nearest-neighbor";
 

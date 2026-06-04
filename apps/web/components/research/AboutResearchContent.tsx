@@ -37,7 +37,7 @@ const SECTIONS = [
     title: "Manual hand projection",
     body: [
       "User-selected cards are validated, featurized, and projected into the learned geometry.",
-      "Primary path: scale → PCA → UMAP transform when available; fallback: kNN interpolation in PCA space.",
+      "Production path: scale -> PCA -> bounded kNN interpolation in PCA space using the saved projection index.",
       "The viewer shows projection method, neighbor IDs, and distances — treat distant neighbors as low confidence.",
     ],
   },
@@ -54,7 +54,7 @@ const CLAIMS = {
     "Clusters prove optimal poker strategy",
     "UMAP distances are perfect strategic distances",
     "Uniform-villain equity equals game-theoretic EV",
-    "Demo/synthetic embeddings represent real strategic structure",
+    "A small sample covers the full strategic state space",
   ],
 };
 
@@ -170,18 +170,6 @@ export function AboutResearchContent({ embed = false }: AboutResearchContentProp
         </ul>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
-          Current data status
-        </h2>
-        <p className="rounded border border-amber-900/40 bg-amber-950/20 p-4 text-zinc-400">
-          Artifacts may be generated from <strong className="text-amber-200">demo synthetic features</strong>{" "}
-          for pipeline validation. Demo embeddings do not represent strategic poker structure.
-          Real datasets require native poker-calculations feature extraction via{" "}
-          <code className="text-amber-100/80">pnpm generate:all</code>.
-        </p>
-      </section>
-
       <section className="space-y-3 border-t border-white/10 pt-8">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
           Full documentation (repository)
@@ -189,7 +177,6 @@ export function AboutResearchContent({ embed = false }: AboutResearchContentProp
         <ul className="space-y-1 font-mono text-xs text-zinc-500">
           <li>docs/research-methodology.md</li>
           <li>docs/performance-analysis.md</li>
-          <li>docs/manifold-findings.md</li>
           <li>docs/limitations.md</li>
           <li>docs/cppcon-talk-outline.md</li>
           <li>docs/quant-firm-project-summary.md</li>

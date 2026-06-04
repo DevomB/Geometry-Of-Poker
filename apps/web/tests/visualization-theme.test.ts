@@ -27,7 +27,6 @@ describe("visualization theme metadata", () => {
   });
 
   it("describes known projection methods in human terms", () => {
-    expect(describeProjectionMethod("saved-umap-transform")).toMatch(/UMAP/);
     expect(describeProjectionMethod("pca-knn-interpolation")).toMatch(/PCA/);
     expect(describeProjectionMethod("precomputed-nearest-neighbor")).toMatch(
       /precomputed/i,

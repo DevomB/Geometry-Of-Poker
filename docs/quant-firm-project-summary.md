@@ -78,7 +78,7 @@ See [limitations.md](./limitations.md).
 | Real 25k/street datasets | ⏳ Blocked on native prebuild (platform) |
 | Demo embeddings | ✅ Synthetic validation only |
 
-**Demo embedding quality (flop, synthetic):** trustworthiness ≈ 0.64, kNN overlap ≈ 0.07, seed-sensitive. Treat as pipeline benchmark, not poker insight.
+**Embedding quality:** trustworthiness, kNN overlap, and seed sensitivity are reported per real artifact release.
 
 ---
 
@@ -89,7 +89,7 @@ See [limitations.md](./limitations.md).
 | GOPK binary parse (2.5k pts) | <0.01 ms |
 | Metadata JSON parse (2.5k pts) | ~14 ms |
 | Feature extraction (flop) | ~5–30 states/sec (est., native) |
-| UMAP embed (2.5k demo) | ~60–120 s / street |
+| UMAP embed | Release-size dependent |
 | Render (2.5k points) | ~60 fps |
 
 Full tables: [performance-analysis.md](./performance-analysis.md)
@@ -120,7 +120,7 @@ Full tables: [performance-analysis.md](./performance-analysis.md)
 
 | Artifact | Location |
 | --- | --- |
-| Live demo | `pnpm dev` → localhost:3000 |
+| Local presentation | `pnpm dev` → localhost:3000 |
 | Methodology | `docs/research-methodology.md` |
 | Performance | `docs/performance-analysis.md` |
 | C++Con outline | `docs/cppcon-talk-outline.md` |

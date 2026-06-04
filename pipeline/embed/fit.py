@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import struct
 
 import hdbscan
 import joblib
 import numpy as np
 import umap
 from sklearn.decomposition import PCA
-from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
 from .config import EmbedConfig
+
+
+PROJECTION_INDEX_MAGIC = b"GOPI"
+PROJECTION_INDEX_VERSION = 1
 
 
 @dataclass
@@ -93,22 +98,42 @@ def save_models(result: FitResult, output_dir: str, ids: np.ndarray) -> None:
     joblib.dump(result.umap_model, out / "umap.joblib")
     joblib.dump(result.clusterer, out / "hdbscan.joblib")
 
-    knn = NearestNeighbors(n_neighbors=min(15, len(ids)), metric="euclidean")
-    knn.fit(result.X_pca)
+    write_projection_index(out / "projection-index.bin", result, ids)
 
-    bundle = {
-        "scaler": result.scaler,
-        "pca": result.pca,
-        "umap": result.umap_model,
-        "hdbscan": result.clusterer,
-        "retained_features": result.retained_features,
-        "knn": knn,
-        "pca_train": result.X_pca,
-        "embedding_train": result.coords,
-        "ids_train": ids,
-        "labels_train": result.labels,
+
+def write_projection_index(path, result: FitResult, ids: np.ndarray) -> None:
+    metadata = {
+        "retainedFeatures": result.retained_features,
+        "scalerMean": result.scaler.mean_.astype(float).tolist(),
+        "scalerScale": result.scaler.scale_.astype(float).tolist(),
+        "pcaMean": result.pca.mean_.astype(float).tolist(),
+        "pcaComponents": result.pca.components_.astype(float).reshape(-1).tolist(),
+        "ids": [str(i) for i in ids],
     }
-    joblib.dump(bundle, out / "projection_bundle.joblib")
+    json_body = json.dumps(metadata, separators=(",", ":")).encode("utf-8")
+    padding = b"\0" * ((4 - (len(json_body) % 4)) % 4)
+    count = int(result.X_pca.shape[0])
+    pca_dim = int(result.X_pca.shape[1])
+    feature_count = len(result.retained_features)
+    header = struct.pack(
+        "<4sIIIII",
+        PROJECTION_INDEX_MAGIC,
+        PROJECTION_INDEX_VERSION,
+        count,
+        pca_dim,
+        feature_count,
+        len(json_body),
+    )
+    body = b"".join(
+        [
+            json_body,
+            padding,
+            result.X_pca.astype(np.float32).tobytes(order="C"),
+            result.coords.astype(np.float32).tobytes(order="C"),
+            result.labels.astype(np.int16).tobytes(order="C"),
+        ]
+    )
+    path.write_bytes(header + body)
 
 
 def fit_variant(

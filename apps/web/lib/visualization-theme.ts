@@ -2,7 +2,7 @@ import type { ColorMode } from "@/lib/types";
 
 /**
  * Centralized visualization theme constants. Keep components free of
- * hardcoded color literals — pull palettes and explanations from here.
+ * hardcoded color literals; pull palettes and explanations from here.
  */
 
 export const SCENE_BACKGROUND = "#08080c";
@@ -52,16 +52,16 @@ export const COLOR_MODE_META: Record<ColorMode, ColorModeMeta> = {
   category: {
     id: "category",
     label: "Hand category",
-    description: "Best 5-card classification — discrete strength buckets.",
+    description: "Best 5-card classification; discrete strength buckets.",
     legendKind: "categorical",
-    legend: { stops: [], labels: ["—", "—"] },
+    legend: { stops: [], labels: ["-", "-"] },
   },
   cluster: {
     id: "cluster",
     label: "Cluster (HDBSCAN)",
     description: "Density-based clusters in the embedding. Grey = noise.",
     legendKind: "cluster",
-    legend: { stops: [], labels: ["—", "—"] },
+    legend: { stops: [], labels: ["-", "-"] },
   },
   pNuts: {
     id: "pNuts",
@@ -76,7 +76,7 @@ export const COLOR_MODE_META: Record<ColorMode, ColorModeMeta> = {
   equityVariance: {
     id: "equityVariance",
     label: "Equity variance",
-    description: "Spread of equity across hypothetical runouts — uncertainty over future cards.",
+    description: "Spread of equity across hypothetical runouts; uncertainty over future cards.",
     legendKind: "continuous",
     legend: {
       stops: ["#1f3873", "#385f9e", "#7a87c0", "#cf8b6f", "#e64a3f"],
@@ -113,10 +113,8 @@ export const STATUS = {
 /** Friendly description for a projection method string returned by /api/project. */
 export function describeProjectionMethod(method: string): string {
   switch (method) {
-    case "saved-umap-transform":
-      return "Saved UMAP transform";
     case "pca-knn-interpolation":
-      return "PCA · kNN interpolation";
+      return "PCA kNN interpolation";
     case "precomputed-nearest-neighbor":
       return "Nearest precomputed state";
     case "exact_match":
@@ -126,7 +124,7 @@ export function describeProjectionMethod(method: string): string {
   }
 }
 
-/** RGB triplet → CSS rgb() string for HTML legend rendering. */
+/** RGB triplet to CSS rgb() string for HTML legend rendering. */
 export function rgbCss(rgb: [number, number, number]): string {
   return `rgb(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)})`;
 }

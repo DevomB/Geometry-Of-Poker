@@ -25,7 +25,7 @@
 
 Texas Hold'em admits an enormous combinatorial state space — far too large to visualize directly. This project maps each hero-centric state to a fixed-dimensional feature vector built from **exact** native calculations (equity, runout distributions, vulnerability, card-removal sensitivity) orchestrated through Node and TypeScript, then embeds vectors into three dimensions with PCA and UMAP for interactive exploration.
 
-The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk focuses on **where native code earns its keep**, how features cross language boundaries, and how to present results without overclaiming. A React Three Fiber viewer renders 100k+ GPU points from precomputed binaries. Live demo: fly through a cluster-colored cloud and project a manually entered hand via kNN interpolation.
+The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk focuses on **where native code earns its keep**, how features cross language boundaries, and how to present results without overclaiming. A React Three Fiber viewer renders GPU points from precomputed binaries. Live walkthrough: fly through a cluster-colored cloud and project a manually entered hand via PCA kNN interpolation.
 
 **Takeaway:** Treat visualization as a lens on engineered feature spaces — the same pattern appears in finance (factor manifolds, risk embeddings) and scientific computing (lossy nonlinear views of high-D data).
 
@@ -35,7 +35,7 @@ The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk f
 
 ### 1. Opening — why geometry? (5 min)
 
-- Show 3D point cloud rotating — **demo hook**
+- Show 3D point cloud rotating — **presentation hook**
 - State space cardinality slide (preflop 1,326 → postflop billions+)
 - What "geometry" means here: **embedding of feature vectors**
 - What it **doesn't** mean: optimal strategy polytope, Nash surface
@@ -69,7 +69,7 @@ The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk f
 
 - Pipeline: StandardScaler → PCA (95%) → UMAP (3D) → HDBSCAN
 - Hyperparameters and **seed sensitivity** (honest results)
-- Evaluation: trustworthiness, kNN overlap — demo numbers
+- Evaluation: trustworthiness, kNN overlap — release numbers
 - Ablation: board vs removal feature groups
 - **Critical:** clusters are embedding artifacts — interpret with poker language, not optimality
 
@@ -79,7 +79,7 @@ The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk f
 - GOPK binary format + typed arrays
 - Color modes: equity, category, cluster, pNuts, …
 - Manual hand: validate → extract → project → fly camera
-- kNN fallback when UMAP transform fails
+- PCA kNN projection for out-of-sample hands
 
 ### 7. Quant finance parallel (5 min)
 
@@ -108,7 +108,7 @@ The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk f
 
 1. **Research explorer** — flop street, equity heatmap, 2,500 points
 2. Toggle **cluster labels** + **NN links** on selected point
-3. **Card picker** — enter known demo hand → project → golden marker
+3. **Card picker** — enter known hand -> project -> golden marker
 4. Inspector: feature values, neighbors, projection method
 5. Switch to **preflop** — compare spatial character
 6. **About Research** page — methodology disclaimer
@@ -152,6 +152,5 @@ The C++ core (`poker-calculations`) performs the heavy combinatorics; the talk f
 - [research-methodology.md](./research-methodology.md)
 - [performance-analysis.md](./performance-analysis.md)
 - [limitations.md](./limitations.md)
-- [manifold-findings.md](./manifold-findings.md)
 
 **Supersedes:** [talk-outline.md](./talk-outline.md) (Phase 0 draft) — use this document for C++Con submission.

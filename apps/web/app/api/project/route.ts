@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     const dataset = await loadStreetDatasetForApi(validated.street);
     let featureVector: number[] | undefined;
     let featureNames: string[] | undefined;
+    let featureExtractionError: string | null = null;
 
     try {
       const extracted = extractGeometryFeatures(
@@ -50,24 +51,30 @@ export async function POST(request: Request) {
       featureVector = extracted.vector;
       featureNames = extracted.featureNames;
     } catch (err) {
-      warnings.push(
-        `Native feature extraction unavailable; using precomputed state lookup only. ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+      featureExtractionError = err instanceof Error ? err.message : String(err);
     }
 
-    const projection = projectIntoGeometry(dataset, {
-      hero: validated.hero,
-      board: validated.board,
-      featureVector,
-      featureNames,
-    });
+    let projection: ReturnType<typeof projectIntoGeometry>;
+    try {
+      projection = projectIntoGeometry(dataset, {
+        hero: validated.hero,
+        board: validated.board,
+        featureVector,
+        featureNames,
+      });
+    } catch (err) {
+      if (featureExtractionError) {
+        return apiError(
+          503,
+          "FEATURE_ENGINE_UNAVAILABLE",
+          `Native feature extraction is required for non-dataset manual projection: ${featureExtractionError}`,
+        );
+      }
+      throw err;
+    }
 
-    if (projection.method !== "exact_match") {
-      warnings.push(
-        "No saved UMAP transform or PCA/scaler projection artifact is present; projection uses nearest precomputed metadata features.",
-      );
+    if (featureExtractionError) {
+      warnings.push(`Native feature extraction unavailable; exact dataset lookup only: ${featureExtractionError}`);
     }
 
     const nearestNeighbors: ProjectNeighbor[] = projection.neighborIds.map((id, i) => {
@@ -108,7 +115,10 @@ export async function POST(request: Request) {
         clusterId: projection.clusterId ?? "noise",
         sourceMethod: projection.method,
       },
-      projectionMethod: "precomputed-nearest-neighbor",
+      projectionMethod:
+        projection.method === "pca_knn_interpolation"
+          ? "pca-knn-interpolation"
+          : "precomputed-nearest-neighbor",
       warnings,
     };
 

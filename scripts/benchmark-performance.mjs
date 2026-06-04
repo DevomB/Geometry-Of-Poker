@@ -4,6 +4,7 @@
  *
  * Usage (from visualizer/):
  *   node scripts/benchmark-performance.mjs
+ *   node scripts/benchmark-performance.mjs --root artifacts/releases/<release-id>/embeddings
  *   node scripts/benchmark-performance.mjs --json > artifacts/benchmarks/latest.json
  */
 import { readFileSync, existsSync, statSync } from "node:fs";
@@ -14,8 +15,16 @@ import { performance } from "node:perf_hooks";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
-const PUBLIC = join(ROOT, "apps/web/public/artifacts/embeddings");
 const STREETS = ["preflop", "flop", "turn", "river"];
+function argValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return null;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${name} requires a value.`);
+  return value;
+}
+
+const ARTIFACT_ROOT = argValue("--root") ?? join(ROOT, "apps/web/public/artifacts/embeddings");
 
 const BINARY_MAGIC = 0x4b504f47;
 
@@ -48,8 +57,8 @@ function bench(name, fn, iterations = 5) {
 function artifactSizes() {
   const rows = [];
   for (const street of STREETS) {
-    const dir = join(PUBLIC, street);
-    for (const file of ["browser-points.bin", "browser-metadata.json", "viewer-manifest.json"]) {
+    const dir = join(ARTIFACT_ROOT, street);
+    for (const file of ["browser-points.bin", "browser-channels.bin", "browser-metadata.json", "projection-index.bin", "viewer-manifest.json"]) {
       const path = join(dir, file);
       if (!existsSync(path)) continue;
       rows.push({ street, file, bytes: statSync(path).size });
@@ -61,7 +70,7 @@ function artifactSizes() {
 function browserLoadBenchmarks() {
   const results = [];
   for (const street of STREETS) {
-    const dir = join(PUBLIC, street);
+    const dir = join(ARTIFACT_ROOT, street);
     const binPath = join(dir, "browser-points.bin");
     const metaPath = join(dir, "browser-metadata.json");
     if (!existsSync(binPath)) continue;
@@ -121,6 +130,7 @@ const report = {
     platform: process.platform,
     arch: process.arch,
   },
+  artifactRoot: ARTIFACT_ROOT,
   artifactSizes: artifactSizes(),
   browserLoadBenchmarks: browserLoadBenchmarks(),
   nativeFeatureProfile: tryNativeProfile(),
@@ -137,6 +147,7 @@ if (jsonOut) {
   console.log("# Geometry of Poker — benchmark snapshot\n");
   console.log(`Generated: ${report.generatedAt}`);
   console.log(`Platform: ${report.environment.platform} ${report.environment.arch}\n`);
+  console.log(`Artifact root: ${report.artifactRoot}\n`);
   console.log("## Artifact sizes\n");
   for (const row of report.artifactSizes) {
     console.log(`- ${row.street}/${row.file}: ${(row.bytes / 1024).toFixed(1)} KB`);

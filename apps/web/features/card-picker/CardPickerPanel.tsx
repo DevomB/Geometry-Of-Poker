@@ -281,7 +281,7 @@ export function CardPickerPanel() {
           className="flex-1 rounded border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/60 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
           aria-busy={isSubmitting}
         >
-          {isSubmitting ? "Projecting…" : "Project into geometry"}
+          {isSubmitting ? "Projecting..." : "Project into geometry"}
         </button>
         <button
           type="button"

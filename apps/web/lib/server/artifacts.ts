@@ -5,16 +5,26 @@ import type { ArtifactMode, Street } from "@geometry-of-poker/shared";
 import type { BrowserMetadata, StreetDataset, StreetManifest } from "@/lib/types";
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";
 import { parseChannelsBin } from "@/lib/artifacts/parse-channels-bin";
+import { parseProjectionIndex } from "@/lib/artifacts/parse-projection-index";
 import { CATEGORY_INDEX } from "@/lib/artifacts/load-street";
 
 export const AVAILABLE_STREETS: Street[] = ["preflop", "flop", "turn", "river"];
 export const APP_VERSION = "0.1.0";
 export const ARTIFACT_MODE: ArtifactMode = process.env.GOP_ARTIFACT_BASE_URL ? "blob" : "public";
 
-const ARTIFACTS_ROOT = join(process.cwd(), "public/artifacts/embeddings");
+const ARTIFACTS_ROOT =
+  process.env.GOP_PUBLIC_ARTIFACTS_ROOT ?? join(process.cwd(), "public/artifacts/embeddings");
 const cache = new Map<Street, StreetDataset>();
 const remoteManifestCache = new Map<Street, Promise<StreetManifest>>();
 const remoteDatasetCache = new Map<Street, Promise<StreetDataset>>();
+
+function assertProductionArtifactConfig() {
+  if (process.env.VERCEL_ENV === "production" && !process.env.GOP_ARTIFACT_BASE_URL) {
+    throw new Error(
+      "GOP_ARTIFACT_BASE_URL is required in Vercel production. Point it at the CloudFront release artifact base.",
+    );
+  }
+}
 
 export function artifactDir(street: Street) {
   return join(ARTIFACTS_ROOT, street);
@@ -27,12 +37,14 @@ export function publicArtifactBase(street: Street) {
 }
 
 export function streetArtifactsExist(street: Street) {
+  assertProductionArtifactConfig();
   if (ARTIFACT_MODE === "blob") return true;
   const dir = artifactDir(street);
   return (
     existsSync(join(dir, "viewer-manifest.json")) &&
     existsSync(join(dir, "browser-metadata.json")) &&
-    existsSync(join(dir, "browser-points.bin"))
+    existsSync(join(dir, "browser-points.bin")) &&
+    existsSync(join(dir, "projection-index.bin"))
   );
 }
 
@@ -50,6 +62,7 @@ export function browserSafeManifest(street: Street): StreetManifest {
       pointsBin: `${base}/browser-points.bin`,
       channelsBin: `${base}/browser-channels.bin`,
       metadataJson: `${base}/browser-metadata.json`,
+      projectionIndexBin: `${base}/projection-index.bin`,
     },
   };
 }
@@ -67,6 +80,7 @@ async function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
 }
 
 export async function loadStreetManifest(street: Street): Promise<StreetManifest> {
+  assertProductionArtifactConfig();
   if (ARTIFACT_MODE === "public") return browserSafeManifest(street);
   const cached = remoteManifestCache.get(street);
   if (cached) return cached;
@@ -77,6 +91,7 @@ export async function loadStreetManifest(street: Street): Promise<StreetManifest
         pointsBin: `${publicArtifactBase(street)}/browser-points.bin`,
         channelsBin: `${publicArtifactBase(street)}/browser-channels.bin`,
         metadataJson: `${publicArtifactBase(street)}/browser-metadata.json`,
+        projectionIndexBin: `${publicArtifactBase(street)}/projection-index.bin`,
       },
     }),
   );
@@ -94,8 +109,16 @@ export function loadStreetDatasetSync(street: Street): StreetDataset {
     readFileSync(join(dir, "browser-metadata.json"), "utf8"),
   ) as BrowserMetadata;
   const bin = readFileSync(join(dir, "browser-points.bin"));
+  const channelsPath = join(dir, "browser-channels.bin");
+  const channelsBin = existsSync(channelsPath) ? readFileSync(channelsPath) : null;
+  const projectionIndexBin = readFileSync(join(dir, "projection-index.bin"));
   const arrayBuffer = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
+  const projectionArrayBuffer = projectionIndexBin.buffer.slice(
+    projectionIndexBin.byteOffset,
+    projectionIndexBin.byteOffset + projectionIndexBin.byteLength,
+  );
   const parsed = parsePointsBin(arrayBuffer as ArrayBuffer);
+  const projectionIndex = parseProjectionIndex(projectionArrayBuffer as ArrayBuffer);
   const count = parsed.count;
   const points = metadata.points;
 
@@ -105,43 +128,49 @@ export function loadStreetDatasetSync(street: Street): StreetDataset {
   if (manifest.pointCount !== count || metadata.count !== count || points.length !== count) {
     throw new Error(`Artifact point-count mismatch for ${street}.`);
   }
+  if (projectionIndex.count !== count) {
+    throw new Error(`Projection index point-count mismatch for ${street}.`);
+  }
 
-  const equity = new Float32Array(count);
-  const clusterId = new Int16Array(count);
-  const categoryIndex = new Uint8Array(count);
-  const pNuts = new Float32Array(count);
-  const equityVariance = new Float32Array(count);
-  const boardConnectivity = new Float32Array(count);
-  const boardRainbow = new Uint8Array(count);
-  const boardTwoTone = new Uint8Array(count);
-  const boardMonotone = new Uint8Array(count);
-  const boardPairedness = new Float32Array(count);
   const idToIndex = new Map<string, number>();
+  points.forEach((p, i) => idToIndex.set(p.id, i));
 
-  points.forEach((p, i) => {
-    idToIndex.set(p.id, i);
-    equity[i] = p.equityVsRandom;
-    clusterId[i] = p.clusterId;
-    categoryIndex[i] = CATEGORY_INDEX[p.category] ?? 0;
-    pNuts[i] = p.summary.pNuts ?? 0;
-    equityVariance[i] = p.summary.equityVariance ?? 0;
-    boardConnectivity[i] = p.summary.boardConnectivityScore ?? 0;
-    boardRainbow[i] = (p.summary.boardRainbowFlag ?? 0) > 0.5 ? 1 : 0;
-    boardTwoTone[i] = (p.summary.boardTwoToneFlag ?? 0) > 0.5 ? 1 : 0;
-    boardMonotone[i] = (p.summary.boardMonotoneFlag ?? 0) > 0.5 ? 1 : 0;
-    boardPairedness[i] = p.summary.boardPairednessScore ?? 0;
-  });
+  let channels: StreetDataset["channels"];
+  if (channelsBin) {
+    const channelArrayBuffer = channelsBin.buffer.slice(
+      channelsBin.byteOffset,
+      channelsBin.byteOffset + channelsBin.byteLength,
+    );
+    const parsedChannels = parseChannelsBin(channelArrayBuffer as ArrayBuffer);
+    if (parsedChannels.count !== count) {
+      throw new Error(`Channel point-count mismatch for ${street}.`);
+    }
+    channels = parsedChannels.channels;
+  } else {
+    const equity = new Float32Array(count);
+    const clusterId = new Int16Array(count);
+    const categoryIndex = new Uint8Array(count);
+    const pNuts = new Float32Array(count);
+    const equityVariance = new Float32Array(count);
+    const boardConnectivity = new Float32Array(count);
+    const boardRainbow = new Uint8Array(count);
+    const boardTwoTone = new Uint8Array(count);
+    const boardMonotone = new Uint8Array(count);
+    const boardPairedness = new Float32Array(count);
 
-  const dataset: StreetDataset = {
-    street,
-    manifest,
-    positions: parsed.positions,
-    colors: new Float32Array(count * 3),
-    sizes: new Float32Array(count),
-    visible: new Uint8Array(count),
-    count,
-    metadata: points,
-    channels: {
+    points.forEach((p, i) => {
+      equity[i] = p.equityVsRandom;
+      clusterId[i] = p.clusterId;
+      categoryIndex[i] = CATEGORY_INDEX[p.category] ?? 0;
+      pNuts[i] = p.summary.pNuts ?? 0;
+      equityVariance[i] = p.summary.equityVariance ?? 0;
+      boardConnectivity[i] = p.summary.boardConnectivityScore ?? 0;
+      boardRainbow[i] = (p.summary.boardRainbowFlag ?? 0) > 0.5 ? 1 : 0;
+      boardTwoTone[i] = (p.summary.boardTwoToneFlag ?? 0) > 0.5 ? 1 : 0;
+      boardMonotone[i] = (p.summary.boardMonotoneFlag ?? 0) > 0.5 ? 1 : 0;
+      boardPairedness[i] = p.summary.boardPairednessScore ?? 0;
+    });
+    channels = {
       equity,
       clusterId,
       categoryIndex,
@@ -152,8 +181,21 @@ export function loadStreetDatasetSync(street: Street): StreetDataset {
       boardTwoTone,
       boardMonotone,
       boardPairedness,
-    },
+    };
+  }
+
+  const dataset: StreetDataset = {
+    street,
+    manifest,
+    positions: parsed.positions,
+    colors: new Float32Array(count * 3),
+    sizes: new Float32Array(count),
+    visible: new Uint8Array(count),
+    count,
+    metadata: points,
+    channels,
     idToIndex,
+    projectionIndex,
   };
   cache.set(street, dataset);
   return dataset;
@@ -165,6 +207,7 @@ function buildDataset(
   metadata: BrowserMetadata,
   bin: ArrayBuffer,
   channelsBin?: ArrayBuffer | null,
+  projectionIndexBin?: ArrayBuffer | null,
 ): StreetDataset {
   const parsed = parsePointsBin(bin);
   const count = parsed.count;
@@ -175,6 +218,13 @@ function buildDataset(
   }
   if (manifest.pointCount !== count || metadata.count !== count || points.length !== count) {
     throw new Error(`Artifact point-count mismatch for ${street}.`);
+  }
+  const projectionIndex = projectionIndexBin ? parseProjectionIndex(projectionIndexBin) : undefined;
+  if (!projectionIndex) {
+    throw new Error(`Missing projection index artifact for ${street}.`);
+  }
+  if (projectionIndex.count !== count) {
+    throw new Error(`Projection index point-count mismatch for ${street}.`);
   }
 
   const idToIndex = new Map<string, number>();
@@ -236,6 +286,7 @@ function buildDataset(
     metadata: points,
     channels,
     idToIndex,
+    projectionIndex,
   };
 }
 
@@ -245,20 +296,24 @@ export async function loadStreetDatasetForApi(street: Street): Promise<StreetDat
   if (cached) return cached;
   const promise = (async () => {
     const manifest = await loadStreetManifest(street);
-    const [metadata, bin, channelsResult] = await Promise.all([
+    const [metadata, bin, channelsResult, projectionIndexResult] = await Promise.all([
       fetchJson<BrowserMetadata>(manifest.artifacts.metadataJson),
       fetchArrayBuffer(manifest.artifacts.pointsBin),
       manifest.artifacts.channelsBin
         ? fetchArrayBuffer(manifest.artifacts.channelsBin).catch(() => null)
         : Promise.resolve(null),
+      manifest.artifacts.projectionIndexBin
+        ? fetchArrayBuffer(manifest.artifacts.projectionIndexBin)
+        : Promise.reject(new Error(`Missing projection index URL for ${street}.`)),
     ]);
-    return buildDataset(street, manifest, metadata, bin, channelsResult);
+    return buildDataset(street, manifest, metadata, bin, channelsResult, projectionIndexResult);
   })();
   remoteDatasetCache.set(street, promise);
   return promise;
 }
 
 export function availableArtifactStreets() {
+  assertProductionArtifactConfig();
   if (ARTIFACT_MODE === "blob") return AVAILABLE_STREETS;
   return AVAILABLE_STREETS.filter(streetArtifactsExist);
 }

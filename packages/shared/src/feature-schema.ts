@@ -1,24 +1,118 @@
 import type { FeatureDescriptor, Street } from "./types.js";
 
 /** Bump when feature column order or semantics change. */
-export const FEATURE_SCHEMA_VERSION = "0.0.0-placeholder";
+export const FEATURE_SCHEMA_VERSION = "1.0.0";
 
-/**
- * Ordered feature schema — names and groups only in this phase.
- * Numeric extraction deferred to feature-engine implementation.
- */
-export const FEATURE_SCHEMA: readonly FeatureDescriptor[] = [
-  { name: "hero_equity_vs_random", label: "Hero equity vs random", group: "equity", higherIsBetter: true },
-  { name: "hero_equity_vs_range", label: "Hero equity vs default range", group: "equity", higherIsBetter: true },
-  { name: "nut_potential", label: "Nut potential", group: "draw", higherIsBetter: true },
-  { name: "draw_strength", label: "Draw strength", group: "draw", higherIsBetter: true },
-  { name: "vulnerability_index", label: "Vulnerability index", group: "vulnerability", higherIsBetter: false },
-  { name: "category_rank", label: "Made-hand category rank", group: "category" },
-  { name: "board_texture_paired", label: "Board paired", group: "texture" },
-  { name: "board_texture_monotone", label: "Board monotone", group: "texture" },
-  { name: "blocker_score", label: "Blocker score", group: "blocker" },
-  { name: "street_index", label: "Street index", group: "meta" },
+export const COMPACT_FEATURE_ORDER = [
+  "equityVsRandom",
+  "categoryIndex",
+  "streetIndex",
+  "categoryHighCard",
+  "categoryPair",
+  "categoryTwoPair",
+  "categoryThreeOfAKind",
+  "categoryStraight",
+  "categoryFlush",
+  "categoryFullHouse",
+  "categoryFourOfAKind",
+  "categoryStraightFlush",
+  "categoryRoyalFlush",
+  "equityMean",
+  "equityVariance",
+  "equityP05",
+  "equityP50",
+  "equityP95",
+  "equityRunoutAvailable",
+  "pNuts",
+  "pDominated",
+  "runoutVulnerabilityAvailable",
+  "boardRankDistinctCount",
+  "boardPairCount",
+  "boardTripsFlag",
+  "boardQuadsFlag",
+  "boardPairednessScore",
+  "boardMaxSuitCount",
+  "boardDistinctSuitCount",
+  "boardRainbowFlag",
+  "boardTwoToneFlag",
+  "boardMonotoneFlag",
+  "boardConnectivityScore",
+  "boardBroadwayDensity",
+  "boardHighCardNormalized",
+  "boardLowCardNormalized",
+  "boardFeaturesAvailable",
+  "flushOutCount",
+  "backdoorFlushFlag",
+  "straightOutCount",
+  "openEndedStraightDrawFlag",
+  "gutshotFlag",
+  "doubleGutshotFlag",
+  "comboDrawFlag",
+  "improvementOutCount",
+  "cleanImprovementOutCount",
+  "improvementProbabilityNextCard",
+  "drawFeaturesAvailable",
+  "removalGradientMean",
+  "removalGradientStdDev",
+  "removalGradientMin",
+  "removalGradientMax",
+  "removalGradientL1",
+  "removalGradientL2",
+  "removalGradientPositiveMass",
+  "removalGradientNegativeMass",
+  "removalGradientAvailable",
+  "transitionEntropy",
+  "transitionMaxProbability",
+  "transitionStdDev",
+  "transitionDiagonalMass",
+  "transitionUpgradeMass",
+  "transitionDowngradeMass",
+  "transitionRiverPairOrBetterMass",
+  "transitionRiverFlushOrBetterMass",
+  "categoryTransitionAvailable",
 ] as const;
+
+function groupForFeature(name: string): FeatureDescriptor["group"] {
+  if (name === "streetIndex") return "meta";
+  if (name.startsWith("category")) return "category";
+  if (name.startsWith("equity") && !name.includes("Runout")) return "equity";
+  if (name.includes("Runout")) return "runout";
+  if (name === "pNuts" || name === "pDominated" || name.includes("Vulnerability")) {
+    return "vulnerability";
+  }
+  if (name.startsWith("board")) return "texture";
+  if (
+    name.includes("Draw") ||
+    name.includes("OutCount") ||
+    name.includes("Flush") ||
+    name.includes("Straight") ||
+    name.startsWith("improvement") ||
+    name.startsWith("cleanImprovement") ||
+    name === "gutshotFlag"
+  ) {
+    return "draw";
+  }
+  if (name.startsWith("removal")) return "removal";
+  if (name.startsWith("transition")) return "transition";
+  return "meta";
+}
+
+function labelForFeature(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+}
+
+export const FEATURE_SCHEMA: readonly FeatureDescriptor[] = COMPACT_FEATURE_ORDER.map((name) => ({
+  name,
+  label: labelForFeature(name),
+  group: groupForFeature(name),
+  higherIsBetter:
+    name.includes("Equity") ||
+    name === "equityVsRandom" ||
+    name === "pNuts" ||
+    name.includes("Upgrade") ||
+    name.includes("FlushOrBetter") ||
+    name.includes("PairOrBetter"),
+}));
 
 export function streetFromCommunityCount(count: number): Street {
   switch (count) {

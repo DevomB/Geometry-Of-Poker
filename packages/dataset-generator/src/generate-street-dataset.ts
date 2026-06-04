@@ -318,7 +318,7 @@ export async function generateStreetDataset(
   const sampleRecords = await loadSampleRecords(parquetPath, sampleJsonCount);
   await writeJson(join(outputDir, "sample.json"), sampleRecords);
 
-  console.log(`[generate] done ${options.street}: ${options.count} records → ${outputDir}`);
+  console.log(`[generate] done ${options.street}: ${options.count} records -> ${outputDir}`);
   console.log(`[generate] validation: ${validation.valid ? "PASS" : "FAIL"}`);
   console.log(`[generate] throughput: ${timing.statesPerSecond.toFixed(2)} states/s`);
 

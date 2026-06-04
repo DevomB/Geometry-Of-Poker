@@ -4,22 +4,24 @@ Reproducible per-street datasets via `@geometry-of-poker/dataset-generator`.
 
 ## Requirements
 
-- Working `poker-calculations` native addon (Node 18–22 with matching prebuild)
+- Working `poker-calculations` native addon (Node 18-22 with matching prebuild)
 - ~2 GB RAM for 25k postflop streets (compact mode)
+
+Production-sized dataset generation must run on AWS Batch or another approved remote compute target. Laptop runs are limited to tiny smoke tests, typically tens of records.
 
 ## CLI
 
 ```bash
 cd visualizer
 
-# Single street
-pnpm generate --street flop --count 25000 --seed 42 --mode compact
+# Tiny local smoke test only
+pnpm generate -- --street flop --count 20 --seed 42 --mode compact
 
-# All initial streets (preflop 1326 + 25k each postflop)
+# Production balanced-small release: run inside the AWS release worker, not locally
 pnpm generate:all
 
-# Resume interrupted batch
-pnpm generate --street turn --count 25000 --seed 42 --resume
+# Resume interrupted remote batch
+pnpm generate -- --street turn --count 25000 --seed 42 --resume
 ```
 
 ### Options
@@ -77,8 +79,8 @@ interface DatasetRecord {
 
 | Tier | Count / street | Notes |
 | --- | --- | --- |
-| Dev | 1,000 | Fast smoke test |
-| Initial | 25,000 | Default postflop |
+| Dev | 20-1,000 | Laptop smoke test only |
+| Initial | 25,000 | Default postflop; AWS Batch |
 | Research | 100,000 | `--count 100000` |
 | Large | 1,000,000 | Batch + SSD; expect hours |
 

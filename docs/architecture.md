@@ -63,7 +63,7 @@ Runtime flow:
 1. **Validate** — structural checks (`feature-engine/validate-state`)
 2. **Extract** — feature vector via `poker-calculations` primitives
 3. **Normalize** — apply saved `StandardScaler` from training
-4. **Project** — UMAP transform or kNN interpolation into 3D
+4. **Project** — scaler/PCA transform and bounded kNN interpolation via `projection-index.bin`
 5. **Highlight** — nearest neighbors in precomputed dataset
 6. **Fly camera** — animate to embedding region
 7. **Metrics panel** — detailed hand statistics
@@ -82,20 +82,20 @@ sequenceDiagram
 
     Note over User,Art: Mode 1 — Research Explorer
     User->>Web: Open app
-    Web->>Art: fetch point-cloud.bin + metadata.json
+    Web->>Art: fetch browser-points.bin + browser-metadata.json
     Art-->>Web: Float32Array positions + JSON metadata
     Web->>Web: BufferGeometry + Points render
 
     Note over User,Art: Mode 2 — Manual Hand
     User->>Web: Enter As Kd / 2c 7d Jh
-    Web->>FE: validatePokerState()
+    Web->>FE: validatePokerStateInput()
     FE-->>Web: PokerState
-    Web->>FE: extractFeatures()
+    Web->>FE: extractGeometryFeatures()
     FE->>PC: equity, draws, vulnerability, ...
     PC-->>FE: raw metrics
     FE-->>Web: FeatureVector
-    Web->>FE: normalizeFeatures(scaler)
-    Web->>Art: kNN query or UMAP transform
+    Web->>Art: load projection-index.bin
+    Web->>Web: scaler/PCA transform + bounded kNN
     Art-->>Web: XYZ + neighbor ids
     Web->>Web: highlight + camera fly-to
 ```
@@ -107,7 +107,7 @@ sequenceDiagram
 | Math primitives | `poker-calculations@2.2.0` (npm) | C++20 core, already covers equity/MC/vulnerability |
 | Feature extraction | TypeScript in `feature-engine` | Same language as web; direct package import |
 | Embedding | Python (NumPy, sklearn, umap-learn) | Mature ML stack; joblib for scaler/UMAP persistence |
-| Web | Next.js 15 App Router | SSR for landing, static artifact hosting |
+| Web | Next.js 15 App Router | SSR for app and Node API routes |
 | 3D | R3F + drei + raw BufferGeometry | GPU point clouds at 100k+ points |
 | State | Zustand | Minimal boilerplate for mode + artifact state |
 | Package manager | pnpm workspaces | Fast installs, strict dependency graph |
@@ -121,17 +121,19 @@ artifacts/
   datasets/
     states.jsonl          # sampled states
     features.parquet      # raw + normalized features
-  models/
-    scaler.joblib         # sklearn StandardScaler
-    pca.joblib            # optional
-    umap.joblib           # UMAP fit
   embeddings/
-    point-cloud.bin       # Float32 xyz × N
-    metadata.json         # ids, cards, features, clusters
-    clusters.json         # HDBSCAN summary
+    <street>/
+      viewer-manifest.json
+      browser-points.bin
+      browser-channels.bin
+      browser-metadata.json
+      retained-features.json
+      projection-index.bin
+  releases/
+    <release-id>/embeddings/<street>/...
 ```
 
-Web copies or symlinks `embeddings/*` to `apps/web/public/artifacts/embeddings/` for static serving.
+Versioned release artifacts are uploaded to S3 and served through CloudFront. Local public artifacts are development-only.
 
 ## Boundaries — what we do NOT rebuild
 
@@ -151,7 +153,7 @@ The following remain in `poker-calculations`:
 Target: subdomain of personal website (e.g. `geometry.poker-calculations.devomb.com`).
 
 - **Frontend:** Vercel static/SSR from `apps/web`
-- **Artifacts:** Large binaries on CDN or Vercel Blob; manifest JSON points to URLs
+- **Artifacts:** Versioned S3/CloudFront release directories; manifest JSON points to URLs
 - **Pipeline:** Local or CI batch job; not deployed as a service
 
 ## Security and data ethics
@@ -166,8 +168,8 @@ See [README.md](../README.md#implementation-checklist) for the full checklist.
 
 | Phase | Scope |
 | --- | --- |
-| **0 (current)** | Scaffold, types, docs, placeholders |
-| **1** | Feature schema finalization + `extractFeatures` |
+| **0** | Scaffold, types, docs |
+| **1** | Feature schema finalization + `extractGeometryFeatures` |
 | **2** | State sampler + dataset generation |
 | **3** | UMAP pipeline + GPU point cloud loader |
 | **4** | Manual hand projection + kNN + camera |

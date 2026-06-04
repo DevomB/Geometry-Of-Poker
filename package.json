@@ -13,9 +13,13 @@
     "generate:all": "pnpm generate -- --all --seed 42 --mode compact",
     "pipeline:extract": "pnpm --filter @geometry-of-poker/feature-engine extract",
     "pipeline:generate": "pnpm generate -- --all --seed 42 --mode compact",
-    "pipeline:embed": "python pipeline/embed/run_umap.py --all",
-    "pipeline:embed:demo": "python pipeline/embed/run_umap.py --all --demo --seed 42",
-    "pipeline:cluster": "python pipeline/analyze/cluster.py",
+    "pipeline:embed": "cd pipeline && python -m embed.run --all",
+    "release:artifacts": "pnpm --filter @geometry-of-poker/web sync-artifacts",
+    "validate:artifacts": "node scripts/validate-release-artifacts.mjs",
+    "aws:deploy-artifacts": "node deploy/aws/deploy-artifact-stack.mjs",
+    "aws:build-worker": "node deploy/aws/build-worker-in-codebuild.mjs",
+    "aws:push-worker": "node deploy/aws/build-push-release-worker.mjs",
+    "aws:submit-release": "node deploy/aws/submit-release-job.mjs",
     "benchmark": "node scripts/benchmark-performance.mjs"
   },
   "engines": {

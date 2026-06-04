@@ -34,7 +34,7 @@ export function TopNav() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   const statusColor =
-    health.status === "ok"
+    health.status === "ok" && health.payload.ok
       ? STATUS.ok
       : health.status === "error"
         ? STATUS.error
@@ -44,12 +44,14 @@ export function TopNav() {
       ? "Connecting…"
       : health.status === "error"
         ? "Backend unreachable"
-        : health.payload.pokerCalculations.available
-          ? "Engine ready"
-          : "Engine fallback";
+        : health.payload.status === "misconfigured"
+          ? "Misconfigured"
+          : health.payload.pokerCalculations.available
+            ? "Engine ready"
+            : "Engine degraded";
   const statusTitle =
     health.status === "ok"
-      ? `Artifacts: ${health.payload.artifactMode} · NAPI ${health.payload.pokerCalculations.napi}`
+      ? `Status: ${health.payload.status} · Artifacts: ${health.payload.artifactMode} · NAPI ${health.payload.pokerCalculations.napi}`
       : health.status === "error"
         ? health.error
         : "Probing /api/health…";

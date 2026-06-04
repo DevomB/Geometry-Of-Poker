@@ -21,9 +21,3 @@ export type {
   Street,
 } from "./types.js";
 export { GeometryFeatureError } from "./types.js";
-
-/** @deprecated Use validatePokerStateInput */
-export { validatePokerStateInput as validatePokerState } from "./validate-input.js";
-
-/** @deprecated Use extractGeometryFeatures */
-export { extractGeometryFeatures as extractFeatures } from "./extract-geometry-features.js";

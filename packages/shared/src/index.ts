@@ -33,6 +33,7 @@ export type {
 export { STREET_INDEX } from "./types.js";
 
 export {
+  COMPACT_FEATURE_ORDER,
   FEATURE_SCHEMA_VERSION,
   FEATURE_SCHEMA,
   streetFromCommunityCount,
@@ -41,5 +42,4 @@ export {
 
 export {
   ARTIFACT_PATHS,
-  DEFAULT_VIEWER_ARTIFACTS,
 } from "./artifacts.js";

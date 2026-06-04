@@ -50,8 +50,11 @@ export type FeatureGroup =
   | "draw"
   | "vulnerability"
   | "category"
+  | "runout"
   | "texture"
   | "blocker"
+  | "removal"
+  | "transition"
   | "meta";
 
 /** Dense numeric feature vector aligned to FEATURE_SCHEMA order. */

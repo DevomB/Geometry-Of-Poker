@@ -54,13 +54,16 @@ interface ViewerState {
 function rebuildVisualization(state: ViewerState): Partial<ViewerState> {
   if (!state.dataset) return {};
   const dataset = state.dataset;
-  const lodIndices = buildLodIndices(dataset.count, state.lodSampleRate);
+  const lodIndices = state.lodSampleRate < 1 ? buildLodIndices(dataset.count, state.lodSampleRate) : undefined;
 
   applyColorMode(dataset, state.colorMode, dataset.colors, lodIndices);
   applyFilters(dataset, state.filters, dataset.visible, dataset.colors);
 
   for (let i = 0; i < dataset.count; i++) {
-    dataset.sizes[i] = state.lodSampleRate < 1 && i % Math.floor(1 / state.lodSampleRate) !== 0 ? 0 : POINT_SIZES.base;
+    dataset.sizes[i] =
+      state.lodSampleRate < 1 && i % Math.floor(1 / state.lodSampleRate) !== 0
+        ? 0
+        : POINT_SIZES.base;
     if (!dataset.visible[i]) dataset.sizes[i] = 0;
   }
 

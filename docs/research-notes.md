@@ -10,7 +10,7 @@ We do not assert a predefined shape (sphere, simplex, etc.). Structure must **em
 
 ## Feature space
 
-- Dimension: ~10–50 (initial scaffold: 10 placeholder columns)
+- Dimension: 66 compact columns
 - Domain: hero hole cards + partial/complete board
 - Constraints: valid card sets, street-consistent board lengths
 

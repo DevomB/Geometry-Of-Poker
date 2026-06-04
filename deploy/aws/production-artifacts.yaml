@@ -1,0 +1,386 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Geometry of Poker artifact hosting and one-off AWS Batch release generation.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: geometry-of-poker
+    AllowedPattern: "^[a-z0-9-]+$"
+  ReleaseWorkerImage:
+    Type: String
+    Description: Full ECR image URI for deploy/aws/release-worker.Dockerfile.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Public subnets are acceptable when AssignPublicIp is enabled. Avoid NAT gateways for this budget.
+  MaxVcpus:
+    Type: Number
+    Default: 4
+    MinValue: 1
+    MaxValue: 16
+  JobVcpus:
+    Type: String
+    Default: "4"
+    AllowedValues: ["1", "2", "4", "8", "16"]
+  JobMemoryMb:
+    Type: String
+    Default: "16384"
+    Description: Fargate memory in MiB. 4 vCPU supports 8192-30720.
+  JobTimeoutSeconds:
+    Type: Number
+    Default: 21600
+    MinValue: 3600
+    MaxValue: 86400
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  ReleaseWorkerRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}-release-worker"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep the latest five release worker images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  BuildSourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireBuildSources
+            Status: Enabled
+            ExpirationInDays: 7
+
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/codebuild/${ProjectName}/release-worker-image"
+      RetentionInDays: 7
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BuildReleaseWorkerImage
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${CodeBuildLogGroup.Arn}:*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub "${BuildSourceBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt BuildSourceBucket.Arn
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeRepositories
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !GetAtt ReleaseWorkerRepository.Arn
+
+  ReleaseWorkerImageBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-release-worker-image"
+      Description: Builds and pushes the Geometry of Poker AWS Batch release worker image.
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: S3
+        Location: !Sub "${BuildSourceBucket}/source.zip"
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${AWS::AccountId}.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+            build:
+              commands:
+                - docker build -f deploy/aws/release-worker.Dockerfile -t "$IMAGE_URI" .
+            post_build:
+              commands:
+                - docker push "$IMAGE_URI"
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: IMAGE_URI
+            Type: PLAINTEXT
+            Value: !Ref ReleaseWorkerImage
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref CodeBuildLogGroup
+          StreamName: release-worker-image
+      TimeoutInMinutes: 60
+      QueuedTimeoutInMinutes: 60
+
+  CloudFrontOac:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${ProjectName}-artifact-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ArtifactDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "${ProjectName} release artifacts"
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        DefaultCacheBehavior:
+          TargetOriginId: artifact-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        Origins:
+          - Id: artifact-bucket
+            DomainName: !GetAtt ArtifactBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt CloudFrontOac.Id
+
+  ArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${ArtifactBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${ArtifactDistribution}"
+
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Egress-only security group for one-off release worker jobs.
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  BatchExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  BatchJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WriteReleaseArtifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt ArtifactBucket.Arn
+                Condition:
+                  StringLike:
+                    s3:prefix: "releases/*"
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:PutObject
+                Resource: !Sub "${ArtifactBucket.Arn}/releases/*"
+
+  BatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/batch/${ProjectName}/release-worker"
+      RetentionInDays: 7
+
+  BatchComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt BatchServiceRole.Arn
+      ComputeEnvironmentName: !Sub "${ProjectName}-fargate"
+      State: ENABLED
+      ComputeResources:
+        Type: FARGATE
+        MaxvCpus: !Ref MaxVcpus
+        Subnets: !Ref SubnetIds
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup
+
+  BatchJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub "${ProjectName}-release"
+      Priority: 1
+      State: ENABLED
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref BatchComputeEnvironment
+
+  ReleaseWorkerJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: !Sub "${ProjectName}-release-worker"
+      Type: container
+      PlatformCapabilities: [FARGATE]
+      RetryStrategy:
+        Attempts: 1
+      Timeout:
+        AttemptDurationSeconds: !Ref JobTimeoutSeconds
+      ContainerProperties:
+        Image: !Ref ReleaseWorkerImage
+        ExecutionRoleArn: !GetAtt BatchExecutionRole.Arn
+        JobRoleArn: !GetAtt BatchJobRole.Arn
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        ResourceRequirements:
+          - Type: VCPU
+            Value: !Ref JobVcpus
+          - Type: MEMORY
+            Value: !Ref JobMemoryMb
+        Environment:
+          - Name: GOP_ARTIFACT_BUCKET
+            Value: !Ref ArtifactBucket
+          - Name: GOP_SEED
+            Value: "42"
+          - Name: GOP_FEATURE_MODE
+            Value: compact
+          - Name: GOP_PREFLOP_COUNT
+            Value: "1326"
+          - Name: GOP_FLOP_COUNT
+            Value: "25000"
+          - Name: GOP_TURN_COUNT
+            Value: "25000"
+          - Name: GOP_RIVER_COUNT
+            Value: "25000"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref BatchLogGroup
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: release-worker
+
+Outputs:
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket
+  CloudFrontDomainName:
+    Value: !GetAtt ArtifactDistribution.DomainName
+  EcrRepositoryUri:
+    Value: !GetAtt ReleaseWorkerRepository.RepositoryUri
+  CodeBuildSourceBucketName:
+    Value: !Ref BuildSourceBucket
+  CodeBuildProjectName:
+    Value: !Ref ReleaseWorkerImageBuildProject
+  BatchJobQueue:
+    Value: !Ref BatchJobQueue
+  BatchJobDefinition:
+    Value: !Ref ReleaseWorkerJobDefinition
+  VercelArtifactBaseUrlTemplate:
+    Value: !Sub "https://${ArtifactDistribution.DomainName}/releases/<release-id>"

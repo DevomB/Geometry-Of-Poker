@@ -44,6 +44,14 @@ function normalizeChannel(values: Float32Array, count: number) {
   return { min, max };
 }
 
+function forEachIndex(count: number, indices: number[] | undefined, visit: (i: number) => void) {
+  if (indices) {
+    for (const i of indices) visit(i);
+    return;
+  }
+  for (let i = 0; i < count; i++) visit(i);
+}
+
 export function applyColorMode(
   dataset: StreetDataset,
   mode: ColorMode,
@@ -51,31 +59,30 @@ export function applyColorMode(
   lodIndices?: number[],
 ) {
   const { count, channels } = dataset;
-  const indices = lodIndices ?? Array.from({ length: count }, (_, i) => i);
 
   if (mode === "equity") {
-    for (const i of indices) {
+    forEachIndex(count, lodIndices, (i) => {
       const [r, g, b] = heatmapColor(channels.equity[i]!);
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = b;
-    }
+    });
     return;
   }
 
   if (mode === "category") {
-    for (const i of indices) {
+    forEachIndex(count, lodIndices, (i) => {
       const cat = INDEX_CATEGORY[channels.categoryIndex[i]!] ?? "highCard";
       const [r, g, b] = CATEGORY_PALETTE[cat] ?? [0.6, 0.6, 0.6];
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = b;
-    }
+    });
     return;
   }
 
   if (mode === "cluster") {
-    for (const i of indices) {
+    forEachIndex(count, lodIndices, (i) => {
       const cid = channels.clusterId[i]!;
       if (cid < 0) {
         colors[i * 3] = 0.25;
@@ -87,47 +94,55 @@ export function applyColorMode(
         colors[i * 3 + 1] = g;
         colors[i * 3 + 2] = b;
       }
-    }
+    });
     return;
   }
 
   if (mode === "pNuts") {
     const { min, max } = normalizeChannel(channels.pNuts, count);
-    for (const i of indices) {
+    forEachIndex(count, lodIndices, (i) => {
       const t = (channels.pNuts[i]! - min) / (max - min);
       const [r, g, b] = divergingColor(t * 2 - 1);
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = b;
-    }
+    });
     return;
   }
 
   if (mode === "equityVariance") {
     const { min, max } = normalizeChannel(channels.equityVariance, count);
-    for (const i of indices) {
+    forEachIndex(count, lodIndices, (i) => {
       const t = (channels.equityVariance[i]! - min) / (max - min);
       const [r, g, b] = heatmapColor(t);
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = b;
-    }
+    });
     return;
   }
 
   if (mode === "boardConnectivity") {
     const { min, max } = normalizeChannel(channels.boardConnectivity, count);
-    for (const i of indices) {
+    forEachIndex(count, lodIndices, (i) => {
       const t = (channels.boardConnectivity[i]! - min) / (max - min);
       const [r, g, b] = heatmapColor(t);
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = b;
-    }
+    });
   }
 }
 
 const HIDDEN_COLOR: [number, number, number] = [0.04, 0.04, 0.06];
+
+function insertTopK(top: { i: number; d: number }[], candidate: { i: number; d: number }, k: number) {
+  if (top.length === k && candidate.d >= top[top.length - 1]!.d) return;
+  let at = top.length;
+  while (at > 0 && candidate.d < top[at - 1]!.d) at--;
+  top.splice(at, 0, candidate);
+  if (top.length > k) top.pop();
+}
 
 export function applyFilters(
   dataset: StreetDataset,
@@ -154,10 +169,9 @@ export function applyFilters(
           (dataset.positions[i * 3]! - px) ** 2 +
           (dataset.positions[i * 3 + 1]! - py) ** 2 +
           (dataset.positions[i * 3 + 2]! - pz) ** 2;
-        candidates.push({ i, d });
+        insertTopK(candidates, { i, d }, 25);
       }
-      candidates.sort((a, b) => a.d - b.d);
-      for (const c of candidates.slice(0, 25)) neighborIndices.add(c.i);
+      for (const c of candidates) neighborIndices.add(c.i);
     }
   }
 

@@ -1,16 +1,32 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   ApiErrorResponse,
   HealthResponse,
   ProjectResponse,
   Street,
 } from "@geometry-of-poker/shared";
-import { GET as healthGET } from "@/app/api/health/route";
-import { GET as manifestsGET } from "@/app/api/manifests/route";
-import { POST as projectPOST } from "@/app/api/project/route";
 import type { BrowserMetadata } from "@/lib/types";
+import { createArtifactFixture } from "./fixture-artifacts";
+
+const fixture = createArtifactFixture();
+let healthGET: typeof import("@/app/api/health/route").GET;
+let manifestsGET: typeof import("@/app/api/manifests/route").GET;
+let projectPOST: typeof import("@/app/api/project/route").POST;
+
+beforeAll(async () => {
+  process.env.GOP_PUBLIC_ARTIFACTS_ROOT = fixture.root;
+  vi.resetModules();
+  healthGET = (await import("@/app/api/health/route")).GET;
+  manifestsGET = (await import("@/app/api/manifests/route")).GET;
+  projectPOST = (await import("@/app/api/project/route")).POST;
+});
+
+afterAll(() => {
+  delete process.env.GOP_PUBLIC_ARTIFACTS_ROOT;
+  fixture.cleanup();
+});
 
 function request(payload: unknown) {
   return new Request("http://localhost/api/project", {
@@ -21,10 +37,7 @@ function request(payload: unknown) {
 }
 
 function sampleState(street: Street) {
-  const file = join(
-    process.cwd(),
-    `public/artifacts/embeddings/${street}/browser-metadata.json`,
-  );
+  const file = join(fixture.root, street, "browser-metadata.json");
   const metadata = JSON.parse(readFileSync(file, "utf8")) as BrowserMetadata;
   const point = metadata.points[0]!;
   return { hero: point.hero, board: point.board, street };
@@ -35,8 +48,8 @@ describe("api routes", () => {
     const res = await healthGET();
     expect(res.status).toBe(200);
     const body = (await res.json()) as HealthResponse;
-    expect(body.ok).toBe(true);
     expect(body.availableStreets).toEqual(["preflop", "flop", "turn", "river"]);
+    expect(["ready", "degraded"]).toContain(body.status);
     expect(typeof body.pokerCalculations.available).toBe("boolean");
   });
 
@@ -46,10 +59,11 @@ describe("api routes", () => {
     const body = (await res.json()) as { streets: Record<Street, { artifacts: Record<string, string> }> };
     expect(Object.keys(body.streets).sort()).toEqual(["flop", "preflop", "river", "turn"]);
     expect(body.streets.flop.artifacts.pointsBin).toContain("/artifacts/embeddings/flop/");
+    expect(body.streets.flop.artifacts.projectionIndexBin).toContain("projection-index.bin");
   });
 
   for (const street of ["preflop", "flop", "turn", "river"] as const) {
-    it(`projects a valid ${street} state`, async () => {
+    it(`projects an exact ${street} fixture state`, async () => {
       const res = await projectPOST(request(sampleState(street)));
       expect(res.status).toBe(200);
       const body = (await res.json()) as ProjectResponse;
@@ -59,6 +73,20 @@ describe("api routes", () => {
       expect(body.projectionMethod).toBe("precomputed-nearest-neighbor");
     });
   }
+
+  it("returns a production-safe error when non-exact projection cannot extract features", async () => {
+    const res = await projectPOST(
+      request({ hero: ["Ah", "Ad"], board: ["2c", "7h", "Jh"], street: "flop" }),
+    );
+    const body = (await res.json()) as ProjectResponse | ApiErrorResponse;
+    if (res.status === 200) {
+      expect((body as ProjectResponse).projectionMethod).toBe("pca-knn-interpolation");
+      expect(Number.isFinite((body as ProjectResponse).projectedPoint.x)).toBe(true);
+    } else {
+      expect(res.status).toBe(503);
+      expect((body as ApiErrorResponse).error.code).toBe("FEATURE_ENGINE_UNAVAILABLE");
+    }
+  });
 
   it("rejects duplicate cards", async () => {
     const res = await projectPOST(

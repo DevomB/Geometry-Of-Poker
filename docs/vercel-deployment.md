@@ -1,72 +1,94 @@
 # Vercel Deployment
 
+Vercel hosts the Next.js app. Runtime artifacts are served from S3/CloudFront through `GOP_ARTIFACT_BASE_URL`.
+
 ## Project Settings
 
-### Root Directory (required)
+### Root Directory
 
-Set **Root Directory** to the Next.js app folder, **not** the monorepo root:
+Set **Root Directory** to the Next.js app folder, not the monorepo root:
 
 | Git repository root | Vercel Root Directory |
 | --- | --- |
 | `visualizer/` only | `apps/web` |
-| `Poker-Calculator/` (full monorepo) | `visualizer/apps/web` |
+| `Poker-Calculator/` parent workspace | `visualizer/apps/web` |
 
-If Root Directory is `visualizer` (parent), Vercel treats the project as a static site and fails with **“No Output Directory named public found”**. The Next.js app and `vercel.json` live in `apps/web`.
+Enable **Include source files outside of the Root Directory in the Build Step** if prompted. The pnpm workspace needs access to `pnpm-workspace.yaml` and `packages/`.
 
-Enable **Include source files outside of the Root Directory in the Build Step** if prompted (pnpm workspace needs `pnpm-workspace.yaml` and `packages/` at the parent).
+### Framework And Build
 
-### Framework and output
+- Framework preset: Next.js.
+- Output Directory: leave default; do not set `public`.
+- Node.js: 22.x.
 
-- **Framework preset:** Next.js (`framework: "nextjs"` in `apps/web/vercel.json`)
-- **Output Directory:** leave empty / default — do **not** set `public` (that override is for static sites only)
-
-### Install and build
-
-Configured in `apps/web/vercel.json` (commands run from the workspace root via `pnpm -C ../..`):
+Configured in `apps/web/vercel.json`:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm --filter @geometry-of-poker/web... build
+pnpm -C ../.. install --frozen-lockfile
+pnpm -C ../.. --filter @geometry-of-poker/web... build
 ```
 
-The trailing `...` builds `@geometry-of-poker/web` **and workspace dependencies** (`shared`, `feature-engine`) before `next build`. Their `dist/` output is gitignored and must be compiled on the build machine.
+The trailing `...` builds workspace dependencies before `next build`.
 
-## Runtime
+## Required Environment
 
-Use Node.js 22.x. The workspace pins `"node": ">=22 <23"` because `poker-calculations@2.2.0` is a native N-API package and Vercel should install the Linux x64 prebuild consistently.
+Production requires:
 
-The API route handlers that touch runtime artifacts or `poker-calculations` explicitly use:
+```text
+GOP_ARTIFACT_BASE_URL=https://<cloudfront-domain>/releases/<release-id>
+```
+
+The app appends `/embeddings/<street>/...` internally. If this variable is missing in Vercel production, `/api/health` reports `misconfigured` and artifact APIs fail closed.
+
+No AWS secret is needed in Vercel for public CloudFront artifact reads.
+
+## Artifact Contract
+
+Publish this layout to S3 and serve through CloudFront:
+
+```text
+releases/<release-id>/embeddings/<street>/
+  viewer-manifest.json
+  browser-points.bin
+  browser-channels.bin
+  browser-metadata.json
+  retained-features.json
+  projection-index.bin
+```
+
+Artifact files are generated offline:
+
+```bash
+pnpm generate:all
+pnpm pipeline:embed
+pnpm release:artifacts -- --release-id <release-id>
+pnpm validate:artifacts -- --release-id <release-id>
+```
+
+Then upload `artifacts/releases/<release-id>/embeddings/` to S3.
+
+For production releases, run these commands inside the AWS Batch release worker. Do not run balanced-small generation or embedding on a laptop; local pipeline runs should be tiny smoke tests only.
+
+Recommended cache headers:
+
+- Versioned files: `Cache-Control: public,max-age=31536000,immutable`
+- Release pointer files, if introduced later: `Cache-Control: public,max-age=60`
+
+## Runtime Behavior
+
+The route handlers that touch artifacts or `poker-calculations` use:
 
 ```ts
 export const runtime = "nodejs";
 ```
 
-Do not move these routes to the Edge runtime.
+Do not move these routes to Edge runtime.
 
-## Artifacts
+Manual projection behavior:
 
-Current production artifacts are committed under:
-
-```text
-apps/web/public/artifacts/embeddings/{preflop,flop,turn,river}/
-```
-
-Each street contains:
-
-```text
-viewer-manifest.json
-browser-points.bin
-browser-metadata.json
-retained-features.json
-```
-
-The browser fetches point-cloud artifacts directly from static URLs returned by `/api/manifests`. Serverless functions do not proxy large binary files.
-
-If artifacts become too large for Git or Vercel static deployment, upload the same `embeddings/{street}/...` directory layout to Vercel Blob or another CDN and set:
-
-```bash
-GOP_ARTIFACT_BASE_URL=https://your-public-blob-base.example
-```
+- Exact card matches use saved metadata coordinates.
+- Non-exact hands require native feature extraction and `projection-index.bin`.
+- If native extraction or the projection index is unavailable, `/api/project` returns a structured error instead of approximating from partial metadata.
 
 ## Local Verification
 
@@ -81,70 +103,19 @@ pnpm build
 pnpm dev
 ```
 
-Then open the local Next.js URL, load each street, and submit one manual hand for preflop, flop, turn, and river.
+For full local viewer verification, set `GOP_ARTIFACT_BASE_URL` to a release on CloudFront. Local generated artifacts should be tiny smoke data only. Without artifacts, the app shell builds and runs but the manifold loader reports missing street artifacts.
 
-If the Vercel CLI is installed:
+## Offline Pipeline Boundary
 
-```bash
-vercel build
-vercel deploy --prebuilt
-```
+Do not run dataset generation, PCA/UMAP fitting, HDBSCAN, or corpus validation inside Vercel functions. Vercel consumes precomputed artifacts only.
 
-## Environment Variables
+## Production Checklist
 
-Required:
-
-```text
-none
-```
-
-Optional:
-
-```text
-GOP_ARTIFACT_BASE_URL
-```
-
-No secrets are required by the production viewer.
-
-## Native Dependency Check
-
-`poker-calculations@2.2.0` declares Node `>=18`, N-API 8, and ships prebuilds for Linux x64, Linux arm64, macOS, and Windows. `/api/health` reports whether the native module loaded successfully in the deployed function.
-
-If `/api/health` returns `pokerCalculations.available: false`, manual projection falls back to exact/precomputed-neighbor behavior where possible and reports warnings in `/api/project`.
-
-## Offline Pipeline
-
-The Python pipeline remains offline-only. Do not run dataset generation, PCA/UMAP fitting, HDBSCAN, or corpus validation inside Vercel functions. Vercel consumes precomputed artifacts only.
-
-`.vercelignore` excludes the offline pipeline and non-public generated artifact roots. Keep only browser-safe runtime artifacts under `apps/web/public/artifacts` or an external public artifact base.
-
-## Deployments
-
-Preview:
-
-```bash
-vercel
-```
-
-Production:
-
-```bash
-vercel --prod
-```
-
-Custom domain:
-
-1. Add the domain in Vercel Project Settings.
-2. Point DNS to the Vercel-provided records.
-3. Confirm `/api/health`, `/api/manifests`, and the static artifact URLs return 200.
-
-Rollback:
-
-1. Open Vercel Deployments.
-2. Select the last known-good deployment.
-3. Promote it to production.
-4. Recheck `/api/health` and one manual projection.
-
-## Known Limitations
-
-The checked-in artifacts do not include a saved UMAP transform or PCA/scaler projection bundle. Runtime projection therefore uses exact precomputed matches when available and nearest-neighbor interpolation over browser metadata features otherwise. `/api/project` reports this as `precomputed-nearest-neighbor` and includes warnings when no true transform is available.
+1. Generate balanced-small artifacts with the AWS Batch release worker.
+2. Confirm the worker ran `pnpm pipeline:embed`.
+3. Confirm the worker ran `pnpm release:artifacts -- --release-id <release-id>`.
+4. Confirm the worker ran `pnpm validate:artifacts -- --release-id <release-id>`.
+5. Upload release artifacts to S3.
+6. Set Vercel `GOP_ARTIFACT_BASE_URL`.
+7. Deploy.
+8. Confirm `/api/health`, `/api/manifests`, all artifact URLs, and one manual projection per street.

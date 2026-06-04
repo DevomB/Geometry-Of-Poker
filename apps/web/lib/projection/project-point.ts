@@ -1,18 +1,5 @@
 import type { BrowserPointMeta, ProjectionResponse, StreetDataset } from "@/lib/types";
 
-const SUMMARY_FEATURES = [
-  "equityVsRandom",
-  "equityMean",
-  "equityVariance",
-  "pNuts",
-  "pDominated",
-  "flushOutCount",
-  "straightOutCount",
-  "removalGradientMean",
-  "transitionEntropy",
-  "boardConnectivityScore",
-] as const;
-
 function cardsKey(hero: [string, string], board: string[]) {
   return `${hero.join(",")}|${board.join(",")}`;
 }
@@ -30,24 +17,135 @@ export function findExactMatch(
   return null;
 }
 
-function featureVectorFromSummary(summary: Record<string, number | undefined>): number[] {
-  return SUMMARY_FEATURES.map((name) => {
-    if (name === "equityVsRandom") return summary.equityVsRandom ?? 0;
-    return summary[name as keyof typeof summary] ?? 0;
-  });
-}
-
-function distance(a: number[], b: number[]) {
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += (a[i]! - b[i]!) ** 2;
-  return Math.sqrt(sum);
-}
-
 export interface ProjectInput {
   hero: [string, string];
   board: string[];
   featureVector?: number[];
   featureNames?: string[];
+}
+
+interface ScoredIndex {
+  index: number;
+  distance: number;
+}
+
+function insertTopK(top: ScoredIndex[], candidate: ScoredIndex, k: number) {
+  if (top.length === k && candidate.distance >= top[top.length - 1]!.distance) return;
+
+  let insertAt = top.length;
+  while (insertAt > 0 && candidate.distance < top[insertAt - 1]!.distance) {
+    insertAt--;
+  }
+  top.splice(insertAt, 0, candidate);
+  if (top.length > k) top.pop();
+}
+
+function nearestByPosition(dataset: StreetDataset, index: number, k: number): ScoredIndex[] {
+  const px = dataset.positions[index * 3]!;
+  const py = dataset.positions[index * 3 + 1]!;
+  const pz = dataset.positions[index * 3 + 2]!;
+  const top: ScoredIndex[] = [];
+
+  for (let i = 0; i < dataset.count; i++) {
+    if (i === index) continue;
+    const dx = dataset.positions[i * 3]! - px;
+    const dy = dataset.positions[i * 3 + 1]! - py;
+    const dz = dataset.positions[i * 3 + 2]! - pz;
+    insertTopK(top, { index: i, distance: dx * dx + dy * dy + dz * dz }, k);
+  }
+
+  return top.map((n) => ({ ...n, distance: Math.sqrt(n.distance) }));
+}
+
+function alignFeatureVector(vector: number[], names: string[], retained: string[]): Float64Array {
+  const byName = new Map<string, number>();
+  for (let i = 0; i < names.length; i++) byName.set(names[i]!, vector[i] ?? 0);
+  return Float64Array.from(retained.map((name) => byName.get(name) ?? 0));
+}
+
+function transformToPca(dataset: StreetDataset, vector: number[], names: string[]): Float64Array {
+  const index = dataset.projectionIndex;
+  if (!index) throw new Error("Projection index artifact is required for manual projection.");
+
+  const aligned = alignFeatureVector(vector, names, index.retainedFeatures);
+  const scaled = new Float64Array(index.featureCount);
+  for (let i = 0; i < index.featureCount; i++) {
+    const scale = index.scalerScale[i] || 1;
+    scaled[i] = (aligned[i]! - index.scalerMean[i]!) / scale;
+  }
+
+  const projected = new Float64Array(index.pcaDimension);
+  for (let component = 0; component < index.pcaDimension; component++) {
+    let sum = 0;
+    const componentOffset = component * index.featureCount;
+    for (let feature = 0; feature < index.featureCount; feature++) {
+      sum += (scaled[feature]! - index.pcaMean[feature]!) * index.pcaComponents[componentOffset + feature]!;
+    }
+    projected[component] = sum;
+  }
+  return projected;
+}
+
+function nearestByPca(dataset: StreetDataset, query: Float64Array, k: number): ScoredIndex[] {
+  const index = dataset.projectionIndex;
+  if (!index) throw new Error("Projection index artifact is required for manual projection.");
+
+  const top: ScoredIndex[] = [];
+  for (let row = 0; row < index.count; row++) {
+    let d = 0;
+    const offset = row * index.pcaDimension;
+    for (let dim = 0; dim < index.pcaDimension; dim++) {
+      const delta = index.pcaTrain[offset + dim]! - query[dim]!;
+      d += delta * delta;
+    }
+    insertTopK(top, { index: row, distance: d }, k);
+  }
+  return top.map((n) => ({ ...n, distance: Math.sqrt(n.distance) }));
+}
+
+function pluralityCluster(dataset: StreetDataset, top: ScoredIndex[]): number | null {
+  const index = dataset.projectionIndex;
+  if (!index) return null;
+
+  const counts = new Map<number, number>();
+  for (const n of top) {
+    const label = index.labels[n.index]!;
+    if (label < 0) continue;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+
+  let best: number | null = null;
+  let bestCount = 0;
+  for (const [label, count] of counts) {
+    if (count > bestCount) {
+      best = label;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+function interpolateEmbedding(dataset: StreetDataset, top: ScoredIndex[]): [number, number, number] {
+  const index = dataset.projectionIndex;
+  if (!index) throw new Error("Projection index artifact is required for manual projection.");
+
+  let wSum = 0;
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (const n of top) {
+    const w = 1 / (n.distance + 1e-9);
+    const offset = n.index * 3;
+    x += index.embeddingTrain[offset]! * w;
+    y += index.embeddingTrain[offset + 1]! * w;
+    z += index.embeddingTrain[offset + 2]! * w;
+    wSum += w;
+  }
+  return [x / wSum, y / wSum, z / wSum];
+}
+
+function pointFeatures(p: BrowserPointMeta) {
+  return { ...p.summary, equityVsRandom: p.equityVsRandom };
 }
 
 export function projectIntoGeometry(
@@ -65,109 +163,38 @@ export function projectIntoGeometry(
       neighborIds: neighbors.map((n) => dataset.metadata[n.index]!.id),
       neighborDistances: neighbors.map((n) => n.distance),
       clusterId: p.clusterId,
-      features: { ...p.summary, equityVsRandom: p.equityVsRandom },
+      features: pointFeatures(p),
       featureNames: Object.keys(p.summary),
       category: p.category,
       equityVsRandom: p.equityVsRandom,
     };
   }
 
-  let queryFeatures: number[] | null = null;
-  if (input.featureVector && input.featureNames) {
-    queryFeatures = alignFeatures(input.featureVector, input.featureNames);
+  if (!input.featureVector || !input.featureNames) {
+    throw new Error("Feature extraction is required for non-dataset manual projection.");
   }
 
-  if (queryFeatures) {
-    return knnProject(dataset, queryFeatures, k, "feature_knn");
-  }
+  const query = transformToPca(dataset, input.featureVector, input.featureNames);
+  const top = nearestByPca(dataset, query, k);
+  if (top.length === 0) throw new Error("Projection index contains no neighbors.");
 
-  throw new Error(
-    "Hand not found in dataset and feature extraction unavailable for projection.",
-  );
-}
-
-function alignFeatures(vector: number[], names: string[]): number[] {
-  return SUMMARY_FEATURES.map((name) => {
-    const idx = names.indexOf(name);
-    return idx >= 0 ? vector[idx]! : 0;
-  });
-}
-
-function knnProject(
-  dataset: StreetDataset,
-  query: number[],
-  k: number,
-  method: string,
-): ProjectionResponse {
-  const scored: { index: number; distance: number }[] = [];
-  for (let i = 0; i < dataset.count; i++) {
-    const p = dataset.metadata[i]!;
-    const fv = featureVectorFromSummary({ ...p.summary, equityVsRandom: p.equityVsRandom });
-    scored.push({ index: i, distance: distance(query, fv) });
-  }
-  scored.sort((a, b) => a.distance - b.distance);
-  const top = scored.slice(0, k);
-  const weights = top.map((n) => 1 / (n.distance + 1e-9));
-  const wSum = weights.reduce((a, b) => a + b, 0);
-
-  let x = 0;
-  let y = 0;
-  let z = 0;
-  for (let j = 0; j < top.length; j++) {
-    const w = weights[j]! / wSum;
-    const idx = top[j]!.index;
-    x += dataset.positions[idx * 3]! * w;
-    y += dataset.positions[idx * 3 + 1]! * w;
-    z += dataset.positions[idx * 3 + 2]! * w;
-  }
-
-  const labels = top.map((n) => dataset.channels.clusterId[n.index]!);
-  const valid = labels.filter((l) => l >= 0);
-  const clusterId =
-    valid.length > 0
-      ? valid.sort((a, b) => valid.filter((v) => v === b).length - valid.filter((v) => v === a).length)[0]!
-      : null;
-
-  const best = dataset.metadata[top[0]!.index]!;
+  const position = interpolateEmbedding(dataset, top);
+  const bestPoint = dataset.metadata[top[0]!.index]!;
 
   return {
-    position: [x, y, z],
-    method,
+    position,
+    method: "pca_knn_interpolation",
     neighborIds: top.map((n) => dataset.metadata[n.index]!.id),
     neighborDistances: top.map((n) => n.distance),
-    clusterId,
-    features: inputFeaturesFromPoint(best),
-    featureNames: Object.keys(best.summary),
-    category: best.category,
-    equityVsRandom: best.equityVsRandom,
+    clusterId: pluralityCluster(dataset, top),
+    features: pointFeatures(bestPoint),
+    featureNames: Object.keys(bestPoint.summary),
+    category: bestPoint.category,
+    equityVsRandom: bestPoint.equityVsRandom,
   };
-}
-
-function inputFeaturesFromPoint(p: BrowserPointMeta) {
-  return { ...p.summary, equityVsRandom: p.equityVsRandom };
-}
-
-function nearestByPosition(dataset: StreetDataset, index: number, k: number) {
-  const px = dataset.positions[index * 3]!;
-  const py = dataset.positions[index * 3 + 1]!;
-  const pz = dataset.positions[index * 3 + 2]!;
-  const scored: { index: number; distance: number }[] = [];
-  for (let i = 0; i < dataset.count; i++) {
-    if (i === index) continue;
-    const d = Math.sqrt(
-      (dataset.positions[i * 3]! - px) ** 2 +
-        (dataset.positions[i * 3 + 1]! - py) ** 2 +
-        (dataset.positions[i * 3 + 2]! - pz) ** 2,
-    );
-    scored.push({ index: i, distance: d });
-  }
-  scored.sort((a, b) => a.distance - b.distance);
-  return scored.slice(0, k);
 }
 
 export function getPointById(dataset: StreetDataset, id: string): BrowserPointMeta | null {
   const idx = dataset.idToIndex.get(id);
   return idx !== undefined ? dataset.metadata[idx]! : null;
 }
-
-export { SUMMARY_FEATURES };

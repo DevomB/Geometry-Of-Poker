@@ -11,7 +11,6 @@ import numpy as np
 from .analyze import build_analysis_context
 from .artifacts import save_artifacts
 from .config import STREETS, resolve_paths
-from .demo_data import generate_demo_parquet
 from .experiments import ExperimentResult, run_experiment_variant, seed_stability
 from .features import EXPERIMENT_VARIANTS
 from .fit import fit_embedding_pipeline, save_models
@@ -26,21 +25,21 @@ def embed_street(
     input_path: Path,
     output_dir: Path,
     random_state: int = 42,
-    demo: bool = False,
 ) -> dict:
     from .config import EmbedConfig
 
-    if demo or not input_path.exists():
-        print(f"[embed] generating demo parquet for {street} (input missing or --demo)")
-        count = {"preflop": 1326, "flop": 2500, "turn": 2500, "river": 2500}[street]
-        input_path = generate_demo_parquet(street, count, random_state, input_path)
+    if not input_path.exists():
+        raise FileNotFoundError(
+            f"Real dataset parquet is required for {street}: {input_path}. "
+            f"Run `pnpm generate -- --street {street}` first."
+        )
 
     print(f"[embed] loading {input_path}")
     t0 = time.perf_counter()
     df = load_parquet(input_path)
     feature_cols = parquet_feature_columns(list(df.columns))
     X, cols = feature_matrix(df, feature_cols)
-    print(f"[embed] {len(df):,} records × {len(cols)} features")
+    print(f"[embed] {len(df):,} records x {len(cols)} features")
 
     config = EmbedConfig(street=street, input_path=input_path, output_dir=output_dir, random_state=random_state)
 
@@ -115,20 +114,19 @@ def embed_street(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Geometry of Poker — street embedding pipeline")
+    parser = argparse.ArgumentParser(description="Geometry of Poker street embedding pipeline")
     parser.add_argument("--street", choices=STREETS, help="Street to embed")
     parser.add_argument("--input", help="Path to records.parquet")
     parser.add_argument("--output", help="Output directory for embedding artifacts")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--all", action="store_true", help="Embed all four streets")
-    parser.add_argument("--demo", action="store_true", help="Use synthetic demo data if parquet missing")
     args = parser.parse_args(argv)
 
     if args.all:
         results = []
         for street in STREETS:
             cfg = resolve_paths(street, args.input, args.output)
-            results.append(embed_street(street, cfg.input_path, cfg.output_dir, args.seed, args.demo))
+            results.append(embed_street(street, cfg.input_path, cfg.output_dir, args.seed))
         print("\n[embed] all streets complete")
         for r in results:
             print(f"  {r['street']}: {r['count']:,} points in {r['elapsed_s']:.1f}s")
@@ -138,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--street is required unless --all is set")
 
     cfg = resolve_paths(args.street, args.input, args.output)
-    embed_street(args.street, cfg.input_path, cfg.output_dir, args.seed, args.demo)
+    embed_street(args.street, cfg.input_path, cfg.output_dir, args.seed)
     return 0
 
 

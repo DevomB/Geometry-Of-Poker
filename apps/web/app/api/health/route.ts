@@ -10,12 +10,23 @@ import {
 export const runtime = "nodejs";
 
 export async function GET() {
+  const pokerCalculations = pokerCalculationsStatus();
+  let availableStreets: HealthResponse["availableStreets"] = [];
+  let status: HealthResponse["status"] = pokerCalculations.available ? "ready" : "degraded";
+
+  try {
+    availableStreets = availableArtifactStreets();
+  } catch {
+    status = "misconfigured";
+  }
+
   const payload: HealthResponse = {
-    ok: true,
+    ok: status === "ready" && availableStreets.length > 0,
+    status,
     version: APP_VERSION,
     artifactMode: ARTIFACT_MODE,
-    availableStreets: availableArtifactStreets(),
-    pokerCalculations: pokerCalculationsStatus(),
+    availableStreets,
+    pokerCalculations,
   };
   return NextResponse.json(payload);
 }

@@ -35,6 +35,7 @@ export function PointCloud() {
   const setHoverIndex = useViewerStore((s) => s.setHoverIndex);
   const selectPoint = useViewerStore((s) => s.selectPoint);
   const pointsRef = useRef<THREE.Points>(null);
+  const lastFallbackHoverAt = useRef(0);
 
   const geometry = useMemo(() => {
     if (!dataset) return null;
@@ -73,8 +74,17 @@ export function PointCloud() {
     // FPS tracked in FpsMonitor
   });
 
-  const handlePointerMove = (event: THREE.Event & { point: THREE.Vector3 }) => {
+  const handlePointerMove = (event: THREE.Event & { point: THREE.Vector3; index?: number }) => {
     if (!dataset) return;
+    if (typeof event.index === "number") {
+      setHoverIndex(event.index);
+      return;
+    }
+
+    const now = performance.now();
+    if (now - lastFallbackHoverAt.current < 50) return;
+    lastFallbackHoverAt.current = now;
+
     const ray = event as unknown as { ray?: THREE.Ray };
     if (!ray.ray) return;
     const origin = ray.ray.origin.toArray() as [number, number, number];

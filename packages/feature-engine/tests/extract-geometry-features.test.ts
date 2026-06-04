@@ -2,12 +2,18 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   COMPACT_FEATURE_DIMENSION,
+  COMPACT_FEATURE_ORDER,
   EXTENDED_FEATURE_DIMENSION,
 } from "../src/feature-order.js";
+import {
+  COMPACT_FEATURE_ORDER as SHARED_COMPACT_FEATURE_ORDER,
+  FEATURE_SCHEMA_VERSION,
+} from "../../shared/src/feature-schema.js";
 import { extractGeometryFeatures } from "../src/extract-geometry-features.js";
 import { isPokerCalculationsAvailable } from "../src/pc.js";
 
 const nativeOk = isPokerCalculationsAvailable();
+const requireNative = process.env.CI === "true" || process.env.GOP_REQUIRE_NATIVE === "1";
 
 function spot(
   hero: [string, string],
@@ -16,6 +22,13 @@ function spot(
 ) {
   return extractGeometryFeatures({ hero, board, deadCards });
 }
+
+describe("feature schema contract", () => {
+  it("aligns compact feature order with the shared schema contract", () => {
+    assert.equal(FEATURE_SCHEMA_VERSION, "1.0.0");
+    assert.deepEqual([...SHARED_COMPACT_FEATURE_ORDER], [...COMPACT_FEATURE_ORDER]);
+  });
+});
 
 describe("extractGeometryFeatures", { skip: !nativeOk }, () => {
   it("has stable compact vector length and ordering", () => {
@@ -131,5 +144,8 @@ describe("extractGeometryFeatures", { skip: !nativeOk }, () => {
 describe("extractGeometryFeatures native availability", () => {
   it("reports whether poker-calculations native addon loaded", () => {
     assert.equal(typeof nativeOk, "boolean");
+    if (requireNative) {
+      assert.equal(nativeOk, true, "poker-calculations native addon is required in CI");
+    }
   });
 });

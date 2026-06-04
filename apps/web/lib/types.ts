@@ -83,6 +83,7 @@ export interface StreetManifest {
     pointsBin: string;
     channelsBin?: string;
     metadataJson: string;
+    projectionIndexBin?: string;
   };
 }
 
@@ -109,6 +110,7 @@ export interface StreetDataset {
     boardPairedness: Float32Array;
   };
   idToIndex: Map<string, number>;
+  projectionIndex?: import("@/lib/artifacts/parse-projection-index").ProjectionIndex;
 }
 
 export interface ViewerFilters {
@@ -152,7 +154,7 @@ export interface ManualMarker {
 
 export interface ProjectionResponse {
   position: [number, number, number];
-  method: string;
+  method: "exact_match" | "pca_knn_interpolation";
   neighborIds: string[];
   neighborDistances: number[];
   clusterId: number | null;

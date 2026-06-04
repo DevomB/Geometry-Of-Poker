@@ -9,7 +9,20 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EMBEDDINGS_ROOT = join(__dirname, "../../../artifacts/embeddings");
-const PUBLIC_ROOT = join(__dirname, "../public/artifacts/embeddings");
+function argValue(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return "";
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${name} requires a value.`);
+  }
+  return value;
+}
+
+const RELEASE_ID = argValue("--release-id") || process.env.GOP_RELEASE_ID || "";
+const PUBLIC_ROOT = RELEASE_ID
+  ? join(__dirname, "../../../artifacts/releases", RELEASE_ID, "embeddings")
+  : join(__dirname, "../public/artifacts/embeddings");
 
 const STREETS = ["preflop", "flop", "turn", "river"];
 const BINARY_MAGIC = Buffer.from("GOPK");
@@ -159,16 +172,31 @@ function syncStreet(street) {
   const srcDir = join(EMBEDDINGS_ROOT, street);
   const dstDir = join(PUBLIC_ROOT, street);
   if (!existsSync(join(srcDir, "browser-metadata.json"))) {
-    console.warn(`Skipping ${street}: no browser-metadata.json`);
+    const message = `Skipping ${street}: no browser-metadata.json`;
+    if (process.env.CI || process.env.VERCEL_ENV === "production" || RELEASE_ID) {
+      throw new Error(message);
+    }
+    console.warn(message);
     return;
   }
 
   mkdirSync(dstDir, { recursive: true });
 
   const metadata = JSON.parse(readFileSync(join(srcDir, "browser-metadata.json"), "utf8"));
+  const projectionIndexPath = join(srcDir, "projection-index.bin");
+  if (!existsSync(projectionIndexPath)) {
+    const message = `Skipping ${street}: no projection-index.bin`;
+    if (process.env.CI || process.env.VERCEL_ENV === "production" || RELEASE_ID) {
+      throw new Error(message);
+    }
+    console.warn(message);
+    return;
+  }
+
   const coords = metadata.points.map((p) => [p.x, p.y, p.z]);
   writeBrowserPoints(join(dstDir, "browser-points.bin"), coords);
   writeBrowserChannels(join(dstDir, "browser-channels.bin"), metadata.points);
+  writeFileSync(join(dstDir, "projection-index.bin"), readFileSync(projectionIndexPath));
 
   const retained = existsSync(join(srcDir, "retained-features.json"))
     ? JSON.parse(readFileSync(join(srcDir, "retained-features.json"), "utf8"))
@@ -185,7 +213,7 @@ function syncStreet(street) {
     version: "1.0.0",
     street,
     pointCount: metadata.count,
-    embeddingMethod: "StandardScaler → PCA → UMAP → HDBSCAN",
+    embeddingMethod: "StandardScaler -> PCA -> UMAP -> HDBSCAN",
     retainedFeatures: retained.retained_features ?? [],
     retainedDimension: retained.retained_dimension ?? null,
     originalDimension: retained.original_dimension ?? null,
@@ -196,6 +224,7 @@ function syncStreet(street) {
       pointsBin: "browser-points.bin",
       channelsBin: "browser-channels.bin",
       metadataJson: "browser-metadata.json",
+      projectionIndexBin: "projection-index.bin",
     },
   };
 
@@ -217,4 +246,4 @@ function syncStreet(street) {
 
 mkdirSync(PUBLIC_ROOT, { recursive: true });
 for (const street of STREETS) syncStreet(street);
-console.log("Artifact sync complete.");
+console.log(RELEASE_ID ? `Release artifact sync complete: ${RELEASE_ID}` : "Artifact sync complete.");

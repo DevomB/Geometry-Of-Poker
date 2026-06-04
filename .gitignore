@@ -6,6 +6,7 @@ node_modules/
 .next/
 dist/
 out/
+.aws-build/
 *.tsbuildinfo
 
 # Python
@@ -15,11 +16,15 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
-# Artifacts (large generated files — keep structure, ignore data)
+# Artifacts (large generated files; keep structure, ignore data)
 artifacts/datasets/*
 artifacts/models/*
 artifacts/embeddings/*
+artifacts/releases/*
+apps/web/public/artifacts/embeddings/*
 !artifacts/**/.gitkeep
+!apps/web/public/artifacts/.gitkeep
+!apps/web/public/artifacts/embeddings/.gitkeep
 
 # Environment
 .env

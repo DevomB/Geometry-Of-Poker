@@ -5,6 +5,7 @@ const require = createRequire(import.meta.url);
 type PokerCalculationsApi = typeof import("poker-calculations");
 
 let cached: PokerCalculationsApi | undefined;
+let lastAvailabilityError: unknown;
 
 export function getPokerCalculations(): PokerCalculationsApi {
   if (!cached) {
@@ -15,9 +16,15 @@ export function getPokerCalculations(): PokerCalculationsApi {
 
 export function isPokerCalculationsAvailable(): boolean {
   try {
-    getPokerCalculations().exactHuEquityVsRandomHand(["As", "Kd"], []);
+    getPokerCalculations().evaluateHandStrengthFast(["As", "Kd"], ["2c", "7d", "9h", "Ts", "Jc"]);
+    lastAvailabilityError = undefined;
     return true;
-  } catch {
+  } catch (err) {
+    lastAvailabilityError = err;
+    if (process.env.GOP_LOG_NATIVE_CHECK === "1") {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[poker-calculations] availability check failed: ${message}`);
+    }
     return false;
   }
 }

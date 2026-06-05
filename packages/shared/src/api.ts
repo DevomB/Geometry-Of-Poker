@@ -21,6 +21,7 @@ export interface HealthResponse {
     platform: string;
     arch: string;
     napi: string;
+    error?: string;
   };
 }
 

@@ -28,3 +28,10 @@ export function isPokerCalculationsAvailable(): boolean {
     return false;
   }
 }
+
+export function pokerCalculationsAvailabilityError(): string | undefined {
+  if (!lastAvailabilityError) return undefined;
+  return lastAvailabilityError instanceof Error
+    ? lastAvailabilityError.message
+    : String(lastAvailabilityError);
+}

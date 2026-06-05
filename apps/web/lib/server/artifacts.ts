@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isPokerCalculationsAvailable } from "@geometry-of-poker/feature-engine";
+import {
+  isPokerCalculationsAvailable,
+  pokerCalculationsAvailabilityError,
+} from "@geometry-of-poker/feature-engine";
 import type { ArtifactMode, Street } from "@geometry-of-poker/shared";
 import type { BrowserMetadata, StreetDataset, StreetManifest } from "@/lib/types";
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";
@@ -319,10 +322,12 @@ export function availableArtifactStreets() {
 }
 
 export function pokerCalculationsStatus() {
+  const available = isPokerCalculationsAvailable();
   return {
-    available: isPokerCalculationsAvailable(),
+    available,
     platform: process.platform,
     arch: process.arch,
     napi: String(process.versions.napi ?? "unknown"),
+    ...(available ? {} : { error: pokerCalculationsAvailabilityError() }),
   };
 }

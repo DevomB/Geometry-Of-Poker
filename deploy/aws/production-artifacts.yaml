@@ -352,6 +352,8 @@ Resources:
             Value: "42"
           - Name: GOP_FEATURE_MODE
             Value: compact
+          - Name: GOP_EXACT_FEATURE_BUDGET
+            Value: production
           - Name: GOP_PREFLOP_COUNT
             Value: "1326"
           - Name: GOP_FLOP_COUNT

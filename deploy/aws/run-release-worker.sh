@@ -5,6 +5,7 @@ ARTIFACTS_ROOT="${GOP_ARTIFACTS_ROOT:-/work/artifacts}"
 RELEASE_ID="${GOP_RELEASE_ID:-}"
 SEED="${GOP_SEED:-42}"
 MODE="${GOP_FEATURE_MODE:-compact}"
+EXACT_FEATURE_BUDGET="${GOP_EXACT_FEATURE_BUDGET:-production}"
 BATCH_SIZE="${GOP_BATCH_SIZE:-1000}"
 PREFLOP_COUNT="${GOP_PREFLOP_COUNT:-1326}"
 FLOP_COUNT="${GOP_FLOP_COUNT:-25000}"
@@ -38,12 +39,13 @@ generate_street() {
   local street="$1"
   local count
   count="$(street_count "$street")"
-  echo "[release-worker] generate $street count=$count seed=$SEED mode=$MODE"
+  echo "[release-worker] generate $street count=$count seed=$SEED mode=$MODE exactFeatureBudget=$EXACT_FEATURE_BUDGET"
   pnpm generate -- \
     --street "$street" \
     --count "$count" \
     --seed "$SEED" \
     --mode "$MODE" \
+    --exact-feature-budget "$EXACT_FEATURE_BUDGET" \
     --batch-size "$BATCH_SIZE" \
     --artifacts "$ARTIFACTS_ROOT" \
     --resume
@@ -56,7 +58,8 @@ embed_street() {
     --street "$street" \
     --input "$ARTIFACTS_ROOT/datasets/$street/records.parquet" \
     --output "$ARTIFACTS_ROOT/embeddings/$street" \
-    --seed "$SEED"
+    --seed "$SEED" \
+    --skip-analysis
 }
 
 for street in preflop flop turn river; do

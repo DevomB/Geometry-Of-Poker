@@ -126,13 +126,21 @@ describe("extractGeometryFeatures", { skip: !nativeOk }, () => {
     assert.equal(result.groups.board.boardFeaturesAvailable, 0);
     assert.equal(result.groups.draws.drawFeaturesAvailable, 0);
     assert.ok(result.groups.core.equityVsRandom > 0);
-    assert.equal(result.groups.runouts.equityRunoutAvailable, 1);
+    assert.equal(result.groups.runouts.equityRunoutAvailable, 0);
   });
 
-  it("flop exposes category transition summaries", () => {
-    const result = spot(["As", "Kd"], ["2c", "7h", "Jh"]);
+  it("full exact budget exposes category transition summaries", () => {
+    const result = extractGeometryFeatures(
+      { hero: ["As", "Kd"], board: ["2c", "7h", "Jh"] },
+      { exactFeatureBudget: "full" },
+    );
     assert.equal(result.groups.transitions.categoryTransitionAvailable, 1);
     assert.ok(result.groups.transitions.transitionEntropy >= 0);
+  });
+
+  it("production budget disables expensive exact transition summaries", () => {
+    const result = spot(["As", "Kd"], ["2c", "7h", "Jh"]);
+    assert.equal(result.groups.transitions.categoryTransitionAvailable, 0);
   });
 
   it("turn disables category transition availability", () => {

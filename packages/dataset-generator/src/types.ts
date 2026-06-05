@@ -1,6 +1,10 @@
-import type { FeatureMode, Street } from "@geometry-of-poker/feature-engine";
+import type {
+  ExactFeatureBudget,
+  FeatureMode,
+  Street,
+} from "@geometry-of-poker/feature-engine";
 
-export type { FeatureMode, Street };
+export type { ExactFeatureBudget, FeatureMode, Street };
 
 export const FEATURE_SCHEMA_VERSION = "1.0.0";
 export const DATASET_VERSION = "1.0.0";
@@ -69,6 +73,7 @@ export interface DatasetManifest {
   street: Street;
   seed: number;
   mode: FeatureMode;
+  exactFeatureBudget: ExactFeatureBudget;
   count: number;
   dimension: number;
   featureNames: string[];
@@ -135,6 +140,7 @@ export interface GenerateStreetDatasetOptions {
   count: number;
   seed: number;
   mode?: FeatureMode;
+  exactFeatureBudget?: ExactFeatureBudget;
   batchSize?: number;
   outputDir: string;
   resume?: boolean;

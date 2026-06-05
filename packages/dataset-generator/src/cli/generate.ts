@@ -2,7 +2,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateStreetDataset } from "../generate-street-dataset.js";
 import { streetOutputDir } from "../io.js";
-import type { FeatureMode, Street } from "../types.js";
+import type { ExactFeatureBudget, FeatureMode, Street } from "../types.js";
 
 const STREETS: Street[] = ["preflop", "flop", "turn", "river"];
 
@@ -22,6 +22,7 @@ function parseArgs(argv: string[]) {
   const args: Record<string, string | boolean> = {
     seed: "42",
     mode: "compact",
+    exactFeatureBudget: "production",
     batchSize: "1000",
     resume: false,
     all: false,
@@ -53,11 +54,12 @@ function parseArgs(argv: string[]) {
 function usage(): string {
   return `Usage:
   pnpm generate --street flop --count 25000 --seed 42 --mode compact [--batch-size 1000] [--resume]
-  pnpm generate --all [--seed 42] [--mode compact]
+  pnpm generate --all [--seed 42] [--mode compact] [--exact-feature-budget production]
 
 Streets: preflop | flop | turn | river
 Preflop default count: 1326 (enumerate all hole-card combos)
-Postflop default count: 25000`;
+Postflop default count: 25000
+Exact feature budget: production | full`;
 }
 
 async function runOne(
@@ -65,6 +67,7 @@ async function runOne(
   count: number,
   seed: number,
   mode: FeatureMode,
+  exactFeatureBudget: ExactFeatureBudget,
   batchSize: number,
   resume: boolean,
   artifactsRoot: string,
@@ -75,6 +78,7 @@ async function runOne(
     count,
     seed,
     mode,
+    exactFeatureBudget,
     batchSize,
     outputDir,
     resume,
@@ -92,6 +96,7 @@ async function main() {
 
   const seed = Number(args.seed ?? 42);
   const mode = (args.mode ?? "compact") as FeatureMode;
+  const exactFeatureBudget = (args.exactFeatureBudget ?? "production") as ExactFeatureBudget;
   const batchSize = Number(args.batchSize ?? 1000);
   const resume = Boolean(args.resume);
   const artifactsRoot = String(args.artifacts ?? repoArtifactsRoot());
@@ -99,7 +104,7 @@ async function main() {
   if (args.all) {
     for (const street of STREETS) {
       const count = Number(args.count ?? DEFAULT_COUNTS[street]);
-      await runOne(street, count, seed, mode, batchSize, resume, artifactsRoot);
+      await runOne(street, count, seed, mode, exactFeatureBudget, batchSize, resume, artifactsRoot);
     }
     return;
   }
@@ -111,7 +116,7 @@ async function main() {
   }
 
   const count = Number(args.count ?? DEFAULT_COUNTS[street]);
-  await runOne(street, count, seed, mode, batchSize, resume, artifactsRoot);
+  await runOne(street, count, seed, mode, exactFeatureBudget, batchSize, resume, artifactsRoot);
 }
 
 main().catch((err) => {

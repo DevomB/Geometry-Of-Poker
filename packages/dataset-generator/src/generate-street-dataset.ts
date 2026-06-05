@@ -5,6 +5,7 @@ import {
   profileFeatureGroups,
   validatePokerStateInput,
   type FeatureMode,
+  type ExactFeatureBudget,
   type Street,
 } from "@geometry-of-poker/feature-engine";
 import { join } from "node:path";
@@ -80,6 +81,7 @@ function finalizeFeatureTimings(agg: FeatureGroupTimingAggregate): FeatureGroupT
 function recordsFromSampled(
   states: ReturnType<typeof resolveStateBatch>,
   mode: FeatureMode,
+  exactFeatureBudget: ExactFeatureBudget,
   street: Street,
   seed: number,
   profileEvery: number,
@@ -94,14 +96,18 @@ function recordsFromSampled(
     const t0 = performance.now();
     const result = extractGeometryFeatures(
       { hero: sampled.hero, board: sampled.board },
-      { mode },
+      { mode, exactFeatureBudget },
     );
     extractMs += performance.now() - t0;
 
     if (sampled.index % profileEvery === 0) {
       agg = aggregateFeatureTimings(
         agg,
-        profileFeatureGroups({ hero: sampled.hero, board: sampled.board }, mode),
+        profileFeatureGroups(
+          { hero: sampled.hero, board: sampled.board },
+          mode,
+          exactFeatureBudget,
+        ),
       );
     }
 
@@ -155,6 +161,7 @@ export async function generateStreetDataset(
   }
 
   const mode = options.mode ?? "compact";
+  const exactFeatureBudget = options.exactFeatureBudget ?? "production";
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
   const profileEvery = options.profileSampleEvery ?? DEFAULT_PROFILE_EVERY;
   const sampleJsonCount = options.sampleJsonCount ?? DEFAULT_SAMPLE_COUNT;
@@ -228,6 +235,7 @@ export async function generateStreetDataset(
     const { records, extractMs, featureAgg: updatedAgg } = recordsFromSampled(
       states,
       mode,
+      exactFeatureBudget,
       options.street,
       options.seed,
       profileEvery,
@@ -293,6 +301,7 @@ export async function generateStreetDataset(
     street: options.street,
     seed: options.seed,
     mode,
+    exactFeatureBudget,
     count: options.count,
     dimension,
     featureNames,

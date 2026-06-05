@@ -1,6 +1,7 @@
 export type Street = "preflop" | "flop" | "turn" | "river";
 
 export type FeatureMode = "compact" | "extended";
+export type ExactFeatureBudget = "production" | "full";
 
 export interface PokerStateInput {
   hero: [string, string];
@@ -10,6 +11,8 @@ export interface PokerStateInput {
 
 export interface GeometryFeatureOptions {
   mode?: FeatureMode;
+  /** production keeps compact generation bounded; full enables expensive exact runout/removal/transition features. */
+  exactFeatureBudget?: ExactFeatureBudget;
   /** Villain range as dense Float64Array(1326); defaults to uniform weights. */
   villainRange?: Float64Array;
 }

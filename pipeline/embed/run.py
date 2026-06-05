@@ -25,6 +25,7 @@ def embed_street(
     input_path: Path,
     output_dir: Path,
     random_state: int = 42,
+    skip_analysis: bool = False,
 ) -> dict:
     from .config import EmbedConfig
 
@@ -61,42 +62,51 @@ def embed_street(
     context["retained_dimensions"] = len(prep.retained_features)
     context["original_dimensions"] = len(cols)
 
-    print("[embed] running feature-group experiments")
     experiments: list[ExperimentResult] = []
-    for name, spec in EXPERIMENT_VARIANTS.items():
-        if spec.get("extended"):
-            ext_cols = [
-                c
-                for c in df.columns
-                if c.startswith("removalGradientDeck") or c.startswith("categoryJoint")
-            ]
-            if not ext_cols:
-                experiments.append(
-                    ExperimentResult(
-                        name=name,
-                        description=spec["description"],
-                        retained_dim=0,
-                        pca_dim=0,
-                        trustworthiness=0.0,
-                        knn_overlap=0.0,
-                        n_clusters=0,
-                        noise_pct=0.0,
-                        skipped=True,
-                        skip_reason="Extended columns not in parquet",
+    if skip_analysis:
+        print("[embed] skipping feature-group experiments and seed stability analysis")
+        stability = {
+            "seeds": [],
+            "pairwise_knn_overlap_mean": 0.0,
+            "pairwise_knn_overlap_min": 0.0,
+            "interpretation": "skipped",
+        }
+    else:
+        print("[embed] running feature-group experiments")
+        for name, spec in EXPERIMENT_VARIANTS.items():
+            if spec.get("extended"):
+                ext_cols = [
+                    c
+                    for c in df.columns
+                    if c.startswith("removalGradientDeck") or c.startswith("categoryJoint")
+                ]
+                if not ext_cols:
+                    experiments.append(
+                        ExperimentResult(
+                            name=name,
+                            description=spec["description"],
+                            retained_dim=0,
+                            pca_dim=0,
+                            trustworthiness=0.0,
+                            knn_overlap=0.0,
+                            n_clusters=0,
+                            noise_pct=0.0,
+                            skipped=True,
+                            skip_reason="Extended columns not in parquet",
+                        )
                     )
-                )
-                continue
-            X_ext, ext_names = feature_matrix(df, parquet_feature_columns(list(df.columns)))
-            exp = run_experiment_variant(name, spec["description"], X_ext, ext_names, config)
-        else:
-            X_var, var_cols = feature_matrix(df, cols, exclude=spec.get("exclude"))
-            exp = run_experiment_variant(name, spec["description"], X_var, var_cols, config)
-        experiments.append(exp)
-        status = "skipped" if exp.skipped else f"kNN={exp.knn_overlap:.3f}"
-        print(f"  - {name}: {status}")
+                    continue
+                X_ext, ext_names = feature_matrix(df, parquet_feature_columns(list(df.columns)))
+                exp = run_experiment_variant(name, spec["description"], X_ext, ext_names, config)
+            else:
+                X_var, var_cols = feature_matrix(df, cols, exclude=spec.get("exclude"))
+                exp = run_experiment_variant(name, spec["description"], X_var, var_cols, config)
+            experiments.append(exp)
+            status = "skipped" if exp.skipped else f"kNN={exp.knn_overlap:.3f}"
+            print(f"  - {name}: {status}")
 
-    stability = seed_stability(prep.X, prep.retained_features, config)
-    print(f"[embed] seed stability: {stability['interpretation']} (mean overlap={stability['pairwise_knn_overlap_mean']:.3f})")
+        stability = seed_stability(prep.X, prep.retained_features, config)
+        print(f"[embed] seed stability: {stability['interpretation']} (mean overlap={stability['pairwise_knn_overlap_mean']:.3f})")
 
     write_analysis_report(output_dir / "analysis-report.md", context, experiments, stability, retained_info)
 
@@ -120,13 +130,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", help="Output directory for embedding artifacts")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--all", action="store_true", help="Embed all four streets")
+    parser.add_argument(
+        "--skip-analysis",
+        action="store_true",
+        help="Skip research-only feature-group and seed-stability UMAP reruns",
+    )
     args = parser.parse_args(argv)
 
     if args.all:
         results = []
         for street in STREETS:
             cfg = resolve_paths(street, args.input, args.output)
-            results.append(embed_street(street, cfg.input_path, cfg.output_dir, args.seed))
+            results.append(embed_street(street, cfg.input_path, cfg.output_dir, args.seed, args.skip_analysis))
         print("\n[embed] all streets complete")
         for r in results:
             print(f"  {r['street']}: {r['count']:,} points in {r['elapsed_s']:.1f}s")
@@ -136,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--street is required unless --all is set")
 
     cfg = resolve_paths(args.street, args.input, args.output)
-    embed_street(args.street, cfg.input_path, cfg.output_dir, args.seed)
+    embed_street(args.street, cfg.input_path, cfg.output_dir, args.seed, args.skip_analysis)
     return 0
 
 

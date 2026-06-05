@@ -95,6 +95,7 @@ GOP_ARTIFACT_BUCKET=<private-artifact-bucket>
 GOP_S3_PREFIX=
 GOP_SEED=42
 GOP_FEATURE_MODE=compact
+GOP_EXACT_FEATURE_BUDGET=production
 GOP_PREFLOP_COUNT=1326
 GOP_FLOP_COUNT=25000
 GOP_TURN_COUNT=25000
@@ -116,6 +117,22 @@ pnpm aws:submit-release -- \
   --region us-east-1 \
   --release-id 2026-06-balanced-small-1
 ```
+
+Before running balanced-small, run a tiny no-upload canary and inspect logs:
+
+```bash
+pnpm aws:submit-release -- \
+  --region us-east-1 \
+  --release-id canary-$(date +%Y%m%d-%H%M%S) \
+  --skip-upload \
+  --preflop-count 10 \
+  --flop-count 20 \
+  --turn-count 20 \
+  --river-count 20 \
+  --exact-feature-budget production
+```
+
+Do not submit a balanced-small job with `GOP_EXACT_FEATURE_BUDGET=full` without an explicit cost/runtime review. Full exact equity, runout, card-removal, and transition features are intended for small research runs; production balanced-small uses bounded compact features. The release worker also passes `--skip-analysis` so production jobs do not rerun research-only UMAP feature-group and seed-stability experiments.
 
 Read the CloudFormation outputs for:
 

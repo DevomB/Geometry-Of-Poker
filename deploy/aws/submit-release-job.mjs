@@ -19,6 +19,12 @@ Optional:
   --job-queue geometry-of-poker-release
   --job-definition geometry-of-poker-release-worker
   --bucket <artifact-bucket>
+  --skip-upload
+  --preflop-count 10
+  --flop-count 20
+  --turn-count 20
+  --river-count 20
+  --exact-feature-budget production
 `;
 }
 
@@ -34,9 +40,23 @@ function main() {
   const jobQueue = argValue("--job-queue") || `${projectName}-release`;
   const jobDefinition = argValue("--job-definition") || `${projectName}-release-worker`;
   const bucket = argValue("--bucket");
+  const exactFeatureBudget = argValue("--exact-feature-budget");
+  const preflopCount = argValue("--preflop-count");
+  const flopCount = argValue("--flop-count");
+  const turnCount = argValue("--turn-count");
+  const riverCount = argValue("--river-count");
+  const skipUpload = process.argv.includes("--skip-upload");
 
   const environment = [{ name: "GOP_RELEASE_ID", value: releaseId }];
   if (bucket) environment.push({ name: "GOP_ARTIFACT_BUCKET", value: bucket });
+  if (skipUpload) environment.push({ name: "GOP_SKIP_UPLOAD", value: "1" });
+  if (exactFeatureBudget) {
+    environment.push({ name: "GOP_EXACT_FEATURE_BUDGET", value: exactFeatureBudget });
+  }
+  if (preflopCount) environment.push({ name: "GOP_PREFLOP_COUNT", value: preflopCount });
+  if (flopCount) environment.push({ name: "GOP_FLOP_COUNT", value: flopCount });
+  if (turnCount) environment.push({ name: "GOP_TURN_COUNT", value: turnCount });
+  if (riverCount) environment.push({ name: "GOP_RIVER_COUNT", value: riverCount });
 
   const containerOverrides = JSON.stringify({ environment });
   const jobName = `gop-${releaseId}`.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 128);

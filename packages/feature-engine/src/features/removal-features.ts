@@ -9,6 +9,7 @@ import {
   stdDev,
 } from "../cards.js";
 import { resolveVillainRange } from "../range.js";
+import type { ExactFeatureBudget } from "../types.js";
 import type { ValidatedState } from "../validate-input.js";
 
 export interface RemovalFeatureResult {
@@ -50,7 +51,12 @@ export function computeRemovalFeatures(
   state: ValidatedState,
   villainRange?: Float64Array,
   includeFullGradient = false,
+  exactFeatureBudget: ExactFeatureBudget = "production",
 ): RemovalFeatureResult {
+  if (exactFeatureBudget !== "full") {
+    return { summaries: { ...NEUTRAL_REMOVAL }, available: 0 };
+  }
+
   try {
     const pc = getPokerCalculations();
     const range = resolveVillainRange(villainRange);

@@ -4,7 +4,7 @@ import { computeCoreFeatures } from "./features/core-features.js";
 import { computeDrawFeatures } from "./features/draw-features.js";
 import { computeRemovalFeatures } from "./features/removal-features.js";
 import { computeTransitionFeatures } from "./features/transition-features.js";
-import type { FeatureMode } from "./types.js";
+import type { ExactFeatureBudget, FeatureMode } from "./types.js";
 
 export interface FeatureGroupTimingsMs {
   core: number;
@@ -19,12 +19,13 @@ export interface FeatureGroupTimingsMs {
 export function profileFeatureGroups(
   state: Parameters<typeof validatePokerStateInput>[0],
   mode: FeatureMode = "compact",
+  exactFeatureBudget: ExactFeatureBudget = mode === "extended" ? "full" : "production",
 ): FeatureGroupTimingsMs {
   const validated = validatePokerStateInput(state);
   const extended = mode === "extended";
 
   let t0 = performance.now();
-  computeCoreFeatures(validated);
+  computeCoreFeatures(validated, exactFeatureBudget);
   const core = performance.now() - t0;
 
   t0 = performance.now();
@@ -36,11 +37,11 @@ export function profileFeatureGroups(
   const draws = performance.now() - t0;
 
   t0 = performance.now();
-  computeRemovalFeatures(validated, undefined, extended);
+  computeRemovalFeatures(validated, undefined, extended, exactFeatureBudget);
   const removal = performance.now() - t0;
 
   t0 = performance.now();
-  computeTransitionFeatures(validated, extended);
+  computeTransitionFeatures(validated, extended, exactFeatureBudget);
   const transitions = performance.now() - t0;
 
   return {

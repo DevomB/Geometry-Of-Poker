@@ -1,4 +1,5 @@
 import { getPokerCalculations } from "../pc.js";
+import type { ExactFeatureBudget } from "../types.js";
 import type { ValidatedState } from "../validate-input.js";
 
 export interface CoreFeatureResult {
@@ -54,13 +55,45 @@ function buildCategoryOneHot(category: string): Record<string, number> {
   return oneHot;
 }
 
-export function computeCoreFeatures(state: ValidatedState): CoreFeatureResult {
+const PRODUCTION_EQUITY_ITERATIONS = 4096;
+
+function seedFromCards(cards: string[]) {
+  let hash = 2166136261;
+  for (const card of cards) {
+    for (let i = 0; i < card.length; i++) {
+      hash ^= card.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+  }
+  return hash >>> 0;
+}
+
+function equityVsRandom(
+  pc: ReturnType<typeof getPokerCalculations>,
+  state: ValidatedState,
+  exactFeatureBudget: ExactFeatureBudget,
+) {
+  if (exactFeatureBudget === "production") {
+    return pc.simulateHandOutcomeDetailed(
+      state.hero,
+      state.board,
+      PRODUCTION_EQUITY_ITERATIONS,
+      seedFromCards([...state.hero, ...state.board]),
+    ).estimate;
+  }
+  return pc.exactHuEquityVsRandomHand(state.hero, state.board);
+}
+
+export function computeCoreFeatures(
+  state: ValidatedState,
+  exactFeatureBudget: ExactFeatureBudget = "production",
+): CoreFeatureResult {
   const pc = getPokerCalculations();
   const category = pc.evaluateHandCategory(state.hero, state.board);
   const categoryIndex = pc.handRankCategoryOrder(category);
 
   const core: Record<string, number> = {
-    equityVsRandom: pc.exactHuEquityVsRandomHand(state.hero, state.board),
+    equityVsRandom: equityVsRandom(pc, state, exactFeatureBudget),
     categoryIndex,
     streetIndex:
       state.street === "preflop"
@@ -74,7 +107,7 @@ export function computeCoreFeatures(state: ValidatedState): CoreFeatureResult {
   };
 
   const runouts = neutralRunouts();
-  if (state.board.length <= 3) {
+  if (exactFeatureBudget === "full" && state.board.length <= 3) {
     try {
       const q = pc.exactHeroEquityRunoutQuantiles(state.hero, state.board);
       runouts.equityMean = q.mean;
@@ -89,7 +122,7 @@ export function computeCoreFeatures(state: ValidatedState): CoreFeatureResult {
   }
 
   const vulnerability = neutralVulnerability();
-  if (state.board.length >= 3 && state.board.length <= 4) {
+  if (exactFeatureBudget === "full" && state.board.length >= 3 && state.board.length <= 4) {
     try {
       const v = pc.exactHeroRunoutVulnerability(
         state.hero,

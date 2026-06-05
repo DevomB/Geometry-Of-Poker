@@ -13,6 +13,7 @@ export {
 } from "./feature-order.js";
 export type {
   FeatureMode,
+  ExactFeatureBudget,
   GeometryFeatureGroups,
   GeometryFeatureMetadata,
   GeometryFeatureOptions,

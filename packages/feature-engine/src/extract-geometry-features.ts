@@ -50,17 +50,24 @@ export function extractGeometryFeatures(
   options: GeometryFeatureOptions = {},
 ): GeometryFeatureResult {
   const mode = options.mode ?? "compact";
+  const exactFeatureBudget =
+    options.exactFeatureBudget ?? (mode === "extended" ? "full" : "production");
   const validated = validatePokerStateInput(state);
 
-  const core = computeCoreFeatures(validated);
+  const core = computeCoreFeatures(validated, exactFeatureBudget);
   const board = computeBoardFeatures(validated);
   const draws = computeDrawFeatures(validated);
   const removal = computeRemovalFeatures(
     validated,
     options.villainRange,
     mode === "extended",
+    exactFeatureBudget,
   );
-  const transitions = computeTransitionFeatures(validated, mode === "extended");
+  const transitions = computeTransitionFeatures(
+    validated,
+    mode === "extended",
+    exactFeatureBudget,
+  );
 
   const featureMap = buildFeatureMap(core, board, draws, removal, transitions);
   const featureNames = [...featureOrderForMode(mode)];

@@ -1,6 +1,6 @@
 import { getPokerCalculations } from "../pc.js";
-import { cardStringToDeckIndex } from "poker-calculations/encode";
 import { entropy, stdDev } from "../cards.js";
+import type { ExactFeatureBudget } from "../types.js";
 import type { ValidatedState } from "../validate-input.js";
 
 export interface TransitionFeatureResult {
@@ -58,7 +58,12 @@ function summarizeJointMatrix(matrix: number[]): Record<string, number> {
 export function computeTransitionFeatures(
   state: ValidatedState,
   includeFullMatrix = false,
+  exactFeatureBudget: ExactFeatureBudget = "production",
 ): TransitionFeatureResult {
+  if (exactFeatureBudget !== "full") {
+    return { summaries: { ...NEUTRAL_TRANSITION }, available: 0 };
+  }
+
   if (state.street !== "flop" || state.board.length !== 3) {
     return { summaries: { ...NEUTRAL_TRANSITION }, available: 0 };
   }

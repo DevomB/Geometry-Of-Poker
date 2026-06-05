@@ -50,11 +50,11 @@ When a feature group cannot be computed for a street, scalar features use **0** 
 
 | | |
 | --- | --- |
-| **Definition** | Exact heads-up equity vs a uniformly random villain hand |
+| **Definition** | Heads-up equity vs a uniformly random villain hand |
 | **Range** | `[0, 1]` |
 | **Streets** | All |
-| **Source** | `exactHuEquityVsRandomHand(hero, board)` |
-| **Type** | Exact |
+| **Source** | Production budget: seeded bounded `simulateHandOutcomeDetailed(hero, board, 4096, seed)`; full budget: `exactHuEquityVsRandomHand(hero, board)` |
+| **Type** | Seeded Monte Carlo in production; exact in full budget |
 
 ### `categoryIndex`
 
@@ -102,7 +102,7 @@ Requires `equityRunoutAvailable = 1`.
 | **Source** | `exactHeroEquityRunoutQuantiles(hero, board)` (no range → vs random) |
 | **Type** | Exact |
 
-**Limitation:** `poker-calculations` rejects board length > 3 for this API. Turn/river use neutral zeros.
+**Production budget:** balanced-small generation sets these fields to neutral zeros and `equityRunoutAvailable = 0`. Use `--exact-feature-budget full` only for small research runs. `poker-calculations` rejects board length > 3 for this API; turn/river use neutral zeros.
 
 ---
 
@@ -120,7 +120,7 @@ Requires `runoutVulnerabilityAvailable = 1`.
 | **Source** | `exactHeroRunoutVulnerability(hero, board, deadCards)` |
 | **Type** | Exact |
 
-**Limitation:** Not defined for preflop or river (requires incomplete board 3–4).
+**Production budget:** balanced-small generation sets these fields to neutral zeros and `runoutVulnerabilityAvailable = 0`. Use `--exact-feature-budget full` only for small research runs. Not defined for preflop or river (requires incomplete board 3–4).
 
 ---
 

@@ -88,11 +88,12 @@ interface DatasetRecord {
 
 Feature extraction bottlenecks (typical):
 
-1. **removal** — `exactEquityCardRemovalGradient` (52 equity solves)
-2. **transitions** — `exactHeroCategoryJointFlopToRiver` (flop only)
-3. **core runouts** — `exactHeroEquityRunoutQuantiles` (preflop–flop)
+1. **core equity** — seeded bounded Monte Carlo in production budget; `exactHuEquityVsRandomHand` only with `--exact-feature-budget full`
+2. **removal** — neutral in production budget; `exactEquityCardRemovalGradient` only with `--exact-feature-budget full`
+3. **transitions** — neutral in production budget; `exactHeroCategoryJointFlopToRiver` only with `--exact-feature-budget full`
+4. **core runouts** — neutral in production budget; `exactHeroEquityRunoutQuantiles` only with `--exact-feature-budget full`
 
-Recommended scaling: batch size 1000–5000, street-separated pipelines, cache villain uniform range, future upstream batch APIs.
+Recommended scaling: use `--exact-feature-budget production` for balanced-small or larger runs, batch size 1000–5000, and `--skip-analysis` during release embedding. Full feature-group and seed-stability analysis should be reserved for smaller research runs.
 
 ## Validation
 

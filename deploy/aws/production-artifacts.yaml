@@ -207,6 +207,7 @@ Resources:
           CachedMethods: [GET, HEAD, OPTIONS]
           Compress: true
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: 5cc3b908-e619-4b99-88e5-2cf7f45965bd # Managed-CORS-With-Preflight
         Origins:
           - Id: artifact-bucket
             DomainName: !GetAtt ArtifactBucket.RegionalDomainName

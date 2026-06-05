@@ -205,6 +205,9 @@ function LoadingProgress() {
 }
 
 function summarizeError(message: string): string {
+  if (/artifact.*cdn|cdn.*artifact/i.test(message)) {
+    return "Artifact CDN unreachable. Check CloudFront CORS/status or retry after cache propagation.";
+  }
   if (/network|fetch|failed to fetch/i.test(message)) {
     return "Backend unreachable. Check your network connection or the server status.";
   }

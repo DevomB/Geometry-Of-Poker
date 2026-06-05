@@ -43,6 +43,17 @@ function loadManifests() {
   return manifestCache;
 }
 
+async function fetchArtifact(url: string, label: string): Promise<Response> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to fetch ${label} artifact from CDN: ${reason}`);
+  }
+}
+
 export async function fetchStreetManifest(street: Street): Promise<StreetManifest> {
   const manifests = await loadManifests();
   const manifest = manifests.streets[street];
@@ -52,23 +63,20 @@ export async function fetchStreetManifest(street: Street): Promise<StreetManifes
 
 export async function fetchPointsBin(street: Street): Promise<ArrayBuffer> {
   const manifest = await fetchStreetManifest(street);
-  const res = await fetch(manifest.artifacts.pointsBin);
-  if (!res.ok) throw new Error(`Failed to load points for ${street}: ${res.status}`);
+  const res = await fetchArtifact(manifest.artifacts.pointsBin, `${street} points`);
   return res.arrayBuffer();
 }
 
 export async function fetchBrowserMetadata(street: Street): Promise<BrowserMetadata> {
   const manifest = await fetchStreetManifest(street);
-  const res = await fetch(manifest.artifacts.metadataJson);
-  if (!res.ok) throw new Error(`Failed to load metadata for ${street}: ${res.status}`);
+  const res = await fetchArtifact(manifest.artifacts.metadataJson, `${street} metadata`);
   return res.json() as Promise<BrowserMetadata>;
 }
 
 export async function fetchChannelsBin(street: Street): Promise<ArrayBuffer | null> {
   const manifest = await fetchStreetManifest(street);
   if (!manifest.artifacts.channelsBin) return null;
-  const res = await fetch(manifest.artifacts.channelsBin);
-  if (!res.ok) throw new Error(`Failed to load channels for ${street}: ${res.status}`);
+  const res = await fetchArtifact(manifest.artifacts.channelsBin, `${street} channels`);
   return res.arrayBuffer();
 }
 

@@ -16,7 +16,7 @@
   "dependencies": {
     "@geometry-of-poker/feature-engine": "workspace:*",
     "parquetjs": "^0.11.2",
-    "poker-calculations": "2.2.0"
+    "poker-calculations": "2.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

@@ -27,12 +27,10 @@ COPY packages/feature-engine/package.json packages/feature-engine/package.json
 COPY packages/dataset-generator/package.json packages/dataset-generator/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY vendor/poker-calculations /tmp/poker-calculations
-COPY deploy/aws/patch-poker-calculations-native.mjs /tmp/patch-poker-calculations-native.mjs
 
 RUN pnpm install --frozen-lockfile
 
 RUN cd /tmp/poker-calculations \
-  && node /tmp/patch-poker-calculations-native.mjs \
   && npm ci \
   && npm run build:native \
   && node scripts/stage-prebuild.js linux-x64 \

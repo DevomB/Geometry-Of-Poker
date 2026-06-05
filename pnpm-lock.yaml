@@ -84,8 +84,8 @@ importers:
         specifier: ^0.11.2
         version: 0.11.2
       poker-calculations:
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: 2.2.1
+        version: 2.2.1
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -103,8 +103,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       poker-calculations:
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: 2.2.1
+        version: 2.2.1
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -2313,8 +2313,8 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
-  poker-calculations@2.2.0:
-    resolution: {integrity: sha512-oItIclajdGpn2DTBSshQV3dqje32pZom1tzgdQLc9xKRL30AS4BvtguY1p7qeVn6oIZdFGVwwYApXfed3ztBGw==}
+  poker-calculations@2.2.1:
+    resolution: {integrity: sha512-pUCNyUcZInl3ZwP6TZmRLszBMrfJ7kIFffXqn+62f1pbKfnF3GBfBmB2Mk2SxZkHhMAaU3qUILYwfIoDFrrvKg==}
     engines: {node: '>=18'}
 
   possible-typed-array-names@1.1.0:
@@ -4981,7 +4981,7 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  poker-calculations@2.2.0:
+  poker-calculations@2.2.1:
     dependencies:
       node-gyp-build: 4.8.4
 

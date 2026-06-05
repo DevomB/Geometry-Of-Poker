@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
-const require = createRequire(import.meta.url);
+const packageRequire = createRequire(import.meta.url);
 
 type PokerCalculationsApi = typeof import("poker-calculations");
 
@@ -9,7 +10,21 @@ let lastAvailabilityError: unknown;
 
 export function getPokerCalculations(): PokerCalculationsApi {
   if (!cached) {
-    cached = require("poker-calculations") as PokerCalculationsApi;
+    const errors: string[] = [];
+    for (const requirePokerCalculations of [
+      createRequire(join(process.cwd(), "package.json")),
+      packageRequire,
+    ]) {
+      try {
+        cached = requirePokerCalculations("poker-calculations") as PokerCalculationsApi;
+        break;
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    if (!cached) {
+      throw new Error(`Unable to load poker-calculations: ${errors.join(" | ")}`);
+    }
   }
   return cached;
 }

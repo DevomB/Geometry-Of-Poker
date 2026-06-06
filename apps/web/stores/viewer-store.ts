@@ -7,6 +7,7 @@ import type {
   CameraFlyTarget,
   ColorMode,
   ManualMarker,
+  RenderQuality,
   SelectionState,
   StreetDataset,
   ViewerFilters,
@@ -31,7 +32,12 @@ interface ViewerState {
   manualMarker: ManualMarker | null;
   cameraFlyTarget: CameraFlyTarget | null;
   fps: number;
+  targetFps: number;
+  renderQuality: RenderQuality;
   visualizationRevision: number;
+  visualUpdate:
+    | { kind: "full" }
+    | { kind: "points"; indices: number[] };
   bounds: ReturnType<typeof computeBounds> | null;
 
   setStreet: (street: Street) => void;
@@ -51,6 +57,15 @@ interface ViewerState {
   loadStreet: () => Promise<void>;
   refreshVisualization: () => void;
 }
+
+const TARGET_FPS = 30;
+const MIN_SAMPLE_RATE = 0.15;
+
+const RENDER_QUALITY: Record<RenderQuality["tier"], RenderQuality> = {
+  high: { tier: "high", dprMax: 1.5, hoverIntervalMs: 48 },
+  balanced: { tier: "balanced", dprMax: 1.25, hoverIntervalMs: 72 },
+  performance: { tier: "performance", dprMax: 1, hoverIntervalMs: 112 },
+};
 
 function defaultLodSampleRate() {
   if (typeof navigator === "undefined") return 1;
@@ -142,7 +157,10 @@ function rebuildVisualization(state: ViewerState): Partial<ViewerState> {
   dataset.sizes.set(dataset.baseSizes);
   applyOverlays(dataset, state);
 
-  return { visualizationRevision: state.visualizationRevision + 1 };
+  return {
+    visualizationRevision: state.visualizationRevision + 1,
+    visualUpdate: { kind: "full" },
+  };
 }
 
 function updateHoverVisual(state: ViewerState, hoverIndex: number | null): Partial<ViewerState> {
@@ -156,10 +174,60 @@ function updateHoverVisual(state: ViewerState, hoverIndex: number | null): Parti
   if (previousHover !== null) applyPointOverlay(dataset, nextState, previousHover);
   if (hoverIndex !== null) applyPointOverlay(dataset, nextState, hoverIndex);
 
+  const indices: number[] = [];
+  if (previousHover !== null) indices.push(previousHover);
+  if (hoverIndex !== null) indices.push(hoverIndex);
+
   return {
     hoverIndex,
     visualizationRevision: state.visualizationRevision + 1,
+    visualUpdate: { kind: "points", indices },
   };
+}
+
+function nextLowerQuality(tier: RenderQuality["tier"]): RenderQuality["tier"] {
+  if (tier === "high") return "balanced";
+  return "performance";
+}
+
+function nextHigherQuality(tier: RenderQuality["tier"]): RenderQuality["tier"] {
+  if (tier === "performance") return "balanced";
+  return "high";
+}
+
+function adaptRenderQuality(state: ViewerState, fps: number): Partial<ViewerState> {
+  const patch: Partial<ViewerState> = { fps };
+
+  if (!state.dataset) return patch;
+
+  if (fps > 0 && fps < TARGET_FPS) {
+    const tier = nextLowerQuality(state.renderQuality.tier);
+    patch.renderQuality = RENDER_QUALITY[tier];
+    if (state.lodSampleRate > MIN_SAMPLE_RATE) {
+      patch.lodSampleRate = Math.max(
+        MIN_SAMPLE_RATE,
+        Number((state.lodSampleRate * 0.78).toFixed(2)),
+      );
+    }
+    return patch;
+  }
+
+  if (
+    fps >= TARGET_FPS + 18 &&
+    state.lodSampleRate < defaultLodSampleRate()
+  ) {
+    patch.lodSampleRate = Math.min(
+      defaultLodSampleRate(),
+      Number((state.lodSampleRate + 0.08).toFixed(2)),
+    );
+  }
+
+  if (fps >= TARGET_FPS + 24 && state.renderQuality.tier !== "high") {
+    const tier = nextHigherQuality(state.renderQuality.tier);
+    patch.renderQuality = RENDER_QUALITY[tier];
+  }
+
+  return patch;
 }
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
@@ -178,7 +246,10 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   manualMarker: null,
   cameraFlyTarget: null,
   fps: 0,
+  targetFps: TARGET_FPS,
+  renderQuality: RENDER_QUALITY.high,
   visualizationRevision: 0,
+  visualUpdate: { kind: "full" },
   bounds: null,
 
   setStreet: (street) => {
@@ -264,7 +335,14 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   flyTo: (cameraFlyTarget) => set({ cameraFlyTarget }),
   clearCameraFlyTarget: () => set({ cameraFlyTarget: null }),
-  setFps: (fps) => set({ fps }),
+  setFps: (fps) => {
+    const state = get();
+    const patch = adaptRenderQuality(state, fps);
+    set(patch);
+    if (patch.lodSampleRate !== undefined) {
+      set(rebuildVisualization(get()));
+    }
+  },
 
   loadStreet: async () => {
     const { street, isLoading } = get();

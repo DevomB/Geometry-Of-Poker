@@ -72,8 +72,12 @@ The viewer uses:
 - Scalar channel sidecar (`browser-channels.bin`) for colors and filters
 - Projection sidecar (`projection-index.bin`) for server-side manual hand projection
 - LOD slider for density reduction
+- Adaptive render quality with a 30 FPS floor target
+- Capped device-pixel-ratio for integrated GPUs
+- Throttled DOM-pointer hover probing instead of default full point-cloud raycast events
+- Partial GPU buffer updates for hover/selection changes
 
-Expected balanced-small behavior is 45-60 FPS on a modern desktop GPU, subject to browser, device, and active filters. At larger releases, metadata JSON and hover picking become the first constraints; compact detail sidecars and GPU picking are the likely next optimizations.
+Expected balanced-small behavior is 45-60 FPS on a modern desktop GPU, subject to browser, device, and active filters. The viewer now attempts to keep measured render rate above 30 FPS by lowering point density, device-pixel-ratio, hover probe frequency, and HTML cluster labels when needed. At larger releases, metadata JSON and CPU hover picking remain the first constraints; compact detail sidecars and true GPU picking are the likely next optimizations.
 
 ## Optimization Priority
 

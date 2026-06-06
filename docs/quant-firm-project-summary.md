@@ -121,6 +121,7 @@ Full tables: [performance-analysis.md](./performance-analysis.md)
 | Artifact | Location |
 | --- | --- |
 | Local presentation | `pnpm dev` → localhost:3000 |
+| Math showpiece | `docs/math-showpiece.md` |
 | Methodology | `docs/research-methodology.md` |
 | Performance | `docs/performance-analysis.md` |
 | C++Con outline | `docs/cppcon-talk-outline.md` |

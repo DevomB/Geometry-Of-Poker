@@ -23,6 +23,9 @@ export function ControlPanel() {
   const toggleClusterLabels = useViewerStore((s) => s.toggleClusterLabels);
   const lodSampleRate = useViewerStore((s) => s.lodSampleRate);
   const setLodSampleRate = useViewerStore((s) => s.setLodSampleRate);
+  const fps = useViewerStore((s) => s.fps);
+  const targetFps = useViewerStore((s) => s.targetFps);
+  const renderQuality = useViewerStore((s) => s.renderQuality);
 
   const categories = dataset?.manifest.categories ?? [];
 
@@ -203,6 +206,18 @@ export function ControlPanel() {
             className="mt-1 w-full accent-cyan-400"
           />
         </label>
+        <div className="mt-2 grid grid-cols-2 gap-1 text-[10px] text-zinc-500">
+          <span>Target</span>
+          <span className="gop-mono text-right tabular-nums">{targetFps}+ fps</span>
+          <span>Measured</span>
+          <span className="gop-mono text-right tabular-nums">
+            {fps > 0 ? `${fps} fps` : "pending"}
+          </span>
+          <span>Quality</span>
+          <span className="gop-mono text-right uppercase tracking-wider">
+            {renderQuality.tier}
+          </span>
+        </div>
       </Section>
 
       <Section title="Camera">

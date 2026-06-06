@@ -8,6 +8,7 @@ import { NEIGHBOR_LINK_COLOR } from "@/lib/visualization-theme";
 export function NeighborLinks() {
   const show = useViewerStore((s) => s.showNnLinks);
   const dataset = useViewerStore((s) => s.dataset);
+  const spatialIndex = useViewerStore((s) => s.spatialIndex);
   const selection = useViewerStore((s) => s.selection);
   const manualMarker = useViewerStore((s) => s.manualMarker);
 
@@ -27,21 +28,13 @@ export function NeighborLinks() {
         const idx = dataset.idToIndex.get(id);
         if (idx !== undefined && idx !== anchorIndex) neighbors.push(idx);
       }
-    } else {
+    } else if (spatialIndex) {
       const px = dataset.positions[anchorIndex * 3]!;
       const py = dataset.positions[anchorIndex * 3 + 1]!;
       const pz = dataset.positions[anchorIndex * 3 + 2]!;
-      const scored: { i: number; d: number }[] = [];
-      for (let i = 0; i < dataset.count; i++) {
-        if (i === anchorIndex) continue;
-        const d =
-          (dataset.positions[i * 3]! - px) ** 2 +
-          (dataset.positions[i * 3 + 1]! - py) ** 2 +
-          (dataset.positions[i * 3 + 2]! - pz) ** 2;
-        scored.push({ i, d });
-      }
-      scored.sort((a, b) => a.d - b.d);
-      neighbors.push(...scored.slice(0, 8).map((s) => s.i));
+      neighbors.push(
+        ...spatialIndex.nearestK(px, py, pz, 8, anchorIndex).map((s) => s.index),
+      );
     }
 
     const positions = new Float32Array(neighbors.length * 6);
@@ -62,7 +55,7 @@ export function NeighborLinks() {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     return geo;
-  }, [show, dataset, selection, manualMarker]);
+  }, [show, dataset, spatialIndex, selection, manualMarker]);
 
   if (!geometry) return null;
 

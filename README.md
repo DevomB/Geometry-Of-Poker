@@ -183,6 +183,7 @@ The current balanced-small release is intended to be usable on laptops with inte
 
 | File | Description |
 | --- | --- |
+| `docs/math-showpiece.md` | Quant-facing math narrative for demos and interviews |
 | `docs/research-methodology.md` | Feature and embedding methodology |
 | `docs/architecture.md` | System design and data flow |
 | `docs/performance-analysis.md` | Performance model and benchmarks |

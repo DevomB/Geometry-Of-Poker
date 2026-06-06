@@ -19,6 +19,14 @@ export const COLOR_MODES: { id: ColorMode; label: string }[] = [
 
 export const STREETS: Street[] = ["preflop", "flop", "turn", "river"];
 
+export type RenderQualityTier = "high" | "balanced" | "performance";
+
+export interface RenderQuality {
+  tier: RenderQualityTier;
+  dprMax: number;
+  hoverIntervalMs: number;
+}
+
 export interface PointSummary {
   equityVsRandom?: number;
   equityMean?: number;

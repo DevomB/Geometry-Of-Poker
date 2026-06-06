@@ -81,6 +81,7 @@ export function SceneShell() {
   const loadError = useViewerStore((s) => s.loadError);
   const street = useViewerStore((s) => s.street);
   const loadStreet = useViewerStore((s) => s.loadStreet);
+  const renderQuality = useViewerStore((s) => s.renderQuality);
   const webglAvailable = useWebGLAvailable();
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export function SceneShell() {
       {webglAvailable !== false && (
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
-          dpr={[1, 1.5]}
+          dpr={[1, renderQuality.dprMax]}
           gl={{ antialias: false, powerPreference: "high-performance" }}
         >
           <color attach="background" args={[SCENE_BACKGROUND]} />

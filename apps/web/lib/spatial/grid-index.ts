@@ -62,31 +62,53 @@ export class GridSpatialIndex {
     return bestIndex;
   }
 
-  nearestK(x: number, y: number, z: number, k: number): { index: number; distance: number }[] {
+  nearestK(
+    x: number,
+    y: number,
+    z: number,
+    k: number,
+    excludeIndex?: number,
+  ): { index: number; distance: number }[] {
     if (!this.positions) return [];
 
     const results: { index: number; distance: number }[] = [];
     const cx = Math.floor(x / this.cellSize);
     const cy = Math.floor(y / this.cellSize);
     const cz = Math.floor(z / this.cellSize);
-    const radius = Math.ceil(Math.sqrt(k / 10)) + 2;
+    const seen = new Set<number>();
+    let radius = 0;
+    const maxRadius = Math.max(4, Math.ceil(Math.cbrt(this.cells.size)) + 2);
 
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dz = -radius; dz <= radius; dz++) {
-          const key = `${cx + dx},${cy + dy},${cz + dz}`;
-          const bucket = this.cells.get(key);
-          if (!bucket) continue;
+    while (results.length < k && radius <= maxRadius) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dz = -radius; dz <= radius; dz++) {
+            if (
+              Math.abs(dx) !== radius &&
+              Math.abs(dy) !== radius &&
+              Math.abs(dz) !== radius
+            ) {
+              continue;
+            }
+            const key = `${cx + dx},${cy + dy},${cz + dz}`;
+            const bucket = this.cells.get(key);
+            if (!bucket) continue;
 
-          for (const i of bucket) {
-            const px = this.positions[i * 3]!;
-            const py = this.positions[i * 3 + 1]!;
-            const pz = this.positions[i * 3 + 2]!;
-            const dist = Math.sqrt((px - x) ** 2 + (py - y) ** 2 + (pz - z) ** 2);
-            results.push({ index: i, distance: dist });
+            for (const i of bucket) {
+              if (i === excludeIndex || seen.has(i)) continue;
+              seen.add(i);
+              const px = this.positions[i * 3]!;
+              const py = this.positions[i * 3 + 1]!;
+              const pz = this.positions[i * 3 + 2]!;
+              const distance = Math.sqrt(
+                (px - x) ** 2 + (py - y) ** 2 + (pz - z) ** 2,
+              );
+              results.push({ index: i, distance });
+            }
           }
         }
       }
+      radius += 1;
     }
 
     results.sort((a, b) => a.distance - b.distance);
@@ -107,13 +129,17 @@ export function nearestPointToRay(
   rayOrigin: [number, number, number],
   rayDirection: [number, number, number],
   threshold = 0.15,
+  sizes?: Float32Array,
+  sampleStep = 1,
 ): number {
   let bestIndex = -1;
   let bestDistSq = threshold * threshold;
   const [ox, oy, oz] = rayOrigin;
   const [dx, dy, dz] = rayDirection;
 
-  for (let i = 0; i < count; i++) {
+  const step = Math.max(1, Math.floor(sampleStep));
+  for (let i = 0; i < count; i += step) {
+    if (sizes && sizes[i]! <= 0) continue;
     const px = positions[i * 3]!;
     const py = positions[i * 3 + 1]!;
     const pz = positions[i * 3 + 2]!;

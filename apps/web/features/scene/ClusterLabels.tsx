@@ -6,8 +6,11 @@ import { useViewerStore } from "@/stores/viewer-store";
 export function ClusterLabels() {
   const show = useViewerStore((s) => s.showClusterLabels);
   const manifest = useViewerStore((s) => s.dataset?.manifest);
+  const renderQuality = useViewerStore((s) => s.renderQuality);
 
-  if (!show || !manifest?.clusters?.length) return null;
+  if (!show || renderQuality.tier === "performance" || !manifest?.clusters?.length) {
+    return null;
+  }
 
   return (
     <>

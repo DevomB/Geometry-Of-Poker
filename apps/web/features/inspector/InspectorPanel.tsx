@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useViewerStore } from "@/stores/viewer-store";
 import { CardDisplay } from "@/components/CardDisplay";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
@@ -335,24 +335,17 @@ function DrawsSection({ point }: { point: BrowserPointMeta }) {
 
 function NearestNeighbors({ index }: { index: number }) {
   const dataset = useViewerStore((s) => s.dataset);
+  const spatialIndex = useViewerStore((s) => s.spatialIndex);
   const selectPoint = useViewerStore((s) => s.selectPoint);
-  if (!dataset) return null;
+  const top = useMemo(() => {
+    if (!dataset || !spatialIndex) return [];
+    const px = dataset.positions[index * 3]!;
+    const py = dataset.positions[index * 3 + 1]!;
+    const pz = dataset.positions[index * 3 + 2]!;
+    return spatialIndex.nearestK(px, py, pz, 6, index);
+  }, [dataset, index, spatialIndex]);
 
-  const px = dataset.positions[index * 3]!;
-  const py = dataset.positions[index * 3 + 1]!;
-  const pz = dataset.positions[index * 3 + 2]!;
-  const scored: { i: number; d: number }[] = [];
-  for (let i = 0; i < dataset.count; i++) {
-    if (i === index) continue;
-    const d = Math.sqrt(
-      (dataset.positions[i * 3]! - px) ** 2 +
-        (dataset.positions[i * 3 + 1]! - py) ** 2 +
-        (dataset.positions[i * 3 + 2]! - pz) ** 2,
-    );
-    scored.push({ i, d });
-  }
-  scored.sort((a, b) => a.d - b.d);
-  const top = scored.slice(0, 6);
+  if (!dataset || top.length === 0) return null;
 
   return (
     <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
@@ -360,17 +353,17 @@ function NearestNeighbors({ index }: { index: number }) {
         Nearest neighbors
       </p>
       <ul className="space-y-0.5 text-[11px]">
-        {top.map(({ i, d }) => {
-          const p = dataset.metadata[i]!;
+      {top.map(({ index: neighborIndex, distance }) => {
+          const p = dataset.metadata[neighborIndex]!;
           return (
             <li key={p.id}>
               <button
                 type="button"
-                onClick={() => selectPoint(i, true)}
+                onClick={() => selectPoint(neighborIndex, true)}
                 className="w-full rounded px-1 py-0.5 text-left transition hover:bg-white/5"
               >
                 <span className="gop-mono tabular-nums text-zinc-500">
-                  {d.toFixed(3)}
+                  {distance.toFixed(3)}
                 </span>{" "}
                 <span className="text-zinc-300">{p.hero.join(" ")}</span>
                 {p.board.length > 0 && (

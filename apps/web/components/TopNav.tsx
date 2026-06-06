@@ -27,6 +27,8 @@ function StatusDot({ color, pulsing }: { color: string; pulsing: boolean }) {
 
 export function TopNav() {
   const fps = useViewerStore((s) => s.fps);
+  const targetFps = useViewerStore((s) => s.targetFps);
+  const renderQuality = useViewerStore((s) => s.renderQuality);
   const dataset = useViewerStore((s) => s.dataset);
   const street = useViewerStore((s) => s.street);
   const isLoading = useViewerStore((s) => s.isLoading);
@@ -108,10 +110,10 @@ export function TopNav() {
 
           {!isLoading && fps > 0 && (
             <span
-              title="Render rate"
+              title={`Render rate; target floor ${targetFps} fps; quality ${renderQuality.tier}`}
               className="hidden tabular-nums text-zinc-500 md:inline-block"
             >
-              {fps} fps
+              {fps} fps / {renderQuality.tier}
             </span>
           )}
 

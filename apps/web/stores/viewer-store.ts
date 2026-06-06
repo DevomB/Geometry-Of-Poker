@@ -31,6 +31,7 @@ interface ViewerState {
   manualMarker: ManualMarker | null;
   cameraFlyTarget: CameraFlyTarget | null;
   fps: number;
+  visualizationRevision: number;
   bounds: ReturnType<typeof computeBounds> | null;
 
   setStreet: (street: Street) => void;
@@ -51,23 +52,63 @@ interface ViewerState {
   refreshVisualization: () => void;
 }
 
-function rebuildVisualization(state: ViewerState): Partial<ViewerState> {
-  if (!state.dataset) return {};
-  const dataset = state.dataset;
-  const lodIndices = state.lodSampleRate < 1 ? buildLodIndices(dataset.count, state.lodSampleRate) : undefined;
+function defaultLodSampleRate() {
+  if (typeof navigator === "undefined") return 1;
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const memoryGb = nav.deviceMemory ?? 16;
+  const cores = nav.hardwareConcurrency ?? 8;
+  if (memoryGb <= 8 || cores <= 6) return 0.55;
+  if (memoryGb <= 16 || cores <= 8) return 0.75;
+  return 1;
+}
 
-  applyColorMode(dataset, state.colorMode, dataset.colors, lodIndices);
-  applyFilters(dataset, state.filters, dataset.visible, dataset.colors);
+function lodStep(sampleRate: number) {
+  return sampleRate < 1 ? Math.max(1, Math.floor(1 / sampleRate)) : 1;
+}
 
-  for (let i = 0; i < dataset.count; i++) {
-    dataset.sizes[i] =
-      state.lodSampleRate < 1 && i % Math.floor(1 / state.lodSampleRate) !== 0
-        ? 0
-        : POINT_SIZES.base;
-    if (!dataset.visible[i]) dataset.sizes[i] = 0;
+function isLodVisible(index: number, sampleRate: number) {
+  return sampleRate >= 1 || index % lodStep(sampleRate) === 0;
+}
+
+function copyPointVisual(dataset: StreetDataset, index: number) {
+  if (index < 0 || index >= dataset.count) return;
+  const colorOffset = index * 3;
+  dataset.colors[colorOffset] = dataset.baseColors[colorOffset]!;
+  dataset.colors[colorOffset + 1] = dataset.baseColors[colorOffset + 1]!;
+  dataset.colors[colorOffset + 2] = dataset.baseColors[colorOffset + 2]!;
+  dataset.sizes[index] = dataset.baseSizes[index]!;
+}
+
+function applyPointOverlay(dataset: StreetDataset, state: ViewerState, index: number) {
+  if (index < 0 || index >= dataset.count) return;
+  copyPointVisual(dataset, index);
+
+  if (state.manualMarker) {
+    for (const id of state.manualMarker.neighborIds) {
+      if (dataset.idToIndex.get(id) === index) {
+        dataset.sizes[index] = Math.max(dataset.sizes[index]!, POINT_SIZES.manualNeighbor);
+        break;
+      }
+    }
   }
 
-  // Highlight projected manual neighbors so they stay visible against any palette.
+  if (state.selection?.locked && state.selection.index === index) {
+    dataset.colors[index * 3] = SELECTION_COLOR[0];
+    dataset.colors[index * 3 + 1] = SELECTION_COLOR[1];
+    dataset.colors[index * 3 + 2] = SELECTION_COLOR[2];
+    dataset.sizes[index] = POINT_SIZES.selected;
+    return;
+  }
+
+  if (state.hoverIndex === index) {
+    dataset.colors[index * 3] = HOVER_COLOR[0];
+    dataset.colors[index * 3 + 1] = HOVER_COLOR[1];
+    dataset.colors[index * 3 + 2] = HOVER_COLOR[2];
+    dataset.sizes[index] = POINT_SIZES.hover;
+  }
+}
+
+function applyOverlays(dataset: StreetDataset, state: ViewerState) {
   if (state.manualMarker && dataset.idToIndex.size > 0) {
     for (const id of state.manualMarker.neighborIds) {
       const idx = dataset.idToIndex.get(id);
@@ -77,21 +118,48 @@ function rebuildVisualization(state: ViewerState): Partial<ViewerState> {
   }
 
   if (state.selection?.locked) {
-    const idx = state.selection.index;
-    dataset.colors[idx * 3] = SELECTION_COLOR[0];
-    dataset.colors[idx * 3 + 1] = SELECTION_COLOR[1];
-    dataset.colors[idx * 3 + 2] = SELECTION_COLOR[2];
-    dataset.sizes[idx] = POINT_SIZES.selected;
+    applyPointOverlay(dataset, state, state.selection.index);
   }
   if (state.hoverIndex !== null && state.hoverIndex !== state.selection?.index) {
-    const idx = state.hoverIndex;
-    dataset.colors[idx * 3] = HOVER_COLOR[0];
-    dataset.colors[idx * 3 + 1] = HOVER_COLOR[1];
-    dataset.colors[idx * 3 + 2] = HOVER_COLOR[2];
-    dataset.sizes[idx] = POINT_SIZES.hover;
+    applyPointOverlay(dataset, state, state.hoverIndex);
+  }
+}
+
+function rebuildVisualization(state: ViewerState): Partial<ViewerState> {
+  if (!state.dataset) return {};
+  const dataset = state.dataset;
+  const lodIndices = state.lodSampleRate < 1 ? buildLodIndices(dataset.count, state.lodSampleRate) : undefined;
+
+  applyColorMode(dataset, state.colorMode, dataset.baseColors, lodIndices);
+  applyFilters(dataset, state.filters, dataset.visible, dataset.baseColors);
+
+  for (let i = 0; i < dataset.count; i++) {
+    dataset.baseSizes[i] = isLodVisible(i, state.lodSampleRate) ? POINT_SIZES.base : 0;
+    if (!dataset.visible[i]) dataset.baseSizes[i] = 0;
   }
 
-  return { dataset: { ...dataset } };
+  dataset.colors.set(dataset.baseColors);
+  dataset.sizes.set(dataset.baseSizes);
+  applyOverlays(dataset, state);
+
+  return { visualizationRevision: state.visualizationRevision + 1 };
+}
+
+function updateHoverVisual(state: ViewerState, hoverIndex: number | null): Partial<ViewerState> {
+  if (state.hoverIndex === hoverIndex) return {};
+  const dataset = state.dataset;
+  if (!dataset) return { hoverIndex };
+
+  const nextState = { ...state, hoverIndex };
+  const previousHover = state.hoverIndex;
+
+  if (previousHover !== null) applyPointOverlay(dataset, nextState, previousHover);
+  if (hoverIndex !== null) applyPointOverlay(dataset, nextState, hoverIndex);
+
+  return {
+    hoverIndex,
+    visualizationRevision: state.visualizationRevision + 1,
+  };
 }
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
@@ -106,10 +174,11 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   hoverIndex: null,
   showNnLinks: false,
   showClusterLabels: false,
-  lodSampleRate: 1,
+  lodSampleRate: defaultLodSampleRate(),
   manualMarker: null,
   cameraFlyTarget: null,
   fps: 0,
+  visualizationRevision: 0,
   bounds: null,
 
   setStreet: (street) => {
@@ -141,8 +210,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   },
 
   setHoverIndex: (hoverIndex) => {
-    set({ hoverIndex });
-    set(rebuildVisualization(get()));
+    set(updateHoverVisual(get(), hoverIndex));
   },
 
   selectPoint: (index, locked = true) => {

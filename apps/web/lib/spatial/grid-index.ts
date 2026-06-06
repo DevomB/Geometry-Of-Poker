@@ -109,7 +109,7 @@ export function nearestPointToRay(
   threshold = 0.15,
 ): number {
   let bestIndex = -1;
-  let bestDist = threshold;
+  let bestDistSq = threshold * threshold;
   const [ox, oy, oz] = rayOrigin;
   const [dx, dy, dz] = rayDirection;
 
@@ -127,9 +127,9 @@ export function nearestPointToRay(
     const cx = ox + dx * t;
     const cy = oy + dy * t;
     const cz = oz + dz * t;
-    const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2 + (pz - cz) ** 2);
-    if (dist < bestDist) {
-      bestDist = dist;
+    const distSq = (px - cx) ** 2 + (py - cy) ** 2 + (pz - cz) ** 2;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
       bestIndex = i;
     }
   }

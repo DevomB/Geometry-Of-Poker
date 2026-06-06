@@ -160,6 +160,10 @@ export async function loadStreetDataset(street: Street): Promise<StreetDataset> 
   }
 
   const channels = channelsBuffer ? parseChannelsBin(channelsBuffer).channels : buildChannels(metadata, count);
+  const baseColors = new Float32Array(count * 3);
+  baseColors.fill(0.75);
+  const baseSizes = new Float32Array(count);
+  baseSizes.fill(1.5);
   const colors = new Float32Array(count * 3);
   colors.fill(0.75);
   const sizes = new Float32Array(count);
@@ -171,6 +175,8 @@ export async function loadStreetDataset(street: Street): Promise<StreetDataset> 
     street,
     manifest,
     positions: parsed.positions,
+    baseColors,
+    baseSizes,
     colors,
     sizes,
     visible,
@@ -194,10 +200,14 @@ export async function loadStreetDatasetProgressive(
   const parsed = parsePointsBin(binBuffer);
   const count = parsed.count;
   const channels = channelsBuffer ? parseChannelsBin(channelsBuffer).channels : buildEmptyChannels(count);
+  const baseColors = new Float32Array(count * 3);
+  const baseSizes = new Float32Array(count);
   const partial: StreetDataset = {
     street,
     manifest,
     positions: parsed.positions,
+    baseColors,
+    baseSizes,
     colors: new Float32Array(count * 3),
     sizes: new Float32Array(count),
     visible: new Uint8Array(count),
@@ -206,6 +216,8 @@ export async function loadStreetDatasetProgressive(
     channels,
     idToIndex: new Map(),
   };
+  partial.baseColors.fill(0.75);
+  partial.baseSizes.fill(1.5);
   partial.colors.fill(0.75);
   partial.sizes.fill(1.5);
   partial.visible.fill(1);
@@ -215,6 +227,10 @@ export async function loadStreetDatasetProgressive(
   const metadata = metadataPayload.points;
   const finalChannels = channelsBuffer ? channels : buildChannels(metadata, count);
 
+  const finalBaseColors = new Float32Array(count * 3);
+  finalBaseColors.fill(0.75);
+  const finalBaseSizes = new Float32Array(count);
+  finalBaseSizes.fill(1.5);
   const colors = new Float32Array(count * 3);
   colors.fill(0.75);
   const sizes = new Float32Array(count);
@@ -226,6 +242,8 @@ export async function loadStreetDatasetProgressive(
     street,
     manifest,
     positions: parsed.positions,
+    baseColors: finalBaseColors,
+    baseSizes: finalBaseSizes,
     colors,
     sizes,
     visible,

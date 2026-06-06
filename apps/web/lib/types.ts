@@ -91,6 +91,8 @@ export interface StreetDataset {
   street: Street;
   manifest: StreetManifest;
   positions: Float32Array;
+  baseColors: Float32Array;
+  baseSizes: Float32Array;
   colors: Float32Array;
   sizes: Float32Array;
   visible: Uint8Array;

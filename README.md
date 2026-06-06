@@ -1,229 +1,203 @@
 # Geometry of Poker
 
-Research-grade interactive 3D visualization of Texas Hold'em state space. Strategically meaningful feature vectors are embedded into a three-dimensional manifold via PCA and UMAP — geometry emerges from poker mathematics, not manual mesh design.
+Geometry of Poker is a production-deployed research visualization for Texas Hold'em state space. It converts poker states into compact feature vectors, embeds those vectors into a three-dimensional manifold, and serves the resulting map as an interactive GPU point cloud.
 
-**Status:** Production-readiness track — artifact-driven viewer, real-data pipeline, and manual projection API.
+The project is built as a portfolio-grade system: real release artifacts, a manual hand projection API, S3/CloudFront artifact hosting, Vercel app deployment, and a documented compute policy that keeps heavy poker workloads off local laptops.
 
-## Goals
+## Live System
 
-- C++Con presentation material
-- Quantitative finance portfolio project
-- Technical research artifact
-- Interactive page on a personal website subdomain
+- App host: Vercel
+- Artifact host: private S3 bucket behind CloudFront
+- Current release base: `https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1`
+- Release size: `1,326` preflop states plus `25,000` flop, `25,000` turn, and `25,000` river states
+- Runtime projection: `/api/project`
+- Health check: `/api/health`
+- Presentation page: `/map`
 
-## Repository structure
+## What This Demonstrates
 
+- Data-oriented rendering with binary browser artifacts and typed arrays
+- A serverless deployment that avoids always-on compute
+- Native poker evaluation via `poker-calculations`
+- A reproducible feature and embedding pipeline
+- Production-safe manual hand projection using saved scaler/PCA/projection sidecars
+- Clear research boundaries: visualization and neighborhood analysis, not poker-solver claims
+
+## Architecture
+
+```text
+Cards
+  -> TypeScript feature engine
+  -> compact feature schema
+  -> AWS Batch release worker
+  -> Parquet datasets
+  -> Python scaler/PCA/UMAP/HDBSCAN pipeline
+  -> browser artifacts
+  -> S3 + CloudFront
+  -> Vercel Next.js viewer/API
 ```
-visualizer/
-├── apps/web/                 # Next.js + R3F viewer (two modes)
-├── packages/
-│   ├── feature-engine/       # Feature extraction (poker-calculations)
-│   └── shared/               # Cross-package TypeScript types
-├── pipeline/                 # Python embedding pipeline
-│   ├── generate/
-│   ├── embed/
-│   └── analyze/
-├── artifacts/                # Generated data (gitignored)
-├── docs/                     # Architecture and research docs
-├── package.json
-└── pnpm-workspace.yaml
+
+Main workspaces:
+
+```text
+apps/web/                  Next.js app, API routes, React Three Fiber viewer
+packages/feature-engine/   TypeScript poker feature extraction
+packages/dataset-generator/Seeded street dataset generation
+packages/shared/           Shared schemas, street types, artifact contracts
+pipeline/                  Python embedding and artifact production
+deploy/aws/                S3/CloudFront, CodeBuild, Batch release worker
+docs/                      Research and engineering documentation
 ```
 
-## Prerequisites
+## Research Model
 
-- **Node.js** ≥ 20
-- **pnpm** ≥ 9
-- **Python** ≥ 3.11 (for embedding pipeline tooling)
+Each point is a poker state:
+
+```text
+s = (hero, board, street)
+x = phi(s) in R^66
+z = (x - mu) / sigma
+y = V_k^T z
+u = UMAP(y) in R^3
+```
+
+Feature groups include equity against a uniform random villain, hand category, board texture, draw pressure, card-removal summaries, and transition-style instability measures. The app visualizes the learned UMAP coordinate `u`; it does not claim that UMAP global distance is equivalent to optimal poker strategy.
+
+Manual hand input follows the production path:
+
+```text
+cards -> validate -> feature extraction -> retained feature alignment
+      -> scaler -> PCA -> bounded kNN in PCA space
+      -> weighted 3D interpolation from existing map points
+```
 
 ## Compute Policy
 
-Do not run production poker generation, embedding, clustering, or release validation workloads on a laptop. Local work is limited to app development, typechecking, linting, unit tests, builds, artifact parsing, and tiny smoke runs only. Balanced-small and larger poker workloads belong on AWS Batch or another approved remote compute target.
+Do not run production poker generation, embedding, clustering, or release validation workloads on a laptop.
 
-Reasonable laptop work:
+Allowed local work:
 
-- `pnpm dev`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`
-- API/viewer checks against already-generated CloudFront artifacts
-- Tiny smoke runs such as one street with tens of records, only when needed to debug pipeline wiring
+- `pnpm dev`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm test`
+- `pnpm build`
+- Small smoke checks against already-generated CloudFront artifacts
+- Tiny dataset/debug runs only when needed to test wiring
 
 Remote-only by default:
 
-- `1,326 + 25,000 + 25,000 + 25,000` balanced-small release generation
-- Full `pnpm generate:all`
-- Full `pnpm pipeline:embed`
-- UMAP/HDBSCAN experiments and release validation over real artifact sets
+- Balanced-small release generation: `1,326 + 25,000 + 25,000 + 25,000`
+- Full dataset generation
+- Full embedding/clustering runs
+- Release validation over complete generated artifacts
+- Any larger research sweep
 
-## Local setup
+Preferred remote compute is short-lived AWS Batch or CodeBuild-backed image construction. Avoid always-on servers and NAT gateways for budget control.
 
-### 1. Install JavaScript dependencies
+## Production Environment
+
+Vercel production requires:
+
+```text
+GOP_ARTIFACT_BASE_URL=https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1
+```
+
+CloudFront must serve release artifacts with:
+
+```text
+Cache-Control: public,max-age=31536000,immutable
+Access-Control-Allow-Origin: *
+```
+
+The S3 bucket remains private. Public reads go through CloudFront Origin Access Control.
+
+## Local Development
 
 ```bash
 cd visualizer
 pnpm install
-```
-
-### 2. Build workspace packages (or use production build)
-
-```bash
-pnpm --filter @geometry-of-poker/web... build
-```
-
-Or build packages individually before `pnpm dev`:
-
-```bash
-pnpm --filter @geometry-of-poker/shared build
-pnpm --filter @geometry-of-poker/feature-engine build
-```
-
-### 3. Run the web app
-
-```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The viewer loads generated local artifacts or CDN artifacts configured through `GOP_ARTIFACT_BASE_URL`.
-
-### 4. Python pipeline tooling
+For a production-equivalent local build:
 
 ```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-
-pip install -r pipeline/requirements.txt
+$env:VERCEL_ENV="production"
+$env:GOP_ARTIFACT_BASE_URL="https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1"
+pnpm --filter @geometry-of-poker/web... build
 ```
 
-Do not run full dataset generation from the laptop. Use the AWS release worker in [deploy/aws/README.md](deploy/aws/README.md) for production artifacts.
-
-### 5. Run tests
+Run checks:
 
 ```bash
-pnpm --filter @geometry-of-poker/feature-engine test
 pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
 ```
 
-## Application modes
+## Key Scripts
 
-| Mode | Description | Status |
-| --- | --- | --- |
-| **Research Dataset Explorer** | Render precomputed 3D point cloud from artifacts | Artifact-driven UI |
-| **Manual Hand Explorer** | Enter cards → extract → project → highlight neighbors | Production API path |
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Start the Next.js viewer |
+| `pnpm typecheck` | Type-check all workspace packages |
+| `pnpm lint` | Run web lint checks |
+| `pnpm test` | Run package and app tests |
+| `pnpm build` | Build packages and app |
+| `pnpm validate:artifacts` | Validate generated release artifacts |
+| `pnpm aws:deploy-artifacts` | Deploy/update S3, CloudFront, Batch infrastructure |
+| `pnpm aws:build-worker` | Build the release worker image remotely through CodeBuild |
+| `pnpm aws:submit-release` | Submit an approved one-off Batch release job |
 
-## Key dependencies
+## Artifact Contract
 
-- [`poker-calculations`](https://www.npmjs.com/package/poker-calculations) — hand evaluation, equity, vulnerability (not reimplemented here)
-- Next.js 15, React Three Fiber, Three.js, Zustand, Tailwind CSS
-- Python: NumPy, pandas, scikit-learn, umap-learn, hdbscan
+Each street release folder contains:
+
+```text
+viewer-manifest.json
+browser-points.bin
+browser-channels.bin
+browser-metadata.json
+retained-features.json
+projection-index.bin
+```
+
+The viewer consumes `browser-points.bin` and `browser-channels.bin` for rendering. The API consumes `projection-index.bin` plus metadata for manual hand projection.
+
+## Performance Notes
+
+The viewer renders a single `THREE.Points` geometry backed by typed arrays. The production path avoids per-point React components. Current optimizations include:
+
+- Binary point and channel artifacts
+- Progressive loading of positions before metadata
+- Adaptive point density on constrained hardware
+- Capped device pixel ratio for integrated GPUs
+- Targeted hover/selection buffer updates instead of full point-cloud rebuilds
+- Bounded nearest-neighbor projection instead of full-array sort
+
+The current balanced-small release is intended to be usable on laptops with integrated or workstation-class mobile GPUs. Future larger releases should use tiled or paged artifacts.
 
 ## Documentation
 
-| Doc | Contents |
+| File | Description |
 | --- | --- |
-| [docs/architecture.md](docs/architecture.md) | System design, data flow, deployment |
-| [docs/research-methodology.md](docs/research-methodology.md) | State definition, features, embedding, reproducibility |
-| [docs/performance-analysis.md](docs/performance-analysis.md) | Throughput benchmarks, component runtime map |
-| [docs/limitations.md](docs/limitations.md) | Epistemic and engineering boundaries |
-| [docs/cppcon-talk-outline.md](docs/cppcon-talk-outline.md) | C++Con talk structure (6-beat narrative) |
-| [docs/quant-firm-project-summary.md](docs/quant-firm-project-summary.md) | Interview / portfolio one-pager |
-| [docs/feature-schema.md](docs/feature-schema.md) | 66-dim feature column reference |
-| [docs/pipeline-embedding.md](docs/pipeline-embedding.md) | Python embed CLI and artifacts |
-| [docs/dataset-generation.md](docs/dataset-generation.md) | CLI, output layout, scaling |
+| `docs/research-methodology.md` | Feature and embedding methodology |
+| `docs/architecture.md` | System design and data flow |
+| `docs/performance-analysis.md` | Performance model and benchmarks |
+| `docs/limitations.md` | Research and engineering boundaries |
+| `docs/feature-schema.md` | Compact feature schema reference |
+| `deploy/aws/README.md` | AWS artifact and Batch workflow |
 
-## Scripts
+## Portfolio Talking Points
 
-| Command | Description |
-| --- | --- |
-| `pnpm dev` | Start Next.js dev server |
-| `pnpm build` | Build all packages and web app |
-| `pnpm test` | Run package tests |
-| `pnpm typecheck` | TypeScript check all packages |
-| `pnpm pipeline:extract` | Feature extraction CLI |
-| `pnpm generate --street flop --count 20 --seed 42` | Tiny local smoke dataset only |
-| `pnpm generate:all` | Full release dataset; use AWS Batch, not laptop |
-| `pnpm benchmark` | Artifact parse + load timing snapshot |
-
-## Design decisions
-
-1. **Monorepo with language split** — TypeScript for features + web (direct `poker-calculations` import); Python for sklearn/UMAP ecosystem.
-2. **Published npm dependency** — `poker-calculations@2.2.0` from npm, not a local `file:` link, so the visualizer deploys independently.
-3. **Artifact-driven rendering** — the web app loads precomputed binaries; no embedding at request time for Mode 1.
-4. **Single GPU point cloud** — `Float32Array` positions in one `BufferGeometry`; no per-state React nodes.
-5. **Explicit schema versioning** — `FEATURE_SCHEMA_VERSION` gates artifact compatibility.
-6. **PCA kNN projection for Mode 2** — manual hands use the saved projection index and bounded nearest-neighbor interpolation in PCA space.
-
-## Open technical risks
-
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| UMAP out-of-sample projection | Manual hands may land inaccurately | kNN interpolation; show neighbor distance confidence |
-| Dataset size vs. browser memory | 500k+ points may stress mobile | LOD, octree culling, or server-side tile streaming |
-| Metadata JSON at scale | Single JSON file too large | Shard by id range; use Parquet + indexed lookup |
-| Feature extraction throughput | 1M states × MC equity is slow | Exact equity where possible; cache; worker pool |
-| Suit isomorphism | 4× duplicate states inflate cloud | Canonicalize or weight; document choice |
-| Cross-language scaler parity | TS normalize ≠ sklearn | Export scaler JSON from Python; test round-trip |
-| `poker-calculations` API gaps | Some planned features may need new exports | Extend npm package in sibling `NPM/` repo |
-
-## Implementation checklist
-
-### Phase 0 — Scaffold ✅
-
-- [x] Monorepo structure
-- [x] Architecture and pipeline docs
-- [x] Shared TypeScript types
-- [x] Initial feature-engine, web app, and pipeline scripts
-- [x] README and talk outline
-
-### Phase 1 — Feature engine
-
-- [ ] Finalize feature schema with poker-calculations API mapping
-- [x] Implement `extractGeometryFeatures()` for compact columns
-- [ ] Implement `normalizeFeatures()` with exported scaler JSON
-- [ ] Unit tests against known hand scenarios
-- [ ] CLI batch extraction
-
-### Phase 2 — Dataset generation ✅ (pipeline)
-
-- [x] `@geometry-of-poker/dataset-generator` package
-- [x] Seeded sampling (`sampleRandomState`, `sampleRandomStates`, `generateStreetDataset`)
-- [x] Per-street separation (preflop / flop / turn / river)
-- [x] Parquet + Float32 binary + manifest + summary report
-- [x] Resumable batches, validation, profiling
-- [x] CLI: `pnpm generate`
-- [ ] Run initial 1326 + 75k generation on machine with working native binding
-
-### Phase 3 — Embedding + viewer
-
-- [x] Per-street Python pipeline (Scaler → PCA → UMAP → HDBSCAN)
-- [x] Artifacts: models, embedding.parquet, browser-points.bin, analysis-report.md
-- [x] Feature-group experiments + seed stability
-- [x] Out-of-sample projection sidecar (`projection-index.bin`)
-- [ ] Run on real generated datasets (requires native poker-calculations)
-- [x] Replace scaffold viewer with artifact-driven GPU cloud in web app
-
-### Phase 4 — Manual hand explorer
-
-- [ ] Wire validation → extraction → normalization
-- [ ] kNN search (in-browser index or precomputed KD-tree)
-- [ ] Camera fly-to animation
-- [ ] Metrics panel with feature breakdown
-- [ ] Highlight nearest neighbors in scene
-
-### Phase 5 — Research polish
-
-- [ ] HDBSCAN clustering + evaluation metrics
-- [ ] Scale to 100k+ states
-- [ ] Research notes with findings
-- [ ] Performance profiling
-
-### Phase 6 — Deploy + talk
-
-- [ ] Run one-off `deploy/aws/release-worker.Dockerfile` Batch job or equivalent local release generation
-- [ ] Upload validated release artifacts to S3/CloudFront
-- [ ] Subdomain deployment
-- [ ] C++Con slides and presentation rehearsal
-- [ ] Portfolio write-up
+- "I separated app hosting from artifact hosting so the system has no always-on poker compute."
+- "The viewer is data-oriented: one point cloud, typed arrays, binary channels, no per-point React tree."
+- "Manual input uses a saved projection sidecar and reports the projection method truthfully."
+- "The research page distinguishes measured poker facts, engineered features, embedding artifacts, and interpretation."
+- "The AWS path is budget-conscious: private S3, CloudFront, and approved one-off Batch jobs only."
 
 ## License
 
-Private research project. Poker calculation primitives subject to `poker-calculations` license.
+Private research project. Poker calculation primitives are provided by the separately published `poker-calculations` package.

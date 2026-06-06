@@ -32,10 +32,11 @@ const fragmentShader = /* glsl */ `
 export function PointCloud() {
   const dataset = useViewerStore((s) => s.dataset);
   const bounds = useViewerStore((s) => s.bounds);
+  const visualizationRevision = useViewerStore((s) => s.visualizationRevision);
   const setHoverIndex = useViewerStore((s) => s.setHoverIndex);
   const selectPoint = useViewerStore((s) => s.selectPoint);
   const pointsRef = useRef<THREE.Points>(null);
-  const lastFallbackHoverAt = useRef(0);
+  const lastHoverAt = useRef(0);
 
   const geometry = useMemo(() => {
     if (!dataset) return null;
@@ -68,7 +69,7 @@ export function PointCloud() {
     col.needsUpdate = true;
     size.array = dataset.sizes;
     size.needsUpdate = true;
-  }, [dataset, geometry]);
+  }, [dataset, geometry, visualizationRevision]);
 
   useFrame(() => {
     // FPS tracked in FpsMonitor
@@ -76,14 +77,14 @@ export function PointCloud() {
 
   const handlePointerMove = (event: THREE.Event & { point: THREE.Vector3; index?: number }) => {
     if (!dataset) return;
+    const now = performance.now();
+    if (now - lastHoverAt.current < 40) return;
+    lastHoverAt.current = now;
+
     if (typeof event.index === "number") {
       setHoverIndex(event.index);
       return;
     }
-
-    const now = performance.now();
-    if (now - lastFallbackHoverAt.current < 50) return;
-    lastFallbackHoverAt.current = now;
 
     const ray = event as unknown as { ray?: THREE.Ray };
     if (!ray.ray) return;

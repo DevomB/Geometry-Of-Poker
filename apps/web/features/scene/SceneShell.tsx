@@ -136,8 +136,8 @@ export function SceneShell() {
       {webglAvailable !== false && (
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
-          dpr={[1, 2]}
-          gl={{ antialias: true, powerPreference: "high-performance" }}
+          dpr={[1, 1.5]}
+          gl={{ antialias: false, powerPreference: "high-performance" }}
         >
           <color attach="background" args={[SCENE_BACKGROUND]} />
           <fog attach="fog" args={[SCENE_BACKGROUND, SCENE_FOG_NEAR, SCENE_FOG_FAR]} />

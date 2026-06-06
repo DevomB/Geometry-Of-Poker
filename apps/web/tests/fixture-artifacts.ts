@@ -205,6 +205,8 @@ export function loadFixtureDataset(root: string, street: Street): StreetDataset 
     street,
     manifest,
     positions: points.positions,
+    baseColors: new Float32Array(points.count * 3),
+    baseSizes: new Float32Array(points.count),
     colors: new Float32Array(points.count * 3),
     sizes: new Float32Array(points.count),
     visible: new Uint8Array(points.count),

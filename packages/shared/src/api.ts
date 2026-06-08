@@ -51,6 +51,7 @@ export interface ProjectNeighbor {
 }
 
 export type ProjectionMethod =
+  | "exact-match"
   | "pca-knn-interpolation"
   | "precomputed-nearest-neighbor";
 

@@ -257,10 +257,10 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       street,
       dataset: null,
       spatialIndex: null,
-      selection: null,
-      hoverIndex: null,
-      manualMarker: null,
-      filters: { ...DEFAULT_FILTER_VALUES },
+        selection: null,
+        hoverIndex: null,
+        manualMarker: null,
+        filters: { ...DEFAULT_FILTER_VALUES },
     });
     void get().loadStreet();
   },
@@ -319,6 +319,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set({ manualMarker });
     if (manualMarker) {
       set({
+        showNnLinks: true,
         cameraFlyTarget: {
           position: [
             manualMarker.position[0] + 2,
@@ -327,7 +328,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
           ],
           target: manualMarker.position,
         },
-        filters: { ...get().filters, searchNeighborOf: manualMarker.neighborIds[0] ?? null },
       });
       set(rebuildVisualization(get()));
     }
@@ -380,7 +380,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         isLoading: false,
         selection: null,
         hoverIndex: null,
-        manualMarker: null,
         cameraFlyTarget: {
           position: [
             bounds.center[0],

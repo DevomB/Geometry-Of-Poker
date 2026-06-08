@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { useViewerStore } from "@/stores/viewer-store";
 import {
@@ -37,6 +38,13 @@ export function ManualMarkerMesh() {
 
   if (!marker) return null;
 
+  const label = [
+    marker.hero.join(" "),
+    marker.board.length > 0 ? marker.board.join(" ") : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
   return (
     <group position={marker.position}>
       <mesh ref={ringRef}>
@@ -56,6 +64,17 @@ export function ManualMarkerMesh() {
           emissiveIntensity={1.1}
         />
       </mesh>
+      <Html
+        position={[0, 0.46, 0]}
+        center
+        distanceFactor={8}
+        style={{ pointerEvents: "none" }}
+      >
+        <div className="gop-mono whitespace-nowrap rounded border border-amber-300/30 bg-black/75 px-2 py-1 text-[10px] text-amber-100 shadow-xl">
+          <span className="mr-1 text-amber-300/70">projected</span>
+          {label}
+        </div>
+      </Html>
     </group>
   );
 }

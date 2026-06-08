@@ -70,7 +70,7 @@ describe("api routes", () => {
       expect(body.state.street).toBe(street);
       expect(Number.isFinite(body.projectedPoint.x)).toBe(true);
       expect(body.nearestNeighbors.length).toBeGreaterThan(0);
-      expect(body.projectionMethod).toBe("precomputed-nearest-neighbor");
+      expect(body.projectionMethod).toBe("exact-match");
     });
   }
 

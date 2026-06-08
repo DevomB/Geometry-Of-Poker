@@ -38,8 +38,7 @@ export function CardPickerPanel() {
   const street = useViewerStore((s) => s.street);
   const setStreet = useViewerStore((s) => s.setStreet);
   const setManualMarker = useViewerStore((s) => s.setManualMarker);
-  const selectPoint = useViewerStore((s) => s.selectPoint);
-  const dataset = useViewerStore((s) => s.dataset);
+  const clearSelection = useViewerStore((s) => s.clearSelection);
 
   const [picker, setPicker] = useState<CardPickerState>(emptyPickerState());
   const [target, setTarget] = useState<PickerTarget | "auto">("auto");
@@ -146,11 +145,7 @@ export function CardPickerPanel() {
             : null,
         features: projection.metrics,
       });
-
-      if (dataset && neighborIds[0]) {
-        const idx = dataset.idToIndex.get(neighborIds[0]);
-        if (idx !== undefined) selectPoint(idx, true);
-      }
+      clearSelection();
     } catch (err) {
       setErrors([err instanceof Error ? err.message : String(err)]);
     } finally {
@@ -281,7 +276,7 @@ export function CardPickerPanel() {
           className="flex-1 rounded border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/60 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
           aria-busy={isSubmitting}
         >
-          {isSubmitting ? "Projecting..." : "Project into geometry"}
+          {isSubmitting ? "Projecting..." : "Project hand"}
         </button>
         <button
           type="button"
@@ -362,7 +357,7 @@ function SlotsRow({
                   {SUIT_SYMBOLS[suit ?? ""] ?? ""}
                 </>
               ) : (
-                "—"
+                "-"
               )}
             </button>
           );

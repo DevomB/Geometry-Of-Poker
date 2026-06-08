@@ -184,6 +184,7 @@ The current balanced-small release is intended to be usable on laptops with inte
 | File | Description |
 | --- | --- |
 | `docs/math-showpiece.md` | Quant-facing math narrative for demos and interviews |
+| `docs/topology-and-clustering-audit.md` | Honest audit of whether the learned geometry supports a sphere or clustered structure |
 | `docs/research-methodology.md` | Feature and embedding methodology |
 | `docs/architecture.md` | System design and data flow |
 | `docs/performance-analysis.md` | Performance model and benchmarks |

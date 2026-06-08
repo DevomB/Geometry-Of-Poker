@@ -72,8 +72,8 @@ function EmptySelection({ hasManual }: { hasManual: boolean }) {
       </p>
       {hasManual && (
         <p className="mt-2 text-amber-300/70">
-          A manually projected hand is active. Click its highlighted neighbors
-          to inspect them.
+          A manually projected hand is active. Its card and metric summary is
+          shown above; neighbors are reference points from the manifold.
         </p>
       )}
     </section>
@@ -82,6 +82,11 @@ function EmptySelection({ hasManual }: { hasManual: boolean }) {
 
 function ManualProjectionCard() {
   const marker = useViewerStore((s) => s.manualMarker)!;
+  const equity = numberMetric(marker.features.equityVsRandom);
+  const category = stringMetric(marker.features.category);
+  const nearestDistance = marker.neighborDistances[0];
+  const distanceLabel =
+    marker.method === "pca-knn-interpolation" ? "Nearest PCA d" : "Nearest 3D d";
   return (
     <section
       aria-label="Manual projection"
@@ -102,15 +107,26 @@ function ManualProjectionCard() {
         )}
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px]">
+        {category && <Row label="Category" value={humanCategory(category)} />}
+        {equity !== null && (
+          <Row label="Equity" value={`${(equity * 100).toFixed(2)}%`} mono />
+        )}
         <Row
           label="Position"
           value={marker.position.map((v) => v.toFixed(2)).join(", ")}
           mono
         />
+        {nearestDistance !== undefined && (
+          <Row label={distanceLabel} value={nearestDistance.toFixed(3)} mono />
+        )}
         {marker.clusterId !== null && (
           <Row label="Cluster" value={`C${marker.clusterId}`} mono />
         )}
       </dl>
+      <p className="mt-2 border-t border-amber-300/20 pt-2 text-[10px] leading-relaxed text-amber-100/70">
+        This marker is the projected custom hand. Neighbor rows are manifold
+        references used to place it, not replacements for the input cards.
+      </p>
       {marker.neighborIds.length > 0 && (
         <div className="mt-2 border-t border-amber-300/20 pt-2">
           <p className="mb-1 text-[10px] uppercase tracking-wider text-amber-300/70">
@@ -143,7 +159,7 @@ function ManualNeighborsList() {
               className="w-full rounded px-1 py-0.5 text-left text-[11px] transition hover:bg-white/5 disabled:opacity-30"
             >
               <span className="gop-mono tabular-nums text-amber-300/70">
-                d={marker.neighborDistances[i]?.toFixed(3) ?? "—"}
+                d={marker.neighborDistances[i]?.toFixed(3) ?? "-"}
               </span>{" "}
               {point ? (
                 <>
@@ -285,7 +301,7 @@ function BoardTextureSection({ point }: { point: BrowserPointMeta }) {
       </p>
       <div className="mb-1 flex flex-wrap gap-1">
         {texture.length === 0 ? (
-          <span className="text-[10px] text-zinc-500">—</span>
+          <span className="text-[10px] text-zinc-500">-</span>
         ) : (
           texture.map((t) => (
             <span
@@ -452,4 +468,12 @@ function equityBarFromValue(eq: number) {
 
 function humanCategory(name: string): string {
   return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+function numberMetric(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringMetric(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

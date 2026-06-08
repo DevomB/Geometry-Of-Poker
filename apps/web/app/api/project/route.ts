@@ -37,6 +37,9 @@ export async function POST(request: Request) {
     const dataset = await loadStreetDatasetForApi(validated.street);
     let featureVector: number[] | undefined;
     let featureNames: string[] | undefined;
+    let extractedFeatures: Record<string, number> | undefined;
+    let extractedCategory: string | undefined;
+    let extractedEquity: number | undefined;
     let featureExtractionError: string | null = null;
 
     try {
@@ -50,6 +53,17 @@ export async function POST(request: Request) {
       );
       featureVector = extracted.vector;
       featureNames = extracted.featureNames;
+      extractedFeatures = {
+        ...extracted.groups.core,
+        ...extracted.groups.runouts,
+        ...extracted.groups.vulnerability,
+        ...extracted.groups.board,
+        ...extracted.groups.draws,
+        ...extracted.groups.removal,
+        ...extracted.groups.transitions,
+      };
+      extractedCategory = extracted.metadata.category;
+      extractedEquity = extracted.groups.core.equityVsRandom;
     } catch (err) {
       featureExtractionError = err instanceof Error ? err.message : String(err);
     }
@@ -61,6 +75,9 @@ export async function POST(request: Request) {
         board: validated.board,
         featureVector,
         featureNames,
+        features: extractedFeatures,
+        category: extractedCategory,
+        equityVsRandom: extractedEquity,
       });
     } catch (err) {
       if (featureExtractionError) {
@@ -116,9 +133,11 @@ export async function POST(request: Request) {
         sourceMethod: projection.method,
       },
       projectionMethod:
-        projection.method === "pca_knn_interpolation"
-          ? "pca-knn-interpolation"
-          : "precomputed-nearest-neighbor",
+        projection.method === "exact_match"
+          ? "exact-match"
+          : projection.method === "pca_knn_interpolation"
+            ? "pca-knn-interpolation"
+            : "precomputed-nearest-neighbor",
       warnings,
     };
 

@@ -22,6 +22,9 @@ export interface ProjectInput {
   board: string[];
   featureVector?: number[];
   featureNames?: string[];
+  features?: Record<string, number>;
+  category?: string;
+  equityVsRandom?: number;
 }
 
 interface ScoredIndex {
@@ -187,10 +190,10 @@ export function projectIntoGeometry(
     neighborIds: top.map((n) => dataset.metadata[n.index]!.id),
     neighborDistances: top.map((n) => n.distance),
     clusterId: pluralityCluster(dataset, top),
-    features: pointFeatures(bestPoint),
-    featureNames: Object.keys(bestPoint.summary),
-    category: bestPoint.category,
-    equityVsRandom: bestPoint.equityVsRandom,
+    features: input.features ?? pointFeatures(bestPoint),
+    featureNames: input.features ? Object.keys(input.features) : Object.keys(bestPoint.summary),
+    category: input.category ?? bestPoint.category,
+    equityVsRandom: input.equityVsRandom ?? bestPoint.equityVsRandom,
   };
 }
 

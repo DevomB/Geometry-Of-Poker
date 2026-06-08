@@ -2,6 +2,8 @@
 
 This is the compact technical narrative for interviews, demos, and portfolio review. The project is not a poker solver. It is a reproducible state-space geometry pipeline: exact combinatorial signals are transformed into fixed-width vectors, embedded into 3D, and inspected in a GPU point-cloud viewer.
 
+For the honest topology/clustering argument, see [Topology And Clustering Audit](./topology-and-clustering-audit.md).
+
 ## Core Object
 
 A poker state is represented as:

@@ -113,12 +113,13 @@ export const STATUS = {
 /** Friendly description for a projection method string returned by /api/project. */
 export function describeProjectionMethod(method: string): string {
   switch (method) {
+    case "exact-match":
+    case "exact_match":
+      return "Exact dataset match";
     case "pca-knn-interpolation":
       return "PCA kNN interpolation";
     case "precomputed-nearest-neighbor":
       return "Nearest precomputed state";
-    case "exact_match":
-      return "Exact match in dataset";
     default:
       return method;
   }

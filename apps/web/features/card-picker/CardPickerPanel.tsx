@@ -144,6 +144,7 @@ export function CardPickerPanel() {
             ? projection.metrics.clusterId
             : null,
         features: projection.metrics,
+        warnings: projection.warnings,
       });
       clearSelection();
     } catch (err) {

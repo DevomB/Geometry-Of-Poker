@@ -4,8 +4,12 @@ import { useMemo, useState } from "react";
 import { useViewerStore } from "@/stores/viewer-store";
 import { CardDisplay } from "@/components/CardDisplay";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
-import type { BrowserPointMeta } from "@/lib/types";
-import { describeProjectionMethod } from "@/lib/visualization-theme";
+import { compareManualToPoint } from "@/lib/inspector/state-comparison";
+import type { BrowserPointMeta, ManualMarker } from "@/lib/types";
+import {
+  describeProjectionMethod,
+  summarizeProjectionLocality,
+} from "@/lib/visualization-theme";
 
 export function InspectorPanel() {
   const dataset = useViewerStore((s) => s.dataset);
@@ -13,6 +17,8 @@ export function InspectorPanel() {
   const manualMarker = useViewerStore((s) => s.manualMarker);
   const clearSelection = useViewerStore((s) => s.clearSelection);
   const setManualMarker = useViewerStore((s) => s.setManualMarker);
+  const filters = useViewerStore((s) => s.filters);
+  const setFilters = useViewerStore((s) => s.setFilters);
 
   const selectedIndex = selection?.index;
   const point =
@@ -52,7 +58,18 @@ export function InspectorPanel() {
       {manualMarker && <ManualProjectionCard />}
 
       {point ? (
-        <SelectedStateCard point={point} index={selectedIndex!} />
+        <SelectedStateCard
+          point={point}
+          index={selectedIndex!}
+          manualMarker={manualMarker}
+          neighborFocusActive={filters.searchNeighborOf === point.id}
+          onToggleNeighborFocus={() =>
+            setFilters({
+              searchNeighborOf:
+                filters.searchNeighborOf === point.id ? null : point.id,
+            })
+          }
+        />
       ) : (
         <EmptySelection hasManual={!!manualMarker} />
       )}
@@ -87,6 +104,7 @@ function ManualProjectionCard() {
   const nearestDistance = marker.neighborDistances[0];
   const distanceLabel =
     marker.method === "pca-knn-interpolation" ? "Nearest PCA d" : "Nearest 3D d";
+  const locality = summarizeProjectionLocality(marker.method, marker.neighborDistances);
   return (
     <section
       aria-label="Manual projection"
@@ -122,7 +140,26 @@ function ManualProjectionCard() {
         {marker.clusterId !== null && (
           <Row label="Cluster" value={`C${marker.clusterId}`} mono />
         )}
+        <Row label="Locality" value={locality.label} title={locality.detail} />
+        {locality.effectiveNeighbors !== null && (
+          <Row
+            label="Effective k"
+            value={locality.effectiveNeighbors.toFixed(1)}
+            mono
+            title="Inverse-distance effective neighbor count for the projection blend"
+          />
+        )}
       </dl>
+      <p className="mt-2 rounded border border-amber-300/20 bg-black/20 px-2 py-1.5 text-[10px] leading-relaxed text-amber-100/70">
+        {locality.detail}
+      </p>
+      {marker.warnings && marker.warnings.length > 0 && (
+        <ul className="mt-2 space-y-1 rounded border border-rose-400/30 bg-rose-950/20 p-2 text-[10px] leading-relaxed text-rose-100/80">
+          {marker.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
       <p className="mt-2 border-t border-amber-300/20 pt-2 text-[10px] leading-relaxed text-amber-100/70">
         This marker is the projected custom hand. Neighbor rows are manifold
         references used to place it, not replacements for the input cards.
@@ -182,20 +219,42 @@ function ManualNeighborsList() {
 function SelectedStateCard({
   point,
   index,
+  manualMarker,
+  neighborFocusActive,
+  onToggleNeighborFocus,
 }: {
   point: BrowserPointMeta;
   index: number;
+  manualMarker: ManualMarker | null;
+  neighborFocusActive: boolean;
+  onToggleNeighborFocus: () => void;
 }) {
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
   return (
     <section className="gop-fade-in space-y-3">
       <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
             Selected state
           </p>
-          <span className="gop-mono text-[10px] text-zinc-500">{point.id}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleNeighborFocus}
+              className={`rounded border px-1.5 py-0.5 text-[10px] transition ${
+                neighborFocusActive
+                  ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-100"
+                  : "border-[var(--border-subtle)] text-zinc-500 hover:border-[var(--border-default)] hover:text-zinc-200"
+              }`}
+              title="Filter the cloud to this point and its nearest embedding neighbors"
+            >
+              {neighborFocusActive ? "Clear 25-NN" : "Focus 25-NN"}
+            </button>
+            <span className="gop-mono truncate text-[10px] text-zinc-500">
+              {point.id}
+            </span>
+          </div>
         </div>
         <div className="space-y-1.5">
           <CardDisplay cards={point.hero} label="Hero" />
@@ -206,6 +265,10 @@ function SelectedStateCard({
       </div>
 
       <KeyMetrics point={point} />
+
+      {manualMarker && (
+        <ManualComparisonCard marker={manualMarker} point={point} />
+      )}
 
       <BoardTextureSection point={point} />
 
@@ -369,7 +432,7 @@ function NearestNeighbors({ index }: { index: number }) {
         Nearest neighbors
       </p>
       <ul className="space-y-0.5 text-[11px]">
-      {top.map(({ index: neighborIndex, distance }) => {
+        {top.map(({ index: neighborIndex, distance }) => {
           const p = dataset.metadata[neighborIndex]!;
           return (
             <li key={p.id}>
@@ -468,6 +531,69 @@ function equityBarFromValue(eq: number) {
 
 function humanCategory(name: string): string {
   return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+function formatSignedPercent(value: number) {
+  const pct = value * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}`;
+}
+
+function ManualComparisonCard({
+  marker,
+  point,
+}: {
+  marker: ManualMarker;
+  point: BrowserPointMeta;
+}) {
+  const comparison = compareManualToPoint(marker, point);
+  return (
+    <div className="rounded border border-cyan-300/20 bg-cyan-500/[0.04] p-3">
+      <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-cyan-200/80">
+        Compared with manual hand
+      </p>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+        <Row
+          label="Reference"
+          value={
+            comparison.neighborRank !== null
+              ? `neighbor #${comparison.neighborRank}`
+              : "outside top-k"
+          }
+        />
+        {comparison.neighborDistance !== null && (
+          <Row
+            label="Neighbor d"
+            value={comparison.neighborDistance.toFixed(3)}
+            mono
+          />
+        )}
+        {comparison.equityDelta !== null && (
+          <Row
+            label="Equity delta"
+            value={`${formatSignedPercent(comparison.equityDelta)} pp`}
+            mono
+          />
+        )}
+        {comparison.categoryMatch !== null && (
+          <Row
+            label="Category"
+            value={comparison.categoryMatch ? "same" : "different"}
+          />
+        )}
+        {comparison.clusterMatch !== null && (
+          <Row
+            label="Cluster"
+            value={comparison.clusterMatch ? "same" : "different"}
+          />
+        )}
+        <Row
+          label="Shared cards"
+          value={`${comparison.sharedCards}/${comparison.totalManualCards}`}
+          mono
+        />
+      </dl>
+    </div>
+  );
 }
 
 function numberMetric(value: unknown): number | null {

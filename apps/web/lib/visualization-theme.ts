@@ -125,6 +125,82 @@ export function describeProjectionMethod(method: string): string {
   }
 }
 
+export interface ProjectionLocalitySummary {
+  label: "Exact" | "Tight" | "Blended" | "Diffuse" | "Unknown";
+  detail: string;
+  effectiveNeighbors: number | null;
+  nearestDistance: number | null;
+}
+
+function effectiveNeighborCount(distances: number[]): number | null {
+  const finite = distances.filter((d) => Number.isFinite(d) && d >= 0);
+  if (finite.length === 0) return null;
+  if (finite.some((d) => d <= 1e-9)) return 1;
+
+  const weights = finite.map((d) => 1 / (d + 1e-9));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  if (total <= 0) return null;
+
+  return 1 / weights.reduce((sum, w) => {
+    const p = w / total;
+    return sum + p * p;
+  }, 0);
+}
+
+export function summarizeProjectionLocality(
+  method: string,
+  distances: number[],
+): ProjectionLocalitySummary {
+  if (method === "exact-match" || method === "exact_match") {
+    return {
+      label: "Exact",
+      detail: "Input cards exist in the loaded dataset.",
+      effectiveNeighbors: 1,
+      nearestDistance: 0,
+    };
+  }
+
+  const finite = distances.filter((d) => Number.isFinite(d) && d >= 0);
+  if (finite.length === 0) {
+    return {
+      label: "Unknown",
+      detail: "No neighbor distances were returned.",
+      effectiveNeighbors: null,
+      nearestDistance: null,
+    };
+  }
+
+  const effective = effectiveNeighborCount(finite);
+  const nearest = Math.min(...finite);
+  const farthest = Math.max(...finite);
+  const spread = nearest > 1e-9 ? farthest / nearest : Infinity;
+
+  if (effective !== null && effective <= 1.6) {
+    return {
+      label: "Tight",
+      detail: `Dominated by the nearest reference point; d=${nearest.toFixed(3)}.`,
+      effectiveNeighbors: effective,
+      nearestDistance: nearest,
+    };
+  }
+
+  if (spread <= 2.5) {
+    return {
+      label: "Blended",
+      detail: `Interpolated across a compact local neighborhood; d=${nearest.toFixed(3)}-${farthest.toFixed(3)}.`,
+      effectiveNeighbors: effective,
+      nearestDistance: nearest,
+    };
+  }
+
+  return {
+    label: "Diffuse",
+    detail: `Nearest references are unevenly spaced; inspect neighbors before over-reading the marker.`,
+    effectiveNeighbors: effective,
+    nearestDistance: nearest,
+  };
+}
+
 /** RGB triplet to CSS rgb() string for HTML legend rendering. */
 export function rgbCss(rgb: [number, number, number]): string {
   return `rgb(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)})`;

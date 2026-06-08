@@ -3,6 +3,7 @@ import {
   COLOR_MODE_META,
   describeProjectionMethod,
   rgbCss,
+  summarizeProjectionLocality,
 } from "@/lib/visualization-theme";
 import { COLOR_MODES } from "@/lib/types";
 
@@ -40,5 +41,27 @@ describe("visualization theme metadata", () => {
 
   it("converts an RGB triplet to an rgb() string", () => {
     expect(rgbCss([1, 0, 0.5])).toBe("rgb(255, 0, 128)");
+  });
+
+  it("summarizes exact-match projection locality without using distances", () => {
+    const summary = summarizeProjectionLocality("exact-match", [3, 4, 5]);
+    expect(summary.label).toBe("Exact");
+    expect(summary.nearestDistance).toBe(0);
+    expect(summary.effectiveNeighbors).toBe(1);
+  });
+
+  it("summarizes compact interpolation neighborhoods", () => {
+    const summary = summarizeProjectionLocality("pca-knn-interpolation", [
+      0.8, 0.9, 1.0, 1.1, 1.2,
+    ]);
+    expect(summary.label).toBe("Blended");
+    expect(summary.effectiveNeighbors).toBeGreaterThan(4);
+  });
+
+  it("flags uneven interpolation neighborhoods as diffuse", () => {
+    const summary = summarizeProjectionLocality("pca-knn-interpolation", [
+      2, 8, 11, 14, 20,
+    ]);
+    expect(summary.label).toBe("Diffuse");
   });
 });

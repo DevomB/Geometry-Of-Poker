@@ -13,6 +13,17 @@ describe("projection", () => {
     expect(idx).toBe(0);
   });
 
+  it("finds exact match regardless of hero or board entry order", () => {
+    const dataset = loadFixtureDataset(fixture.root, "river");
+    const first = dataset.metadata[0]!;
+    const idx = findExactMatch(
+      dataset,
+      [first.hero[1], first.hero[0]],
+      [...first.board].reverse(),
+    );
+    expect(idx).toBe(0);
+  });
+
   it("projects known hand to exact coordinates", () => {
     const dataset = loadFixtureDataset(fixture.root, "flop");
     const first = dataset.metadata[0]!;
@@ -23,6 +34,17 @@ describe("projection", () => {
     expect(result.method).toBe("exact_match");
     expect(result.position).toEqual([first.x, first.y, first.z]);
     expect(result.neighborIds.length).toBeGreaterThan(0);
+  });
+
+  it("projects permuted known hand to exact coordinates", () => {
+    const dataset = loadFixtureDataset(fixture.root, "turn");
+    const first = dataset.metadata[0]!;
+    const result = projectIntoGeometry(dataset, {
+      hero: [first.hero[1], first.hero[0]],
+      board: [...first.board].reverse(),
+    });
+    expect(result.method).toBe("exact_match");
+    expect(result.position).toEqual([first.x, first.y, first.z]);
   });
 
   it("projects a non-dataset hand with PCA kNN interpolation", () => {

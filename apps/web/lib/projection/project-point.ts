@@ -1,7 +1,15 @@
 import type { BrowserPointMeta, ProjectionResponse, StreetDataset } from "@/lib/types";
 
+function normalizeCard(card: string) {
+  return `${card[0]?.toUpperCase() ?? ""}${card[1]?.toLowerCase() ?? ""}`;
+}
+
+function cardSetKey(cards: string[]) {
+  return cards.map(normalizeCard).sort().join(",");
+}
+
 function cardsKey(hero: [string, string], board: string[]) {
-  return `${hero.join(",")}|${board.join(",")}`;
+  return `${cardSetKey(hero)}|${cardSetKey(board)}`;
 }
 
 export function findExactMatch(

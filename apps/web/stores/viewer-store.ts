@@ -257,10 +257,10 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       street,
       dataset: null,
       spatialIndex: null,
-        selection: null,
-        hoverIndex: null,
-        manualMarker: null,
-        filters: { ...DEFAULT_FILTER_VALUES },
+      selection: null,
+      hoverIndex: null,
+      manualMarker: null,
+      filters: { ...DEFAULT_FILTER_VALUES },
     });
     void get().loadStreet();
   },
@@ -329,8 +329,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
           target: manualMarker.position,
         },
       });
-      set(rebuildVisualization(get()));
     }
+    set(rebuildVisualization(get()));
   },
 
   flyTo: (cameraFlyTarget) => set({ cameraFlyTarget }),

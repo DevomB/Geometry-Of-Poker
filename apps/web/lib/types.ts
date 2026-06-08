@@ -160,6 +160,7 @@ export interface ManualMarker {
   neighborDistances: number[];
   clusterId: number | null;
   features: Record<string, number | string | boolean>;
+  warnings?: string[];
 }
 
 export interface ProjectionResponse {

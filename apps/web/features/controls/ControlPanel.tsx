@@ -28,6 +28,38 @@ export function ControlPanel() {
   const renderQuality = useViewerStore((s) => s.renderQuality);
 
   const categories = dataset?.manifest.categories ?? [];
+  const clusters = dataset?.manifest.clusters ?? [];
+  let visibleCount = 0;
+  if (dataset) {
+    for (let i = 0; i < dataset.visible.length; i++) {
+      if (dataset.visible[i]) visibleCount++;
+    }
+  }
+  const filtersActive =
+    filters.equityMin > 0 ||
+    filters.equityMax < 1 ||
+    filters.categories.length > 0 ||
+    filters.clusters.length > 0 ||
+    filters.boardRainbow !== null ||
+    filters.boardTwoTone !== null ||
+    filters.boardMonotone !== null ||
+    filters.searchNeighborOf !== null;
+
+  const toggleCategory = (category: string) => {
+    setFilters({
+      categories: filters.categories.includes(category)
+        ? filters.categories.filter((c) => c !== category)
+        : [...filters.categories, category],
+    });
+  };
+
+  const toggleCluster = (cluster: number) => {
+    setFilters({
+      clusters: filters.clusters.includes(cluster)
+        ? filters.clusters.filter((c) => c !== cluster)
+        : [...filters.clusters, cluster],
+    });
+  };
 
   return (
     <aside
@@ -78,14 +110,36 @@ export function ControlPanel() {
         <ColorLegend mode={colorMode} dataset={dataset} />
       </Section>
 
-      <Section title="Filters">
+      <Section title="Filters" defaultOpen>
         <fieldset className="space-y-2">
           <legend className="sr-only">Filters</legend>
+          {dataset && (
+            <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-1.5 text-[10px] text-zinc-400">
+              <div className="flex items-center justify-between">
+                <span>Visible states</span>
+                <span className="gop-mono tabular-nums text-zinc-300">
+                  {visibleCount.toLocaleString()}/{dataset.count.toLocaleString()}
+                </span>
+              </div>
+              {filters.searchNeighborOf && (
+                <div className="mt-1 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-1">
+                  <span className="truncate">Focused on 25-NN</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilters({ searchNeighborOf: null })}
+                    className="text-cyan-300/80 transition hover:text-cyan-200"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <label className="block text-[11px] text-zinc-400">
             <span className="flex justify-between">
               <span>Equity range</span>
               <span className="gop-mono tabular-nums text-zinc-500">
-                {Math.round(filters.equityMin * 100)}–{Math.round(filters.equityMax * 100)}%
+                {Math.round(filters.equityMin * 100)}-{Math.round(filters.equityMax * 100)}%
               </span>
             </span>
             <div className="mt-1 flex items-center gap-2">
@@ -127,24 +181,68 @@ export function ControlPanel() {
           </label>
 
           {categories.length > 0 && (
-            <label className="block text-[11px] text-zinc-400">
-              Hand category
-              <select
-                multiple
-                value={filters.categories}
-                onChange={(e) => {
-                  const selected = [...e.target.selectedOptions].map((o) => o.value);
-                  setFilters({ categories: selected });
-                }}
-                className="mt-1 h-20 w-full rounded border border-[var(--border-default)] bg-black/40 px-2 py-1 text-[11px] focus:border-cyan-300/50 focus:outline-none"
-              >
+            <div className="text-[11px] text-zinc-400">
+              <div className="mb-1 flex items-center justify-between">
+                <span>Hand category</span>
+                {filters.categories.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters({ categories: [] })}
+                    className="text-[10px] text-zinc-500 transition hover:text-zinc-300"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
                 {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                  <FilterChip
+                    key={c}
+                    label={humanCategory(c)}
+                    active={filters.categories.includes(c)}
+                    onClick={() => toggleCategory(c)}
+                  />
                 ))}
-              </select>
-            </label>
+              </div>
+            </div>
+          )}
+
+          {clusters.length > 0 && (
+            <div className="text-[11px] text-zinc-400">
+              <div className="mb-1 flex items-center justify-between">
+                <span>Cluster</span>
+                {filters.clusters.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters({ clusters: [] })}
+                    className="text-[10px] text-zinc-500 transition hover:text-zinc-300"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {clusters.slice(0, 12).map((c) => (
+                  <FilterChip
+                    key={c.id}
+                    label={`C${c.id}`}
+                    active={filters.clusters.includes(c.id)}
+                    onClick={() => toggleCluster(c.id)}
+                    title={`${c.size.toLocaleString()} states`}
+                  />
+                ))}
+                <FilterChip
+                  label="noise"
+                  active={filters.clusters.includes(-1)}
+                  onClick={() => toggleCluster(-1)}
+                />
+              </div>
+              {clusters.length > 12 && (
+                <p className="mt-1 text-[10px] text-zinc-600">
+                  Showing the first 12 manifest clusters.
+                </p>
+              )}
+            </div>
           )}
 
           <div className="space-y-1 text-[11px] text-zinc-300">
@@ -168,7 +266,8 @@ export function ControlPanel() {
           <button
             type="button"
             onClick={resetFilters}
-            className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-zinc-400 transition hover:border-[var(--border-default)] hover:text-zinc-200"
+            disabled={!filtersActive}
+            className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-zinc-400 transition hover:border-[var(--border-default)] hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
           >
             Reset filters
           </button>
@@ -255,12 +354,43 @@ function Section({
       >
         <span>{title}</span>
         <span aria-hidden="true" className="text-zinc-600">
-          {open ? "−" : "+"}
+          {open ? "-" : "+"}
         </span>
       </button>
       {open && <div className="gop-fade-in">{children}</div>}
     </section>
   );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+  title,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`min-h-6 rounded border px-1.5 py-0.5 text-[10px] transition ${
+        active
+          ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-100"
+          : "border-[var(--border-subtle)] bg-white/[0.02] text-zinc-400 hover:border-[var(--border-default)] hover:text-zinc-200"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function humanCategory(name: string): string {
+  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
 function Toggle({

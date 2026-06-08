@@ -1,11 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useViewerStore } from "@/stores/viewer-store";
 import { CardDisplay } from "@/components/CardDisplay";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
 import { compareManualToPoint } from "@/lib/inspector/state-comparison";
-import type { BrowserPointMeta, ManualMarker } from "@/lib/types";
+import {
+  computeClusterProfile,
+  formatDelta,
+  type ClusterProfile,
+} from "@/lib/inspector/cluster-profile";
+import {
+  computePopulationStanding,
+  formatPercentile,
+  type PopulationStanding,
+} from "@/lib/inspector/population-standing";
+import {
+  computeStateCombinatorics,
+  formatBigInt,
+} from "@/lib/poker/combinatorics";
+import type { BrowserPointMeta, ManualMarker, StreetDataset } from "@/lib/types";
 import {
   describeProjectionMethod,
   summarizeProjectionLocality,
@@ -57,10 +72,11 @@ export function InspectorPanel() {
 
       {manualMarker && <ManualProjectionCard />}
 
-      {point ? (
+      {point && dataset ? (
         <SelectedStateCard
           point={point}
           index={selectedIndex!}
+          dataset={dataset}
           manualMarker={manualMarker}
           neighborFocusActive={filters.searchNeighborOf === point.id}
           onToggleNeighborFocus={() =>
@@ -219,17 +235,27 @@ function ManualNeighborsList() {
 function SelectedStateCard({
   point,
   index,
+  dataset,
   manualMarker,
   neighborFocusActive,
   onToggleNeighborFocus,
 }: {
   point: BrowserPointMeta;
   index: number;
+  dataset: StreetDataset;
   manualMarker: ManualMarker | null;
   neighborFocusActive: boolean;
   onToggleNeighborFocus: () => void;
 }) {
   const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const standing = useMemo(
+    () => computePopulationStanding(dataset, index),
+    [dataset, index],
+  );
+  const clusterProfile = useMemo(
+    () => computeClusterProfile(dataset, index),
+    [dataset, index],
+  );
 
   return (
     <section className="gop-fade-in space-y-3">
@@ -265,6 +291,12 @@ function SelectedStateCard({
       </div>
 
       <KeyMetrics point={point} />
+
+      {standing && <PopulationStandingSection standing={standing} />}
+
+      {clusterProfile && <ClusterProfileSection profile={clusterProfile} />}
+
+      <CombinatoricsSection point={point} />
 
       {manualMarker && (
         <ManualComparisonCard marker={manualMarker} point={point} />
@@ -302,6 +334,228 @@ function SelectedStateCard({
 
       <NearestNeighbors index={index} />
     </section>
+  );
+}
+
+function ClusterProfileSection({ profile }: { profile: ClusterProfile }) {
+  return (
+    <div className="rounded border border-sky-300/20 bg-sky-500/[0.035] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-sky-200/80">
+          Cluster profile
+        </p>
+        <span className="gop-mono text-[10px] tabular-nums text-sky-300/70">
+          {profile.label} {formatShare(profile.share)}
+        </span>
+      </div>
+
+      <div className="space-y-1.5">
+        {profile.metrics.map((metric) => (
+          <div
+            key={metric.id}
+            className="rounded border border-white/[0.06] bg-black/10 px-2 py-1.5"
+            title={`Cluster mean ${metric.clusterMean.toFixed(4)} vs street mean ${metric.streetMean.toFixed(4)}`}
+          >
+            <div className="flex items-center justify-between gap-2 text-[10px]">
+              <span className="text-zinc-500">{metric.label}</span>
+              <span
+                className={`gop-mono tabular-nums ${
+                  metric.delta >= 0 ? "text-emerald-300/80" : "text-rose-300/80"
+                }`}
+              >
+                {formatDelta(metric.delta, metric.format)}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[9px] text-zinc-600">
+              <span className="gop-mono tabular-nums">
+                cluster {formatClusterMetric(metric.clusterMean, metric.format)}
+              </span>
+              <span className="gop-mono tabular-nums">
+                street {formatClusterMetric(metric.streetMean, metric.format)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {profile.categories.length > 0 && (
+        <div className="mt-3 border-t border-sky-300/15 pt-2">
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-sky-200/70">
+            Category mix
+          </p>
+          <div className="space-y-1">
+            {profile.categories.slice(0, 4).map((category) => (
+              <div key={category.label}>
+                <div className="mb-0.5 flex items-center justify-between text-[10px]">
+                  <span className="truncate text-zinc-400">
+                    {humanCategory(category.label)}
+                  </span>
+                  <span className="gop-mono tabular-nums text-zinc-500">
+                    {formatShare(category.share)}
+                  </span>
+                </div>
+                <div className="h-1 overflow-hidden rounded bg-white/[0.06]">
+                  <div
+                    className="h-full rounded bg-sky-300/60"
+                    style={{ width: `${Math.max(3, category.share * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PopulationStandingSection({
+  standing,
+}: {
+  standing: PopulationStanding;
+}) {
+  return (
+    <div className="rounded border border-violet-300/20 bg-violet-500/[0.035] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-violet-200/80">
+          Population standing
+        </p>
+        <span className="gop-mono text-[10px] tabular-nums text-violet-300/70">
+          n={standing.streetCount.toLocaleString()}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {standing.metrics.map((metric) => (
+          <div key={metric.id} title={metric.detail}>
+            <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
+              <span className="text-zinc-500">{metric.label}</span>
+              <span className="gop-mono tabular-nums text-zinc-300">
+                {formatPercentile(metric.percentile)}
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded bg-white/[0.06]">
+              <div
+                className="h-full rounded bg-violet-300/70"
+                style={{ width: `${Math.max(3, metric.percentile * 100)}%` }}
+              />
+            </div>
+            <div className="mt-0.5 text-right gop-mono text-[9px] tabular-nums text-zinc-600">
+              {formatStandingValue(metric.value, metric.format)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-0.5 border-t border-violet-300/15 pt-2 text-[10px]">
+        <Row
+          label="Category share"
+          value={`${humanCategory(standing.category.label)} ${formatShare(standing.category.share)}`}
+        />
+        <Row
+          label="Category n"
+          value={standing.category.count.toLocaleString()}
+          mono
+        />
+        <Row
+          label="Cluster share"
+          value={`${standing.cluster.label} ${formatShare(standing.cluster.share)}`}
+        />
+        <Row
+          label="Cluster n"
+          value={standing.cluster.count.toLocaleString()}
+          mono
+        />
+      </dl>
+    </div>
+  );
+}
+
+function CombinatoricsSection({ point }: { point: BrowserPointMeta }) {
+  const math = computeStateCombinatorics({
+    hero: point.hero,
+    board: point.board,
+    equityVsRandom: point.equityVsRandom,
+    summary: point.summary,
+  });
+
+  return (
+    <div className="rounded border border-emerald-300/20 bg-emerald-500/[0.035] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80">
+          Exact combinatorics
+        </p>
+        <Link
+          href="/research/combinatorial-proofs"
+          className="text-[10px] text-emerald-300/70 transition hover:text-emerald-200"
+        >
+          Proof notes
+        </Link>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+        <Row label="Known cards" value={`${math.knownCards}/52`} mono />
+        <Row label="Remaining deck" value={String(math.remainingCards)} mono />
+        <Row
+          label="Villain hands"
+          value={formatBigInt(math.legalVillainHands)}
+          mono
+          title="C(52 - known cards, 2)"
+        />
+        <Row
+          label="Runout cards"
+          value={String(math.runoutCardsToRiver)}
+          mono
+          title="Cards still needed to reach the river"
+        />
+        <Row
+          label="Runouts/villain"
+          value={formatBigInt(math.publicRunoutsAfterVillain)}
+          mono
+          title="C(remaining cards after villain, cards to river)"
+        />
+        <Row
+          label="Terminal leaves"
+          value={formatBigInt(math.terminalLeaves)}
+          mono
+          title="Villain hand choices multiplied by public-board completions"
+        />
+        {math.improvementProbability !== null && (
+          <Row
+            label="Improve next"
+            value={formatPercent(math.improvementProbability)}
+            mono
+            title="Exact one-card odds from enumerated improvement outs"
+          />
+        )}
+        {math.cleanImprovementProbability !== null && (
+          <Row
+            label="Clean improve"
+            value={formatPercent(math.cleanImprovementProbability)}
+            mono
+            title="Improvement odds excluding known villain leapfrog cards when available"
+          />
+        )}
+        {math.flushOutCount !== null && math.flushOutCount > 0 && (
+          <Row label="Flush outs" value={String(math.flushOutCount)} mono />
+        )}
+        {math.straightOutCount !== null && math.straightOutCount > 0 && (
+          <Row label="Straight outs" value={String(math.straightOutCount)} mono />
+        )}
+        {math.equityLeafStandardError !== null && (
+          <Row
+            label="Leaf-scale SE"
+            value={`${(math.equityLeafStandardError * 100).toFixed(3)} pp`}
+            mono
+            title="Binomial-equivalent standard error over terminal leaves; exact engine equity is not a Monte Carlo estimate"
+          />
+        )}
+      </dl>
+      <p className="mt-2 border-t border-emerald-300/15 pt-2 text-[10px] leading-relaxed text-emerald-100/65">
+        These counts are pure deck combinatorics. They define the enumeration universe
+        behind exact equity and next-card odds; model claims still stop at the
+        documented uniform-villain assumption.
+      </p>
+    </div>
   );
 }
 
@@ -536,6 +790,24 @@ function humanCategory(name: string): string {
 function formatSignedPercent(value: number) {
   const pct = value * 100;
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}`;
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(2)}%`;
+}
+
+function formatShare(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatStandingValue(value: number, format: "percent" | "decimal") {
+  if (format === "percent") return `${(value * 100).toFixed(2)}%`;
+  return value.toFixed(4);
+}
+
+function formatClusterMetric(value: number, format: "percent" | "decimal") {
+  if (format === "percent") return `${(value * 100).toFixed(1)}%`;
+  return value.toFixed(3);
 }
 
 function ManualComparisonCard({

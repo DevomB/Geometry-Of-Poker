@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useViewerStore } from "@/stores/viewer-store";
 import { COLOR_MODES, STREETS } from "@/lib/types";
 import type { Street } from "@geometry-of-poker/shared";
 import { resetCameraView } from "@/features/scene/SceneShell";
 import { CardPickerPanel } from "@/features/card-picker/CardPickerPanel";
 import { ColorLegend } from "@/components/ColorLegend";
+import {
+  computeStreetAtlas,
+  formatAtlasValue,
+  type AtlasSlice,
+} from "@/lib/atlas/street-atlas";
 
 export function ControlPanel() {
   const street = useViewerStore((s) => s.street);
@@ -26,6 +31,10 @@ export function ControlPanel() {
   const fps = useViewerStore((s) => s.fps);
   const targetFps = useViewerStore((s) => s.targetFps);
   const renderQuality = useViewerStore((s) => s.renderQuality);
+  const atlas = useMemo(
+    () => (dataset && dataset.metadata.length > 0 ? computeStreetAtlas(dataset) : null),
+    [dataset],
+  );
 
   const categories = dataset?.manifest.categories ?? [];
   const clusters = dataset?.manifest.clusters ?? [];
@@ -95,18 +104,7 @@ export function ControlPanel() {
       </Section>
 
       <Section title="Color mode" defaultOpen>
-        <select
-          value={colorMode}
-          onChange={(e) => setColorMode(e.target.value as typeof colorMode)}
-          aria-label="Color mode"
-          className="mb-2 w-full rounded border border-[var(--border-default)] bg-black/40 px-2 py-1.5 text-xs text-zinc-200 focus:border-cyan-300/50 focus:outline-none"
-        >
-          {COLOR_MODES.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        <ColorModePicker value={colorMode} onChange={setColorMode} />
         <ColorLegend mode={colorMode} dataset={dataset} />
       </Section>
 
@@ -319,6 +317,121 @@ export function ControlPanel() {
         </div>
       </Section>
 
+      {dataset && (
+        <Section title="Diagnostics">
+          <div className="space-y-2 rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2 text-[10px] text-zinc-500">
+            <MetricRow
+              label="Embedding"
+              value={dataset.manifest.embeddingMethod || "unknown"}
+            />
+            <MetricRow
+              label="Points"
+              value={dataset.count.toLocaleString()}
+              mono
+            />
+            <MetricRow
+              label="Feature dims"
+              value={`${dataset.manifest.retainedDimension ?? dataset.manifest.retainedFeatures.length}/${dataset.manifest.originalDimension ?? "?"}`}
+              mono
+              title="Retained dimensions after preprocessing compared with original feature dimensions"
+            />
+            {dataset.manifest.pcaDimensions != null && (
+              <MetricRow
+                label="PCA dims"
+                value={String(dataset.manifest.pcaDimensions)}
+                mono
+              />
+            )}
+            {dataset.manifest.pcaVariance != null && (
+              <MetricRow
+                label="PCA variance"
+                value={formatUnitInterval(dataset.manifest.pcaVariance)}
+                mono
+              />
+            )}
+            {dataset.manifest.trustworthiness != null && (
+              <MetricRow
+                label="Trustworthiness"
+                value={formatUnitInterval(dataset.manifest.trustworthiness)}
+                mono
+                title="How often embedding neighbors remain neighbors in source feature space"
+              />
+            )}
+            {dataset.manifest.knnOverlap != null && (
+              <MetricRow
+                label="kNN overlap"
+                value={formatUnitInterval(dataset.manifest.knnOverlap)}
+                mono
+                title="Shared-neighbor overlap between feature space and 3D embedding"
+              />
+            )}
+            {dataset.manifest.hdbscan && (
+              <>
+                <MetricRow
+                  label="Clusters"
+                  value={String(dataset.manifest.hdbscan.clusters ?? "unknown")}
+                  mono
+                />
+                {dataset.manifest.hdbscan.noiseFraction != null && (
+                  <MetricRow
+                    label="Noise"
+                    value={formatUnitInterval(dataset.manifest.hdbscan.noiseFraction)}
+                    mono
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {atlas && (
+        <Section title="Street atlas">
+          <div className="space-y-3">
+            <div className="space-y-2 rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2">
+              {atlas.metrics.map((metric) => (
+                <div key={metric.id}>
+                  <div className="mb-1 flex items-center justify-between text-[10px]">
+                    <span className="text-zinc-500">{metric.label}</span>
+                    <span className="gop-mono tabular-nums text-zinc-300">
+                      med {formatAtlasValue(metric.median, metric.format)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[9px] text-zinc-600">
+                    <span className="gop-mono tabular-nums">
+                      min {formatAtlasValue(metric.min, metric.format)}
+                    </span>
+                    <span className="gop-mono text-center tabular-nums">
+                      iqr {formatAtlasValue(metric.q25, metric.format)}-
+                      {formatAtlasValue(metric.q75, metric.format)}
+                    </span>
+                    <span className="gop-mono text-right tabular-nums">
+                      max {formatAtlasValue(metric.max, metric.format)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <AtlasSliceList
+              title="Categories"
+              slices={atlas.categories.slice(0, 5)}
+              activeIds={filters.categories}
+              onSelect={(id) => setFilters({ categories: [id] })}
+              onClear={() => setFilters({ categories: [] })}
+            />
+
+            <AtlasSliceList
+              title="Clusters"
+              slices={atlas.clusters.slice(0, 6)}
+              activeIds={filters.clusters.map(String)}
+              onSelect={(id) => setFilters({ clusters: [Number(id)] })}
+              onClear={() => setFilters({ clusters: [] })}
+            />
+          </div>
+        </Section>
+      )}
+
       <Section title="Camera">
         <button
           type="button"
@@ -331,6 +444,85 @@ export function ControlPanel() {
 
       <CardPickerPanel />
     </aside>
+  );
+}
+
+function ColorModePicker({
+  value,
+  onChange,
+}: {
+  value: (typeof COLOR_MODES)[number]["id"];
+  onChange: (mode: (typeof COLOR_MODES)[number]["id"]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const activeMode = COLOR_MODES.find((mode) => mode.id === value) ?? COLOR_MODES[0]!;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative mb-2">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Color mode"
+        onClick={() => setOpen((next) => !next)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setOpen(false);
+        }}
+        className="flex min-h-9 w-full items-center justify-between rounded border border-[var(--border-default)] bg-black/50 px-2.5 py-1.5 text-left text-xs text-zinc-100 shadow-[0_0_0_1px_rgba(0,0,0,0.3)] transition hover:border-[var(--border-strong)] hover:bg-black/60 focus:border-cyan-300/50 focus:outline-none"
+      >
+        <span className="truncate">{activeMode.label}</span>
+        <span className="gop-mono pl-2 text-[10px] text-zinc-500" aria-hidden="true">
+          {open ? "^" : "v"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 overflow-hidden rounded border border-cyan-300/25 bg-[#101018] shadow-2xl shadow-black/60">
+          <ul role="listbox" aria-label="Color mode options" className="py-1">
+            {COLOR_MODES.map((mode) => {
+              const active = mode.id === value;
+              return (
+                <li key={mode.id} role="option" aria-selected={active}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(mode.id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition ${
+                      active
+                        ? "bg-cyan-500/15 text-cyan-100"
+                        : "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100"
+                    }`}
+                  >
+                    <span>{mode.label}</span>
+                    {active && (
+                      <span className="gop-mono text-[10px] text-cyan-200" aria-hidden="true">
+                        on
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -413,6 +605,99 @@ function Toggle({
       {label}
     </label>
   );
+}
+
+function MetricRow({
+  label,
+  value,
+  mono,
+  title,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  title?: string;
+}) {
+  return (
+    <div className="flex justify-between gap-2" title={title}>
+      <span>{label}</span>
+      <span
+        className={`max-w-[9rem] truncate text-right text-zinc-300 ${
+          mono ? "gop-mono tabular-nums" : ""
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function AtlasSliceList({
+  title,
+  slices,
+  activeIds,
+  onSelect,
+  onClear,
+}: {
+  title: string;
+  slices: AtlasSlice[];
+  activeIds: string[];
+  onSelect: (id: string) => void;
+  onClear: () => void;
+}) {
+  const hasActive = activeIds.length > 0;
+  return (
+    <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-wider text-zinc-500">{title}</p>
+        {hasActive && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[10px] text-zinc-500 transition hover:text-zinc-300"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="space-y-1">
+        {slices.map((slice) => {
+          const active = activeIds.includes(slice.id);
+          return (
+            <button
+              key={slice.id}
+              type="button"
+              onClick={() => onSelect(slice.id)}
+              className={`w-full rounded px-1.5 py-1 text-left transition ${
+                active
+                  ? "bg-cyan-500/15 text-cyan-100"
+                  : "hover:bg-white/[0.05]"
+              }`}
+              title={`${slice.count.toLocaleString()} states`}
+            >
+              <div className="flex items-center justify-between gap-2 text-[10px]">
+                <span className="truncate text-zinc-300">{slice.label}</span>
+                <span className="gop-mono tabular-nums text-zinc-500">
+                  {(slice.share * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="mt-1 h-1 overflow-hidden rounded bg-white/[0.06]">
+                <div
+                  className="h-full rounded bg-cyan-300/55"
+                  style={{ width: `${Math.max(2, slice.share * 100)}%` }}
+                />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatUnitInterval(value: number) {
+  const clamped = Math.max(0, Math.min(1, value));
+  return `${(clamped * 100).toFixed(1)}%`;
 }
 
 function BoardFlagToggle({

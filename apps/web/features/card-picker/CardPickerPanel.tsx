@@ -5,6 +5,7 @@ import {
   RANKS,
   SUITS,
   SUIT_SYMBOLS,
+  HAND_SCENARIO_PRESETS,
   cardKey,
   cardsUsed,
   emptyPickerState,
@@ -12,11 +13,16 @@ import {
   nextTargetZone,
   pickerReady,
   placeCardInZone,
+  presetToPickerState,
   removeCard,
   type CardPickerState,
   type PickerTarget,
 } from "@/lib/cards/card-picker";
 import { validateHandInput } from "@/lib/cards/validate-hand";
+import {
+  computeStateCombinatorics,
+  formatBigInt,
+} from "@/lib/poker/combinatorics";
 import { useViewerStore } from "@/stores/viewer-store";
 import type { ApiErrorResponse, ProjectResponse, Street } from "@geometry-of-poker/shared";
 
@@ -66,6 +72,14 @@ export function CardPickerPanel() {
 
   const clearAll = () => {
     setPicker(emptyPickerState());
+    setTarget("auto");
+    setErrors([]);
+  };
+
+  const loadPreset = (presetId: string) => {
+    const preset = HAND_SCENARIO_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setPicker(presetToPickerState(preset));
     setTarget("auto");
     setErrors([]);
   };
@@ -178,6 +192,31 @@ export function CardPickerPanel() {
         inferred from the number of board cards.
       </p>
 
+      <div className="mb-3">
+        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-zinc-500">
+          <span>Scenarios</span>
+          <span className="gop-mono text-zinc-600">load</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          {HAND_SCENARIO_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => loadPreset(preset.id)}
+              className="min-h-12 rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-1.5 text-left transition hover:border-cyan-300/30 hover:bg-white/[0.05]"
+              title={preset.detail}
+            >
+              <span className="block text-[10px] font-medium text-zinc-300">
+                {preset.label}
+              </span>
+              <span className="gop-mono mt-0.5 block text-[9px] text-zinc-600">
+                {[...preset.hero, ...preset.board].join(" ")}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mb-3 space-y-2" role="group" aria-label="Selected cards">
         <SlotsRow
           label="Hero"
@@ -269,6 +308,10 @@ export function CardPickerPanel() {
         </ul>
       )}
 
+      {ready && inferred && (
+        <PickerCombinatoricsPreview picker={picker} />
+      )}
+
       <div className="flex gap-2">
         <button
           type="button"
@@ -290,6 +333,40 @@ export function CardPickerPanel() {
       </div>
 
     </section>
+  );
+}
+
+function PickerCombinatoricsPreview({ picker }: { picker: CardPickerState }) {
+  const hero = picker.hero.filter(Boolean) as [string, string];
+  const board = picker.board.filter(Boolean) as string[];
+  const math = computeStateCombinatorics({ hero, board });
+
+  return (
+    <div className="mb-2 rounded border border-emerald-300/20 bg-emerald-500/[0.035] p-2">
+      <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-emerald-200/80">
+        <span>Combinatorics preview</span>
+        <span className="gop-mono text-emerald-300/70">
+          {math.remainingCards} unseen
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+        <PreviewRow label="Villain hands" value={formatBigInt(math.legalVillainHands)} />
+        <PreviewRow label="Runouts/villain" value={formatBigInt(math.publicRunoutsAfterVillain)} />
+        <PreviewRow label="Terminal leaves" value={formatBigInt(math.terminalLeaves)} />
+        <PreviewRow label="Runout cards" value={String(math.runoutCardsToRiver)} />
+      </dl>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt className="text-zinc-500">{label}</dt>
+      <dd className="gop-mono truncate text-right tabular-nums text-zinc-300">
+        {value}
+      </dd>
+    </>
   );
 }
 

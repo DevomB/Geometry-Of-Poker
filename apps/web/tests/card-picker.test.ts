@@ -10,6 +10,8 @@ import {
   inferredStreet,
   nextTargetZone,
   cardsUsed,
+  HAND_SCENARIO_PRESETS,
+  presetToPickerState,
 } from "@/lib/cards/card-picker";
 
 describe("card picker validation", () => {
@@ -130,5 +132,18 @@ describe("card picker zone-based placement", () => {
     state.hero = ["As", "Kh"];
     state.board = ["2c", "3d", "4s", null, null];
     expect(cardsUsed(state)).toEqual(new Set(["As", "Kh", "2c", "3d", "4s"]));
+  });
+
+  it("ships scenario presets that map to valid picker states", () => {
+    expect(HAND_SCENARIO_PRESETS.length).toBeGreaterThan(0);
+
+    for (const preset of HAND_SCENARIO_PRESETS) {
+      const state = presetToPickerState(preset);
+      expect(pickerReady(state)).toBe(true);
+      expect(new Set([...preset.hero, ...preset.board]).size).toBe(
+        preset.hero.length + preset.board.length,
+      );
+      expect(inferredStreet(state)).not.toBeNull();
+    }
   });
 });

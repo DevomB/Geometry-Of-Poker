@@ -136,6 +136,14 @@ export function TopNav() {
           </Link>
 
           <Link
+            href="/release"
+            className="hidden rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06] lg:inline-block"
+            title="Open release dashboard"
+          >
+            Release
+          </Link>
+
+          <Link
             href="/research"
             className="hidden text-zinc-500 transition hover:text-zinc-200 md:inline-block"
             title="Open full research page"

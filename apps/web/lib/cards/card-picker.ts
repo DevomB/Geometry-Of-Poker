@@ -17,8 +17,54 @@ export interface CardPickerState {
   board: (string | null)[];
 }
 
+export interface HandScenarioPreset {
+  id: string;
+  label: string;
+  detail: string;
+  hero: [string, string];
+  board: string[];
+}
+
+export const HAND_SCENARIO_PRESETS: HandScenarioPreset[] = [
+  {
+    id: "flop-nut-flush-draw",
+    label: "Nut flush draw",
+    detail: "Flop draw pressure with overcard equity",
+    hero: ["As", "Ks"],
+    board: ["Qs", "7s", "2d"],
+  },
+  {
+    id: "flop-set-wet-board",
+    label: "Set on wet board",
+    detail: "Strong made hand with straight/flush pressure",
+    hero: ["8h", "8d"],
+    board: ["8s", "9s", "Ts"],
+  },
+  {
+    id: "turn-overpair",
+    label: "Turn overpair",
+    detail: "Made-hand vulnerability before the river",
+    hero: ["Ah", "Ad"],
+    board: ["Kh", "7c", "3s", "9d"],
+  },
+  {
+    id: "river-bluff-catcher",
+    label: "River bluff catcher",
+    detail: "Terminal no-runout comparison state",
+    hero: ["Ac", "Jd"],
+    board: ["As", "Kh", "7h", "4c", "2d"],
+  },
+];
+
 export function emptyPickerState(): CardPickerState {
   return { hero: [null, null], board: [null, null, null, null, null] };
+}
+
+export function presetToPickerState(preset: HandScenarioPreset): CardPickerState {
+  return {
+    hero: [...preset.hero],
+    board: Array.from({ length: 5 }, (_, i) => preset.board[i] ?? null),
+  };
 }
 
 export function boardLengthForStreet(street: Street): number {

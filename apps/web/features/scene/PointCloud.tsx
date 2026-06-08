@@ -13,7 +13,8 @@ const vertexShader = /* glsl */ `
   void main() {
     vColor = color;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (220.0 / -mvPosition.z);
+    float depth = max(2.0, -mvPosition.z);
+    gl_PointSize = clamp(size * (36.0 / depth), 1.0, 10.0);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -25,7 +26,7 @@ const fragmentShader = /* glsl */ `
     float d = dot(c, c);
     if (d > 0.25) discard;
     float alpha = smoothstep(0.25, 0.12, d);
-    gl_FragColor = vec4(vColor, alpha);
+    gl_FragColor = vec4(vColor, alpha * 0.82);
   }
 `;
 
@@ -69,7 +70,7 @@ export function PointCloud() {
         fragmentShader,
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
       }),
     [],
   );

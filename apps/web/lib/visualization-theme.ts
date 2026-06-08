@@ -22,10 +22,10 @@ export const AXIS_COLORS = {
 } as const;
 
 export const POINT_SIZES = {
-  base: 1.5,
-  hover: 2.6,
-  selected: 3.6,
-  manualNeighbor: 2.4,
+  base: 1.0,
+  hover: 1.75,
+  selected: 2.35,
+  manualNeighbor: 1.65,
 } as const;
 
 export interface ColorModeMeta {

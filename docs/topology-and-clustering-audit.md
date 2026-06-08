@@ -178,7 +178,7 @@ This evidence argues against a sphere. It argues for better sampling, embedding 
 
 Yes, for the right claim.
 
-The math is good as a **quant-style representation pipeline**:
+The math is good as a **poker-state representation pipeline**:
 
 ```text
 combinatorial state
@@ -190,7 +190,7 @@ combinatorial state
 -> density clustering and diagnostics
 ```
 
-This mirrors real quantitative research workflows: define a state, engineer factors, normalize, reduce dimension, inspect local neighborhoods, and measure fidelity. That is a credible project.
+This keeps the mathematical structure explicit: define a state, engineer poker factors, normalize, reduce dimension, inspect local neighborhoods, and measure fidelity.
 
 The math is not good as a proof that poker is a sphere. A spherical presentation would be cosmetic unless backed by topology diagnostics.
 
@@ -248,7 +248,7 @@ The current system should be presented as:
 - a rigorous feature-engineering and visualization pipeline,
 - an exploratory manifold-learning tool,
 - a cluster/outlier analysis surface,
-- a quant-style project with honest diagnostics.
+- a poker-math project with honest diagnostics.
 
 It should not be presented as:
 

@@ -2,7 +2,7 @@
 
 Geometry of Poker is a production-deployed research visualization for Texas Hold'em state space. It converts poker states into compact feature vectors, embeds those vectors into a three-dimensional manifold, and serves the resulting map as an interactive GPU point cloud.
 
-The project is built as a portfolio-grade system: real release artifacts, a manual hand projection API, S3/CloudFront artifact hosting, Vercel app deployment, and a documented compute policy that keeps heavy poker workloads off local laptops.
+The project is built as a reproducible poker-math system: real release artifacts, a manual hand projection API, S3/CloudFront artifact hosting, Vercel app deployment, and a documented compute policy that keeps heavy poker workloads off local laptops.
 
 ## Live System
 
@@ -183,7 +183,7 @@ The current balanced-small release is intended to be usable on laptops with inte
 
 | File | Description |
 | --- | --- |
-| `docs/math-showpiece.md` | Quant-facing math narrative for demos and interviews |
+| `docs/math-showpiece.md` | Compact mathematical narrative for the poker-state geometry |
 | `docs/topology-and-clustering-audit.md` | Honest audit of whether the learned geometry supports a sphere or clustered structure |
 | `docs/research-methodology.md` | Feature and embedding methodology |
 | `docs/architecture.md` | System design and data flow |
@@ -192,7 +192,7 @@ The current balanced-small release is intended to be usable on laptops with inte
 | `docs/feature-schema.md` | Compact feature schema reference |
 | `deploy/aws/README.md` | AWS artifact and Batch workflow |
 
-## Portfolio Talking Points
+## Research Talking Points
 
 - "I separated app hosting from artifact hosting so the system has no always-on poker compute."
 - "The viewer is data-oriented: one point cloud, typed arrays, binary channels, no per-point React tree."

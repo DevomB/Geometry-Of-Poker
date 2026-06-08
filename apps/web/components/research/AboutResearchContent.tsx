@@ -176,10 +176,11 @@ export function AboutResearchContent({ embed = false }: AboutResearchContentProp
         </h2>
         <ul className="space-y-1 font-mono text-xs text-zinc-500">
           <li>docs/research-methodology.md</li>
+          <li>docs/math-showpiece.md</li>
+          <li>docs/topology-and-clustering-audit.md</li>
           <li>docs/performance-analysis.md</li>
           <li>docs/limitations.md</li>
-          <li>docs/cppcon-talk-outline.md</li>
-          <li>docs/quant-firm-project-summary.md</li>
+          <li>docs/feature-schema.md</li>
         </ul>
       </section>
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Map Behind the Project - Geometry of Poker",
   description:
-    "A presentation-ready walkthrough of the state-space map, feature geometry, embedding pipeline, and projection method behind Geometry of Poker.",
+    "A technical walkthrough of the state-space map, feature geometry, embedding pipeline, and projection method behind Geometry of Poker.",
 };
 
 const RELEASE_STATS = [
@@ -73,7 +73,7 @@ const FEATURE_GROUPS = [
   },
 ];
 
-const TALKING_POINTS = [
+const RESEARCH_NOTES = [
   "The map is not a poker solver. It is a geometry of measurable state properties.",
   "UMAP preserves local neighborhoods better than global distances, so interpretation should focus on nearby structure.",
   "Manual hands are projected by PCA-space neighbor interpolation, not by inventing new UMAP coordinates at request time.",
@@ -89,7 +89,7 @@ export default function MapPage() {
             Back to viewer
           </Link>
           <p className="mt-8 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
-            Presentation map
+            Research map
           </p>
           <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight text-zinc-50">
             How Geometry of Poker turns Hold&apos;em states into a navigable manifold
@@ -207,10 +207,10 @@ export default function MapPage() {
 
         <section className="py-10">
           <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-            Talk track
+            Research notes
           </h2>
           <ul className="mt-4 grid gap-3 md:grid-cols-2">
-            {TALKING_POINTS.map((point) => (
+            {RESEARCH_NOTES.map((point) => (
               <li key={point} className="rounded border border-white/10 bg-white/[0.02] p-4 text-sm leading-6 text-zinc-400">
                 {point}
               </li>

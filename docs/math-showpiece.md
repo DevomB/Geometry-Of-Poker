@@ -1,6 +1,6 @@
 # Math Showpiece - Geometry of Poker
 
-This is the compact technical narrative for interviews, demos, and portfolio review. The project is not a poker solver. It is a reproducible state-space geometry pipeline: exact combinatorial signals are transformed into fixed-width vectors, embedded into 3D, and inspected in a GPU point-cloud viewer.
+This is the compact mathematical narrative for Geometry of Poker. The project is not a poker solver. It is a reproducible state-space geometry pipeline: exact combinatorial signals are transformed into fixed-width vectors, embedded into 3D, and inspected in a GPU point-cloud viewer.
 
 For the honest topology/clustering argument, see [Topology And Clustering Audit](./topology-and-clustering-audit.md).
 
@@ -50,7 +50,7 @@ Incomplete streets integrate over legal future boards. The implementation delega
 
 ## Card-Removal Gradient
 
-One of the strongest quant-style features is sensitivity to blockers. For each remaining card `c`, recompute equity with `c` removed from the future/villain universe:
+One of the strongest poker-math features is sensitivity to blockers. For each remaining card `c`, recompute equity with `c` removed from the future/villain universe:
 
 ```text
 g_c(s) = E(s with c unavailable) - E(s)
@@ -118,9 +118,9 @@ sizes:     Float32Array[N]
 
 A custom shader draws the cloud as circular point sprites. Filters, hover, and selection mutate typed arrays and upload changed buffer ranges to the GPU. Runtime adaptation protects the 30 FPS floor by lowering point density, device-pixel-ratio, hover frequency, and HTML overlays when measured frame rate falls below target.
 
-## Interview Summary
+## Mathematical Summary
 
-The project demonstrates the same structure as many quant research tools:
+The project follows a disciplined poker-state geometry workflow:
 
 ```text
 combinatorial state -> exact signals -> feature vector -> normalized factor space

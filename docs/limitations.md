@@ -1,6 +1,6 @@
 # Limitations - Geometry of Poker
 
-Explicit boundaries on claims, data, and methodology. Read this before citing the project in talks, interviews, or writing.
+Explicit boundaries on claims, data, and methodology. Read this before citing or extending the project.
 
 ## Claim Boundaries
 

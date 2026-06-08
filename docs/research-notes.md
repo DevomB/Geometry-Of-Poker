@@ -1,6 +1,6 @@
 # Research Notes
 
-Working document for quantitative analysis and C++Con narrative.
+Working document for poker-state geometry, feature-space analysis, and embedding diagnostics.
 
 ## Hypothesis
 

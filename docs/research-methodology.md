@@ -1,6 +1,6 @@
 # Research Methodology — Geometry of Poker
 
-This document describes how Texas Hold'em states are represented, featurized, embedded, and visualized. It is written for technical review (C++Con, quant interviews, portfolio) and assumes familiarity with basic poker notation.
+This document describes how Texas Hold'em states are represented, featurized, embedded, and visualized. It is written for technical review of the poker mathematics and assumes familiarity with basic poker notation.
 
 **Scope:** methodology and reproducibility. Interpretive claims about strategy must be labeled as observations, not theorems.
 

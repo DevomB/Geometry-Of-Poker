@@ -123,4 +123,17 @@ describe("api routes", () => {
     expect(res.status).toBe(400);
     expect(body.error.code).toBe("DUPLICATE_CARD");
   });
+
+  it("returns accepted dead cards in projected state", async () => {
+    const res = await projectPOST(
+      request({ hero: ["Ah", "Ad"], board: ["2c", "7h", "Jh"], deadCards: ["Qs"], street: "flop" }),
+    );
+    const body = (await res.json()) as ProjectResponse | ApiErrorResponse;
+    if (res.status === 200) {
+      expect((body as ProjectResponse).state.deadCards).toEqual(["Qs"]);
+    } else {
+      expect(res.status).toBe(503);
+      expect((body as ApiErrorResponse).error.code).toBe("FEATURE_ENGINE_UNAVAILABLE");
+    }
+  });
 });

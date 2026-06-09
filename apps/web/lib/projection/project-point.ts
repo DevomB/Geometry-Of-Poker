@@ -28,6 +28,7 @@ export function findExactMatch(
 export interface ProjectInput {
   hero: [string, string];
   board: string[];
+  deadCards?: string[];
   featureVector?: number[];
   featureNames?: string[];
   features?: Record<string, number>;
@@ -164,7 +165,9 @@ export function projectIntoGeometry(
   input: ProjectInput,
   k = 5,
 ): ProjectionResponse {
-  const exact = findExactMatch(dataset, input.hero, input.board);
+  const exact = input.deadCards && input.deadCards.length > 0
+    ? null
+    : findExactMatch(dataset, input.hero, input.board);
   if (exact !== null) {
     const p = dataset.metadata[exact]!;
     const neighbors = nearestByPosition(dataset, exact, k);

@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useViewerStore } from "@/stores/viewer-store";
 import { CardDisplay } from "@/components/CardDisplay";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
-import { compareManualToPoint } from "@/lib/inspector/state-comparison";
+import {
+  compareManualToPoint,
+  countBlockerCollisions,
+  summarizeBlockerNeighbors,
+} from "@/lib/inspector/state-comparison";
 import {
   computeClusterProfile,
   formatDelta,
@@ -16,6 +20,10 @@ import {
   formatPercentile,
   type PopulationStanding,
 } from "@/lib/inspector/population-standing";
+import { computeRemovalPressure } from "@/lib/inspector/removal-pressure";
+import { computeCategoryTransitionSummary } from "@/lib/inspector/category-transition";
+import { computeRunoutDistribution } from "@/lib/inspector/runout-distribution";
+import { computeDrawPressure } from "@/lib/inspector/draw-pressure";
 import {
   computeStateCombinatorics,
   formatBigInt,
@@ -115,12 +123,19 @@ function EmptySelection({ hasManual }: { hasManual: boolean }) {
 
 function ManualProjectionCard() {
   const marker = useViewerStore((s) => s.manualMarker)!;
+  const dataset = useViewerStore((s) => s.dataset);
   const equity = numberMetric(marker.features.equityVsRandom);
   const category = stringMetric(marker.features.category);
+  const math = computeStateCombinatorics({
+    hero: marker.hero,
+    board: marker.board,
+    deadCards: marker.deadCards,
+  });
   const nearestDistance = marker.neighborDistances[0];
   const distanceLabel =
     marker.method === "pca-knn-interpolation" ? "Nearest PCA d" : "Nearest 3D d";
   const locality = summarizeProjectionLocality(marker.method, marker.neighborDistances);
+  const blockerNeighborSummary = computeBlockerNeighborSummary(marker, dataset);
   return (
     <section
       aria-label="Manual projection"
@@ -139,6 +154,9 @@ function ManualProjectionCard() {
         {marker.board.length > 0 && (
           <CardDisplay cards={marker.board} label="Board" />
         )}
+        {marker.deadCards.length > 0 && (
+          <CardDisplay cards={marker.deadCards} label="Dead" />
+        )}
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px]">
         {category && <Row label="Category" value={humanCategory(category)} />}
@@ -156,6 +174,63 @@ function ManualProjectionCard() {
         {marker.clusterId !== null && (
           <Row label="Cluster" value={`C${marker.clusterId}`} mono />
         )}
+        {marker.deadCards.length > 0 && (
+          <Row label="Dead cards" value={String(marker.deadCards.length)} mono />
+        )}
+        <Row label="Live deck" value={String(math.remainingCards)} mono />
+        <Row
+          label="Villain hands"
+          value={formatBigInt(math.legalVillainHands)}
+          mono
+          title="C(52 - hero - board - dead, 2)"
+        />
+        <Row
+          label="Terminal leaves"
+          value={formatBigInt(math.terminalLeaves)}
+          mono
+          title="Villain hand choices multiplied by public-board completions"
+        />
+        {marker.deadCards.length > 0 && math.terminalLeafFractionOfNoDead !== null && (
+          <Row
+            label="Leaf fraction"
+            value={formatPercent(math.terminalLeafFractionOfNoDead)}
+            mono
+            title="Dead-card-conditioned leaves divided by the no-dead leaf count"
+          />
+        )}
+        {marker.deadCards.length > 0 && (
+          <Row
+            label="Removed leaves"
+            value={formatBigInt(math.removedTerminalLeavesByDeadCards)}
+            mono
+            title="No-dead terminal leaves minus dead-card-conditioned terminal leaves"
+          />
+        )}
+        {marker.deadCards.length > 0 && (
+          <Row
+            label="Removed states"
+            value={formatBigInt(math.removedStreetStatesByDeadCards)}
+            mono
+            title="No-dead street states minus dead-card-conditioned street states"
+          />
+        )}
+        {blockerNeighborSummary && (
+          <Row
+            label="Compatible NN"
+            value={`${blockerNeighborSummary.compatible}/${blockerNeighborSummary.total}`}
+            mono
+            title="Nearest reference points that do not use a manual dead card"
+          />
+        )}
+        {blockerNeighborSummary?.compatibleWeightShare !== null &&
+          blockerNeighborSummary?.compatibleWeightShare !== undefined && (
+            <Row
+              label="Compatible w"
+              value={formatPercent(blockerNeighborSummary.compatibleWeightShare)}
+              mono
+              title="Inverse-distance projection weight share from blocker-compatible references"
+            />
+          )}
         <Row label="Locality" value={locality.label} title={locality.detail} />
         {locality.effectiveNeighbors !== null && (
           <Row
@@ -179,6 +254,9 @@ function ManualProjectionCard() {
       <p className="mt-2 border-t border-amber-300/20 pt-2 text-[10px] leading-relaxed text-amber-100/70">
         This marker is the projected custom hand. Neighbor rows are manifold
         references used to place it, not replacements for the input cards.
+        {marker.deadCards.length > 0
+          ? " Dead cards constrain the live deck before villain hands and runouts are counted."
+          : ""}
       </p>
       {marker.neighborIds.length > 0 && (
         <div className="mt-2 border-t border-amber-300/20 pt-2">
@@ -203,6 +281,10 @@ function ManualNeighborsList() {
       {marker.neighborIds.map((id, i) => {
         const idx = dataset.idToIndex.get(id);
         const point = idx !== undefined ? dataset.metadata[idx] : undefined;
+        const blockerCollisions =
+          point && marker.deadCards.length > 0
+            ? countBlockerCollisions(marker.deadCards, [...point.hero, ...point.board])
+            : null;
         return (
           <li key={id}>
             <button
@@ -219,6 +301,19 @@ function ManualNeighborsList() {
                   <span className="text-zinc-200">{point.hero.join(" ")}</span>
                   {point.board.length > 0 && (
                     <span className="text-zinc-500"> | {point.board.join(" ")}</span>
+                  )}
+                  {blockerCollisions !== null && (
+                    <span
+                      className={
+                        blockerCollisions === 0
+                          ? "ml-1 text-emerald-300/70"
+                          : "ml-1 text-rose-300/80"
+                      }
+                    >
+                      {blockerCollisions === 0
+                        ? "compatible"
+                        : `blocked x${blockerCollisions}`}
+                    </span>
                   )}
                 </>
               ) : (
@@ -292,11 +387,13 @@ function SelectedStateCard({
 
       <KeyMetrics point={point} />
 
+      <RunoutDistributionSection point={point} />
+
       {standing && <PopulationStandingSection standing={standing} />}
 
       {clusterProfile && <ClusterProfileSection profile={clusterProfile} />}
 
-      <CombinatoricsSection point={point} />
+      <CombinatoricsSection point={point} dataset={dataset} />
 
       {manualMarker && (
         <ManualComparisonCard marker={manualMarker} point={point} />
@@ -305,6 +402,10 @@ function SelectedStateCard({
       <BoardTextureSection point={point} />
 
       <DrawsSection point={point} />
+
+      <RemovalPressureSection point={point} />
+
+      <CategoryTransitionSection point={point} />
 
       <details
         open={showAllFeatures}
@@ -409,6 +510,25 @@ function ClusterProfileSection({ profile }: { profile: ClusterProfile }) {
   );
 }
 
+function computeBlockerNeighborSummary(
+  marker: ManualMarker,
+  dataset: StreetDataset | null,
+): ReturnType<typeof summarizeBlockerNeighbors> {
+  if (!dataset || marker.deadCards.length === 0) return null;
+  const references = marker.neighborIds.flatMap((id, i) => {
+    const idx = dataset.idToIndex.get(id);
+    const point = idx !== undefined ? dataset.metadata[idx] : undefined;
+    if (!point) return [];
+    return [
+      {
+        cards: [...point.hero, ...point.board],
+        distance: marker.neighborDistances[i] ?? null,
+      },
+    ];
+  });
+  return summarizeBlockerNeighbors(marker.deadCards, references);
+}
+
 function PopulationStandingSection({
   standing,
 }: {
@@ -471,7 +591,13 @@ function PopulationStandingSection({
   );
 }
 
-function CombinatoricsSection({ point }: { point: BrowserPointMeta }) {
+function CombinatoricsSection({
+  point,
+  dataset,
+}: {
+  point: BrowserPointMeta;
+  dataset: StreetDataset;
+}) {
   const math = computeStateCombinatorics({
     hero: point.hero,
     board: point.board,
@@ -496,6 +622,30 @@ function CombinatoricsSection({ point }: { point: BrowserPointMeta }) {
         <Row label="Known cards" value={`${math.knownCards}/52`} mono />
         <Row label="Remaining deck" value={String(math.remainingCards)} mono />
         <Row
+          label="Street universe"
+          value={formatBigInt(math.streetStateUniverse)}
+          mono
+          title="C(52, 2) * C(50, board cards)"
+        />
+        <Row
+          label="Sample coverage"
+          value={formatCoverage(dataset.count, math.streetStateUniverse)}
+          mono
+          title="Loaded point count divided by the exact hero-centric street universe"
+        />
+        <Row
+          label="Hero-fixed boards"
+          value={formatBigInt(math.heroFixedPublicBoards)}
+          mono
+          title="C(50, board cards), holding this two-card hero hand fixed"
+        />
+        <Row
+          label="Board-fixed heroes"
+          value={formatBigInt(math.boardFixedHeroHands)}
+          mono
+          title="C(52 - board cards, 2), holding this public board fixed"
+        />
+        <Row
           label="Villain hands"
           value={formatBigInt(math.legalVillainHands)}
           mono
@@ -507,6 +657,15 @@ function CombinatoricsSection({ point }: { point: BrowserPointMeta }) {
           mono
           title="Cards still needed to reach the river"
         />
+        {math.nextStreetCardsToDeal !== null &&
+          math.nextStreetPublicContinuations !== null && (
+            <Row
+              label="Next-street branches"
+              value={formatBigInt(math.nextStreetPublicContinuations)}
+              mono
+              title={`C(remaining deck, ${math.nextStreetCardsToDeal})`}
+            />
+          )}
         <Row
           label="Runouts/villain"
           value={formatBigInt(math.publicRunoutsAfterVillain)}
@@ -551,9 +710,9 @@ function CombinatoricsSection({ point }: { point: BrowserPointMeta }) {
         )}
       </dl>
       <p className="mt-2 border-t border-emerald-300/15 pt-2 text-[10px] leading-relaxed text-emerald-100/65">
-        These counts are pure deck combinatorics. They define the enumeration universe
-        behind exact equity and next-card odds; model claims still stop at the
-        documented uniform-villain assumption.
+        These counts are pure deck combinatorics. The street universe measures
+        sampling coverage; the villain/runout leaves define the exact equity
+        enumeration under the documented uniform-villain assumption.
       </p>
     </div>
   );
@@ -597,6 +756,67 @@ function KeyMetrics({ point }: { point: BrowserPointMeta }) {
           title="Probability of being dominated"
         />
       )}
+    </div>
+  );
+}
+
+function RunoutDistributionSection({ point }: { point: BrowserPointMeta }) {
+  const runout = computeRunoutDistribution(point.summary);
+  if (!runout) return null;
+
+  return (
+    <div className="rounded border border-amber-300/20 bg-amber-500/[0.035] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
+          Runout distribution
+        </p>
+        <span className="gop-mono text-[10px] tabular-nums text-amber-300/70">
+          exact
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+        {runout.hasRunoutQuantiles && (
+          <>
+            <Row label="Mean" value={formatPercent(runout.mean)} mono />
+            <Row label="Median" value={formatPercent(runout.median)} mono />
+            <Row label="P05" value={formatPercent(runout.p05)} mono />
+            <Row label="P95" value={formatPercent(runout.p95)} mono />
+            <Row
+              label="P05-P95 width"
+              value={`${(runout.intervalWidth * 100).toFixed(2)} pp`}
+              mono
+              title="equityP95 - equityP05"
+            />
+            <Row
+              label="Tail skew"
+              value={`${formatSignedPercent(runout.tailSkew)} pp`}
+              mono
+              title="(equityP95 - equityP50) - (equityP50 - equityP05)"
+            />
+          </>
+        )}
+        {runout.vulnerability && (
+          <>
+            <Row label="pNuts" value={formatPercent(runout.vulnerability.pNuts)} mono />
+            <Row
+              label="pDominated"
+              value={formatPercent(runout.vulnerability.pDominated)}
+              mono
+            />
+            <Row
+              label="Nuts edge"
+              value={`${formatSignedPercent(runout.vulnerability.edge)} pp`}
+              mono
+              title="pNuts - pDominated"
+            />
+          </>
+        )}
+      </dl>
+      <p className="mt-2 border-t border-amber-300/15 pt-2 text-[10px] leading-relaxed text-amber-100/65">
+        Exact runout quantiles come from the engine. The viewer derives width =
+        P95 - P05, tail skew = (P95 - P50) - (P50 - P05), and nuts edge =
+        pNuts - pDominated.
+      </p>
     </div>
   );
 }
@@ -647,21 +867,210 @@ function BoardTextureSection({ point }: { point: BrowserPointMeta }) {
 }
 
 function DrawsSection({ point }: { point: BrowserPointMeta }) {
-  const s = point.summary;
-  const flushOuts = s.flushOutCount ?? 0;
-  const straightOuts = s.straightOutCount ?? 0;
-  if (flushOuts === 0 && straightOuts === 0) return null;
+  const math = computeStateCombinatorics({
+    hero: point.hero,
+    board: point.board,
+    summary: point.summary,
+  });
+  const pressure =
+    math.nextCardUniverse === null
+      ? null
+      : computeDrawPressure(point.summary, math.nextCardUniverse);
+  if (!pressure) return null;
+
   return (
     <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
-      <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-        Draws
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+          Draw pressure
+        </p>
+        {pressure.drawClass && (
+          <span className="gop-mono text-[10px] text-zinc-400">
+            {pressure.drawClass}
+          </span>
+        )}
+      </div>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
-        {flushOuts > 0 && <Row label="Flush outs" value={String(flushOuts)} mono />}
-        {straightOuts > 0 && (
-          <Row label="Straight outs" value={String(straightOuts)} mono />
+        <Row
+          label="Improve outs"
+          value={`${pressure.improvementOuts}/${pressure.unseenCardCount}`}
+          mono
+          title="Exact count of next cards that strictly improve hand strength"
+        />
+        <Row
+          label="Improve next"
+          value={formatPercent(pressure.improvementProbability)}
+          mono
+          title="improvementOutCount divided by the unseen next-card deck"
+        />
+        <Row
+          label="Clean outs"
+          value={`${pressure.cleanImprovementOuts}/${pressure.unseenCardCount}`}
+          mono
+          title="Improvement outs that do not trigger a known villain leapfrog"
+        />
+        <Row
+          label="Clean next"
+          value={formatPercent(pressure.cleanImprovementProbability)}
+          mono
+          title="cleanImprovementOutCount divided by the unseen next-card deck"
+        />
+        {pressure.dirtyImprovementOuts > 0 && (
+          <Row
+            label="Dirty outs"
+            value={`${pressure.dirtyImprovementOuts}/${pressure.unseenCardCount}`}
+            mono
+            title="Improvement outs minus clean improvement outs"
+          />
+        )}
+        {pressure.dirtyImprovementOuts > 0 && (
+          <Row
+            label="Dirty next"
+            value={formatPercent(pressure.dirtyImprovementProbability)}
+            mono
+            title="Dirty improvement outs divided by the unseen next-card deck"
+          />
+        )}
+        <Row
+          label="Blank cards"
+          value={`${pressure.blankCards}/${pressure.unseenCardCount}`}
+          mono
+          title="Unseen next cards that are not improvement outs"
+        />
+        <Row
+          label="Miss next"
+          value={formatPercent(pressure.blankProbability)}
+          mono
+          title="1 minus the exact next-card improvement probability"
+        />
+        {pressure.flushOuts > 0 && (
+          <Row label="Flush outs" value={String(pressure.flushOuts)} mono />
+        )}
+        {pressure.straightOuts > 0 && (
+          <Row label="Straight outs" value={String(pressure.straightOuts)} mono />
+        )}
+        {pressure.comboDraw && (
+          <Row
+            label="Combo draw"
+            value="yes"
+            title="Both flush and straight pressure are present in the exact draw summary"
+          />
         )}
       </dl>
+      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[10px] leading-relaxed text-zinc-500">
+        Exact one-card odds use P = outs / r over the unseen next-card deck.
+        Dirty outs are improvement outs outside the clean subset; blanks are the
+        complement r - improvementOutCount.
+      </p>
+    </div>
+  );
+}
+
+function RemovalPressureSection({ point }: { point: BrowserPointMeta }) {
+  const math = computeStateCombinatorics({
+    hero: point.hero,
+    board: point.board,
+  });
+  const pressure = computeRemovalPressure(point.summary, math.remainingCards);
+  if (!pressure) return null;
+
+  return (
+    <div className="rounded border border-rose-300/20 bg-rose-500/[0.035] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-rose-200/80">
+          Card-removal pressure
+        </p>
+        <span className="gop-mono text-[10px] tabular-nums text-rose-300/70">
+          n={pressure.activeCardCount ?? "-"}
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+        <Row label="L1 mass" value={pressure.l1.toFixed(4)} mono title="sum |g_c|" />
+        <Row label="L2 norm" value={pressure.l2.toFixed(4)} mono title="sqrt(sum g_c^2)" />
+        <Row
+          label="Concentration"
+          value={pressure.concentration.toFixed(3)}
+          mono
+          title="L2 / L1, bounded above by 1 for nonzero gradients"
+        />
+        {pressure.uniformConcentrationFloor !== null && (
+          <Row
+            label="Uniform floor"
+            value={pressure.uniformConcentrationFloor.toFixed(3)}
+            mono
+            title="1 / sqrt(active unseen cards)"
+          />
+        )}
+        <Row
+          label="Signed mass"
+          value={formatSignedDecimal(pressure.signedMass)}
+          mono
+          title="positive mass minus negative mass"
+        />
+        <Row label="Positive" value={pressure.positiveMass.toFixed(4)} mono />
+        <Row label="Negative" value={pressure.negativeMass.toFixed(4)} mono />
+        <Row label="Mean" value={pressure.mean.toFixed(4)} mono />
+        <Row label="Std dev" value={pressure.stdDev.toFixed(4)} mono />
+        <Row label="Min / max" value={`${pressure.min.toFixed(4)} / ${pressure.max.toFixed(4)}`} mono />
+      </dl>
+      <p className="mt-2 border-t border-rose-300/15 pt-2 text-[10px] leading-relaxed text-rose-100/65">
+        Engine gradient vector g is summarized over active unseen cards:
+        ||g||1 = sum |g_c|, ||g||2 = sqrt(sum g_c^2), and signed mass =
+        sum(g_c &gt; 0) - sum(|g_c| for g_c &lt; 0). Cauchy gives
+        1/sqrt(n) &lt;= ||g||2 / ||g||1 &lt;= 1 when ||g||1 &gt; 0.
+      </p>
+    </div>
+  );
+}
+
+function CategoryTransitionSection({ point }: { point: BrowserPointMeta }) {
+  const transition = computeCategoryTransitionSummary(point.summary);
+  if (!transition) return null;
+
+  return (
+    <div className="rounded border border-cyan-300/20 bg-cyan-500/[0.035] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-200/80">
+          Category transition
+        </p>
+        <span className="gop-mono text-[10px] tabular-nums text-cyan-300/70">
+          9x9 exact
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+        <Row label="Entropy H" value={transition.entropy.toFixed(3)} mono />
+        <Row
+          label="H / log 81"
+          value={formatPercent(transition.normalizedEntropy)}
+          mono
+          title="Normalized entropy over the 9 by 9 turn-river category matrix"
+        />
+        <Row label="Max cell" value={formatPercent(transition.maxProbability)} mono />
+        <Row label="Stay same" value={formatPercent(transition.diagonalMass)} mono />
+        <Row label="Upgrade" value={formatPercent(transition.upgradeMass)} mono />
+        <Row label="Downgrade" value={formatPercent(transition.downgradeMass)} mono />
+        <Row
+          label="Upgrade edge"
+          value={`${formatSignedPercent(transition.directionalMass)} pp`}
+          mono
+          title="Upgrade mass minus downgrade mass"
+        />
+        <Row
+          label="River pair+"
+          value={formatPercent(transition.riverPairOrBetterMass)}
+          mono
+        />
+        <Row
+          label="River flush+"
+          value={formatPercent(transition.riverFlushOrBetterMass)}
+          mono
+        />
+      </dl>
+      <p className="mt-2 border-t border-cyan-300/15 pt-2 text-[10px] leading-relaxed text-cyan-100/65">
+        The engine supplies a probability matrix p_ij for turn category i and
+        river category j. H = -sum p_ij log(p_ij), H/log(81) lies in [0, 1],
+        and upgrade edge = sum(j &gt; i)p_ij - sum(j &lt; i)p_ij.
+      </p>
     </div>
   );
 }
@@ -792,12 +1201,24 @@ function formatSignedPercent(value: number) {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}`;
 }
 
+function formatSignedDecimal(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(4)}`;
+}
+
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(2)}%`;
 }
 
 function formatShare(value: number) {
   return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatCoverage(sampleCount: number, universe: bigint) {
+  const total = Number(universe);
+  if (!Number.isFinite(total) || total <= 0) return "-";
+  const pct = (sampleCount / total) * 100;
+  if (pct > 0 && pct < 0.001) return "<0.001%";
+  return `${pct.toFixed(3)}%`;
 }
 
 function formatStandingValue(value: number, format: "percent" | "decimal") {
@@ -863,6 +1284,17 @@ function ManualComparisonCard({
           value={`${comparison.sharedCards}/${comparison.totalManualCards}`}
           mono
         />
+        {comparison.blockerCompatible !== null && (
+          <Row
+            label="Blockers"
+            value={
+              comparison.blockerCompatible
+                ? "compatible"
+                : `${comparison.deadCardCollisions} collision${comparison.deadCardCollisions === 1 ? "" : "s"}`
+            }
+            title="A blocker collision means this reference point uses a manual dead card"
+          />
+        )}
       </dl>
     </div>
   );

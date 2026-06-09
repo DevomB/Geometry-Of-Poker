@@ -14,11 +14,11 @@ import {
   pickerReady,
   placeCardInZone,
   presetToPickerState,
+  validateCardPicker,
   removeCard,
   type CardPickerState,
   type PickerTarget,
 } from "@/lib/cards/card-picker";
-import { validateHandInput } from "@/lib/cards/validate-hand";
 import {
   computeStateCombinatorics,
   formatBigInt,
@@ -54,6 +54,7 @@ export function CardPickerPanel() {
   const used = useMemo(() => cardsUsed(picker), [picker]);
   const heroFilled = picker.hero.filter(Boolean).length;
   const boardFilled = picker.board.filter(Boolean).length;
+  const deadFilled = picker.deadCards.filter(Boolean).length;
   const inferred = inferredStreet(picker);
   const ready = pickerReady(picker);
 
@@ -100,6 +101,14 @@ export function CardPickerPanel() {
     });
   };
 
+  const removeFromDead = (i: number) => {
+    setPicker((p) => {
+      const deadCards = [...p.deadCards];
+      deadCards[i] = null;
+      return { ...p, deadCards };
+    });
+  };
+
   const submit = async () => {
     if (!ready || !inferred) {
       const msgs: string[] = [];
@@ -109,9 +118,8 @@ export function CardPickerPanel() {
       setErrors(msgs);
       return;
     }
-    const hero = picker.hero.filter(Boolean) as [string, string];
-    const board = picker.board.filter(Boolean) as string[];
-    const validation = validateHandInput(hero, board);
+    const deadCards = picker.deadCards.filter(Boolean) as string[];
+    const validation = validateCardPicker(picker, inferred);
     if (!validation.valid) {
       setErrors(validation.errors);
       return;
@@ -126,6 +134,7 @@ export function CardPickerPanel() {
         body: JSON.stringify({
           hero: validation.normalizedState!.heroHoleCards,
           board: validation.normalizedState!.communityCards,
+          deadCards,
           street: inferred,
         }),
       });
@@ -145,6 +154,7 @@ export function CardPickerPanel() {
         id: `manual-${Date.now()}`,
         hero: projection.state.hero,
         board: projection.state.board,
+        deadCards: projection.state.deadCards,
         position: [
           projection.projectedPoint.x,
           projection.projectedPoint.y,
@@ -238,6 +248,16 @@ export function CardPickerPanel() {
           onSetActive={() => setTarget("board")}
           accent="amber"
         />
+        <SlotsRow
+          label="Dead"
+          maxFilled={picker.deadCards.length}
+          filled={deadFilled}
+          slots={picker.deadCards.map((card, i) => ({ card, key: `dead-${i}` }))}
+          onClickSlot={(i) => removeFromDead(i)}
+          isActive={activeTarget === "dead"}
+          onSetActive={() => setTarget("dead")}
+          accent="rose"
+        />
       </div>
 
       <div
@@ -257,7 +277,9 @@ export function CardPickerPanel() {
                 ? "hero"
                 : picker.board.includes(card)
                   ? "board"
-                  : null;
+                  : picker.deadCards.includes(card)
+                    ? "dead"
+                    : null;
               return (
                 <button
                   key={card}
@@ -272,6 +294,8 @@ export function CardPickerPanel() {
                       ? "border border-cyan-300/50 bg-cyan-500/15 ring-1 ring-cyan-300/30"
                       : usedHere === "board"
                         ? "border border-amber-300/50 bg-amber-500/15 ring-1 ring-amber-300/30"
+                        : usedHere === "dead"
+                          ? "border border-rose-300/50 bg-rose-500/15 ring-1 ring-rose-300/30"
                         : "border border-[var(--border-subtle)] bg-white/[0.02] hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
                   } ${taken && !usedHere ? "cursor-not-allowed opacity-25" : ""} ${SUIT_TONE[suit]}`}
                   disabled={taken && !usedHere}
@@ -292,6 +316,10 @@ export function CardPickerPanel() {
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-sm border border-amber-300/60 bg-amber-500/20" />
             board
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm border border-rose-300/60 bg-rose-500/20" />
+            dead
           </span>
           <span className="ml-auto">click again to remove</span>
         </div>
@@ -339,14 +367,15 @@ export function CardPickerPanel() {
 function PickerCombinatoricsPreview({ picker }: { picker: CardPickerState }) {
   const hero = picker.hero.filter(Boolean) as [string, string];
   const board = picker.board.filter(Boolean) as string[];
-  const math = computeStateCombinatorics({ hero, board });
+  const deadCards = picker.deadCards.filter(Boolean) as string[];
+  const math = computeStateCombinatorics({ hero, board, deadCards });
 
   return (
     <div className="mb-2 rounded border border-emerald-300/20 bg-emerald-500/[0.035] p-2">
       <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-emerald-200/80">
         <span>Combinatorics preview</span>
         <span className="gop-mono text-emerald-300/70">
-          {math.remainingCards} unseen
+          {math.remainingCards} live
         </span>
       </div>
       <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
@@ -354,9 +383,46 @@ function PickerCombinatoricsPreview({ picker }: { picker: CardPickerState }) {
         <PreviewRow label="Runouts/villain" value={formatBigInt(math.publicRunoutsAfterVillain)} />
         <PreviewRow label="Terminal leaves" value={formatBigInt(math.terminalLeaves)} />
         <PreviewRow label="Runout cards" value={String(math.runoutCardsToRiver)} />
+        {deadCards.length > 0 && (
+          <PreviewRow label="Dead cards" value={String(deadCards.length)} />
+        )}
+        {deadCards.length > 0 && (
+          <PreviewRow
+            label="Removed leaves"
+            value={formatBigInt(math.removedTerminalLeavesByDeadCards)}
+          />
+        )}
+        {deadCards.length > 0 && (
+          <PreviewRow
+            label="Removed states"
+            value={formatBigInt(math.removedStreetStatesByDeadCards)}
+          />
+        )}
+        {deadCards.length > 0 && math.terminalLeafFractionOfNoDead !== null && (
+          <PreviewRow
+            label="Leaf fraction"
+            value={formatPercent(math.terminalLeafFractionOfNoDead)}
+          />
+        )}
+        {deadCards.length > 0 && math.streetStateFractionOfNoDead !== null && (
+          <PreviewRow
+            label="Street fraction"
+            value={formatPercent(math.streetStateFractionOfNoDead)}
+          />
+        )}
+        {math.nextStreetPublicContinuations !== null && (
+          <PreviewRow
+            label="Next street"
+            value={formatBigInt(math.nextStreetPublicContinuations)}
+          />
+        )}
       </dl>
     </div>
   );
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(2)}%`;
 }
 
 function PreviewRow({ label, value }: { label: string; value: string }) {
@@ -387,10 +453,20 @@ function SlotsRow({
   onClickSlot: (i: number) => void;
   isActive: boolean;
   onSetActive: () => void;
-  accent: "cyan" | "amber";
+  accent: "cyan" | "amber" | "rose";
 }) {
-  const accentBorder = accent === "cyan" ? "border-cyan-300/40" : "border-amber-300/40";
-  const accentRing = accent === "cyan" ? "ring-cyan-300/40" : "ring-amber-300/40";
+  const accentBorder =
+    accent === "cyan"
+      ? "border-cyan-300/40"
+      : accent === "amber"
+        ? "border-amber-300/40"
+        : "border-rose-300/40";
+  const accentRing =
+    accent === "cyan"
+      ? "ring-cyan-300/40"
+      : accent === "amber"
+        ? "ring-amber-300/40"
+        : "ring-rose-300/40";
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">

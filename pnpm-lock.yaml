@@ -9,7 +9,7 @@ importers:
   .: {}
 
   apps/web:
-    dependencies:
+    dependencies
       '@geometry-of-poker/feature-engine':
         specifier: workspace:*
         version: link:../../packages/feature-engine

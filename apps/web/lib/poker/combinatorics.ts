@@ -1,6 +1,7 @@
 export interface StateCombinatoricsInput {
   hero: readonly string[];
   board: readonly string[];
+  deadCards?: readonly string[];
   equityVsRandom?: number;
   summary?: {
     improvementOutCount?: number;
@@ -12,11 +13,24 @@ export interface StateCombinatoricsInput {
 
 export interface StateCombinatorics {
   knownCards: number;
+  deadCards: number;
   remainingCards: number;
   runoutCardsToRiver: number;
+  streetBoardCards: number;
+  heroFixedPublicBoards: bigint;
+  boardFixedHeroHands: bigint;
+  streetStateUniverse: bigint;
+  nextStreetCardsToDeal: number | null;
+  nextStreetPublicContinuations: bigint | null;
   legalVillainHands: bigint;
   publicRunoutsAfterVillain: bigint;
   terminalLeaves: bigint;
+  baselineTerminalLeavesNoDead: bigint;
+  removedTerminalLeavesByDeadCards: bigint;
+  terminalLeafFractionOfNoDead: number | null;
+  baselineStreetStateUniverseNoDead: bigint;
+  removedStreetStatesByDeadCards: bigint;
+  streetStateFractionOfNoDead: number | null;
   nextCardUniverse: number | null;
   improvementOutCount: number | null;
   cleanImprovementOutCount: number | null;
@@ -43,12 +57,30 @@ export function choose(n: number, k: number): bigint {
 }
 
 export function computeStateCombinatorics(input: StateCombinatoricsInput): StateCombinatorics {
-  const knownCards = input.hero.length + input.board.length;
+  const deadCards = input.deadCards?.length ?? 0;
+  const knownCards = input.hero.length + input.board.length + deadCards;
   const remainingCards = 52 - knownCards;
   const runoutCardsToRiver = Math.max(0, RIVER_BOARD_LENGTH - input.board.length);
+  const streetBoardCards = input.board.length;
+  const liveDeckBeforeHero = 52 - deadCards;
+  const heroFixedPublicBoards = choose(liveDeckBeforeHero - input.hero.length, streetBoardCards);
+  const boardFixedHeroHands = choose(liveDeckBeforeHero - streetBoardCards, input.hero.length);
+  const streetStateUniverse = choose(liveDeckBeforeHero, input.hero.length) * heroFixedPublicBoards;
+  const nextStreetCardsToDeal = cardsToNextStreet(streetBoardCards);
+  const nextStreetPublicContinuations =
+    nextStreetCardsToDeal === null ? null : choose(remainingCards, nextStreetCardsToDeal);
   const legalVillainHands = choose(remainingCards, 2);
   const publicRunoutsAfterVillain = choose(remainingCards - 2, runoutCardsToRiver);
   const terminalLeaves = legalVillainHands * publicRunoutsAfterVillain;
+  const baselineKnownCards = input.hero.length + input.board.length;
+  const baselineRemainingCards = 52 - baselineKnownCards;
+  const baselineTerminalLeavesNoDead =
+    choose(baselineRemainingCards, 2) *
+    choose(baselineRemainingCards - 2, runoutCardsToRiver);
+  const baselineStreetStateUniverseNoDead =
+    choose(52, input.hero.length) * choose(52 - input.hero.length, streetBoardCards);
+  const removedTerminalLeavesByDeadCards = baselineTerminalLeavesNoDead - terminalLeaves;
+  const removedStreetStatesByDeadCards = baselineStreetStateUniverseNoDead - streetStateUniverse;
   const nextCardUniverse = runoutCardsToRiver > 0 ? remainingCards : null;
   const improvementOutCount = finiteCount(input.summary?.improvementOutCount);
   const cleanImprovementOutCount = finiteCount(input.summary?.cleanImprovementOutCount);
@@ -57,11 +89,24 @@ export function computeStateCombinatorics(input: StateCombinatoricsInput): State
 
   return {
     knownCards,
+    deadCards,
     remainingCards,
     runoutCardsToRiver,
+    streetBoardCards,
+    heroFixedPublicBoards,
+    boardFixedHeroHands,
+    streetStateUniverse,
+    nextStreetCardsToDeal,
+    nextStreetPublicContinuations,
     legalVillainHands,
     publicRunoutsAfterVillain,
     terminalLeaves,
+    baselineTerminalLeavesNoDead,
+    removedTerminalLeavesByDeadCards,
+    terminalLeafFractionOfNoDead: bigintRatio(terminalLeaves, baselineTerminalLeavesNoDead),
+    baselineStreetStateUniverseNoDead,
+    removedStreetStatesByDeadCards,
+    streetStateFractionOfNoDead: bigintRatio(streetStateUniverse, baselineStreetStateUniverseNoDead),
     nextCardUniverse,
     improvementOutCount,
     cleanImprovementOutCount,
@@ -85,6 +130,28 @@ function finiteCount(value: number | undefined): number | null {
 function nextCardProbability(outs: number | null, universe: number | null): number | null {
   if (outs === null || universe === null || universe <= 0) return null;
   return outs / universe;
+}
+
+function bigintRatio(numerator: bigint, denominator: bigint): number | null {
+  if (denominator <= 0n) return null;
+  const n = Number(numerator);
+  const d = Number(denominator);
+  if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return null;
+  return n / d;
+}
+
+function cardsToNextStreet(boardCards: number): number | null {
+  switch (boardCards) {
+    case 0:
+      return 3;
+    case 3:
+    case 4:
+      return 1;
+    case 5:
+      return null;
+    default:
+      return null;
+  }
 }
 
 function equityStandardError(equity: number | undefined, leaves: bigint): number | null {

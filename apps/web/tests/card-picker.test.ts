@@ -84,6 +84,26 @@ describe("card picker zone-based placement", () => {
     expect(state.board.filter(Boolean)).toEqual([]);
   });
 
+  it("places and validates dead cards as blockers", () => {
+    let state = emptyPickerState();
+    state.hero = ["As", "Kh"];
+    state = placeCardInZone(state, "2c", "dead");
+    state = placeCardInZone(state, "3d", "dead");
+
+    expect(state.deadCards.filter(Boolean)).toEqual(["2c", "3d"]);
+    expect(cardsUsed(state)).toEqual(new Set(["As", "Kh", "2c", "3d"]));
+    expect(validateCardPicker(state, "preflop").valid).toBe(true);
+  });
+
+  it("rejects dead-card collisions", () => {
+    const state = emptyPickerState();
+    state.hero = ["As", "Kh"];
+    state.deadCards[0] = "As";
+    const result = validateCardPicker(state, "preflop");
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(" ")).toContain("Duplicate");
+  });
+
   it("removes a card by value from any zone", () => {
     let state = emptyPickerState();
     state.hero = ["As", "Kh"];
@@ -92,6 +112,9 @@ describe("card picker zone-based placement", () => {
     expect(state.hero).toEqual(["As", null]);
     state = removeCard(state, "3d");
     expect(state.board.filter(Boolean)).toEqual(["2c", "4s"]);
+    state = placeCardInZone(state, "5h", "dead");
+    state = removeCard(state, "5h");
+    expect(state.deadCards.filter(Boolean)).toEqual([]);
   });
 
   it("infers street from board count", () => {

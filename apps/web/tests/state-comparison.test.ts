@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { compareManualToPoint } from "@/lib/inspector/state-comparison";
+import {
+  compareManualToPoint,
+  countBlockerCollisions,
+  summarizeBlockerNeighbors,
+} from "@/lib/inspector/state-comparison";
 import type { BrowserPointMeta, ManualMarker } from "@/lib/types";
 
 const point: BrowserPointMeta = {
@@ -19,6 +23,7 @@ const marker: ManualMarker = {
   id: "manual",
   hero: ["Kd", "As"],
   board: ["Jh", "7h", "2c"],
+  deadCards: [],
   position: [0, 0, 0],
   method: "exact-match",
   neighborIds: ["other", "p0"],
@@ -31,6 +36,29 @@ const marker: ManualMarker = {
 };
 
 describe("manual state comparison", () => {
+  it("counts normalized blocker collisions by finite set intersection", () => {
+    expect(countBlockerCollisions(["as", "TD", "2c"], ["As", "Kd", "2C"])).toBe(2);
+    expect(countBlockerCollisions(["Qs"], ["As", "Kd", "2c"])).toBe(0);
+  });
+
+  it("summarizes compatible blocker neighbors by count and inverse-distance weight", () => {
+    const summary = summarizeBlockerNeighbors(["Qs"], [
+      { cards: ["As", "Kd", "2c"], distance: 1 },
+      { cards: ["Qs", "Jh", "7d"], distance: 2 },
+      { cards: ["3c", "4d", "5h"], distance: 4 },
+    ]);
+
+    expect(summary?.compatible).toBe(2);
+    expect(summary?.total).toBe(3);
+    expect(summary?.compatibleWeightShare).toBeCloseTo((1 + 0.25) / (1 + 0.5 + 0.25));
+  });
+
+  it("omits blocker neighbor summaries without blockers", () => {
+    expect(
+      summarizeBlockerNeighbors([], [{ cards: ["As", "Kd"], distance: 1 }]),
+    ).toBeNull();
+  });
+
   it("compares a selected manifold point to the active manual marker", () => {
     const comparison = compareManualToPoint(marker, point);
     expect(comparison.equityDelta).toBeCloseTo(0.02);
@@ -40,6 +68,8 @@ describe("manual state comparison", () => {
     expect(comparison.neighborDistance).toBe(0.75);
     expect(comparison.sharedCards).toBe(5);
     expect(comparison.totalManualCards).toBe(5);
+    expect(comparison.deadCardCollisions).toBe(0);
+    expect(comparison.blockerCompatible).toBeNull();
   });
 
   it("reports unknown matches when manual metrics are unavailable", () => {
@@ -54,5 +84,27 @@ describe("manual state comparison", () => {
     expect(comparison.equityDelta).toBeNull();
     expect(comparison.categoryMatch).toBeNull();
     expect(comparison.clusterMatch).toBeNull();
+  });
+
+  it("reports blocker compatibility against selected reference cards", () => {
+    const compatible = compareManualToPoint(
+      {
+        ...marker,
+        deadCards: ["Qs", "Td"],
+      },
+      point,
+    );
+    expect(compatible.deadCardCollisions).toBe(0);
+    expect(compatible.blockerCompatible).toBe(true);
+
+    const incompatible = compareManualToPoint(
+      {
+        ...marker,
+        deadCards: ["2c", "Qs"],
+      },
+      point,
+    );
+    expect(incompatible.deadCardCollisions).toBe(1);
+    expect(incompatible.blockerCompatible).toBe(false);
   });
 });

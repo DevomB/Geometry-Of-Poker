@@ -1,6 +1,6 @@
 import type { Street } from "@geometry-of-poker/shared";
 import type { CardValidationResult } from "@geometry-of-poker/shared";
-import { validateHandInput } from "@/lib/cards/validate-hand";
+import { isValidCardString, normalizeCard, validateHandInput } from "@/lib/cards/validate-hand";
 
 export const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"] as const;
 export const SUITS = ["s", "h", "d", "c"] as const;
@@ -15,6 +15,7 @@ export const SUIT_COLORS: Record<string, string> = {
 export interface CardPickerState {
   hero: [string | null, string | null];
   board: (string | null)[];
+  deadCards: (string | null)[];
 }
 
 export interface HandScenarioPreset {
@@ -57,13 +58,18 @@ export const HAND_SCENARIO_PRESETS: HandScenarioPreset[] = [
 ];
 
 export function emptyPickerState(): CardPickerState {
-  return { hero: [null, null], board: [null, null, null, null, null] };
+  return {
+    hero: [null, null],
+    board: [null, null, null, null, null],
+    deadCards: [null, null, null, null, null, null, null, null],
+  };
 }
 
 export function presetToPickerState(preset: HandScenarioPreset): CardPickerState {
   return {
     hero: [...preset.hero],
     board: Array.from({ length: 5 }, (_, i) => preset.board[i] ?? null),
+    deadCards: [null, null, null, null, null, null, null, null],
   };
 }
 
@@ -84,11 +90,12 @@ export function pickerToInput(state: CardPickerState, street: Street) {
   const expectedBoard = boardLengthForStreet(street);
   const hero = state.hero.filter(Boolean) as [string, string];
   const board = state.board.slice(0, expectedBoard).filter(Boolean) as string[];
-  return { hero, board, expectedBoard };
+  const deadCards = state.deadCards.filter(Boolean) as string[];
+  return { hero, board, deadCards, expectedBoard };
 }
 
 export function validateCardPicker(state: CardPickerState, street: Street): CardValidationResult {
-  const { hero, board, expectedBoard } = pickerToInput(state, street);
+  const { hero, board, deadCards, expectedBoard } = pickerToInput(state, street);
   const errors: string[] = [];
 
   if (hero.length !== 2) {
@@ -99,6 +106,24 @@ export function validateCardPicker(state: CardPickerState, street: Street): Card
     errors.push(
       `Board must have ${expectedBoard} cards for ${street} — selected ${board.length}.`,
     );
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  for (const card of deadCards) {
+    if (!isValidCardString(card)) errors.push(`Invalid dead card: ${card}`);
+  }
+
+  if (deadCards.length > state.deadCards.length) {
+    errors.push(`Dead-card zone cannot contain more than ${state.deadCards.length} cards.`);
+  }
+
+  const normalizedDead = deadCards.map(normalizeCard);
+  const all = [...hero.map(normalizeCard), ...board.map(normalizeCard), ...normalizedDead];
+  if (new Set(all).size !== all.length) {
+    errors.push("Duplicate cards detected across hero, board, and dead cards.");
   }
 
   if (errors.length > 0) {
@@ -122,6 +147,7 @@ export function cardsUsed(state: CardPickerState): Set<string> {
   const used = new Set<string>();
   for (const c of state.hero) if (c) used.add(c);
   for (const c of state.board) if (c) used.add(c);
+  for (const c of state.deadCards) if (c) used.add(c);
   return used;
 }
 
@@ -133,7 +159,7 @@ export function streetFromBoardCount(count: number): Street | null {
   return null;
 }
 
-export type PickerTarget = "hero" | "board";
+export type PickerTarget = "hero" | "board" | "dead";
 
 /** Place a card into the next available slot of a target zone. */
 export function placeCardInZone(
@@ -146,17 +172,22 @@ export function placeCardInZone(
   const next: CardPickerState = {
     hero: [...state.hero] as [string | null, string | null],
     board: [...state.board],
+    deadCards: [...state.deadCards],
   };
   if (target === "hero") {
     const slot = next.hero.findIndex((c) => c === null);
     if (slot === -1) return state;
     next.hero[slot] = card;
-  } else {
+  } else if (target === "board") {
     const filled = next.board.filter(Boolean).length;
     if (filled >= maxBoard) return state;
     const slot = next.board.findIndex((c) => c === null);
     if (slot === -1) return state;
     next.board[slot] = card;
+  } else {
+    const slot = next.deadCards.findIndex((c) => c === null);
+    if (slot === -1) return state;
+    next.deadCards[slot] = card;
   }
   return next;
 }
@@ -166,6 +197,7 @@ export function removeCard(state: CardPickerState, card: string): CardPickerStat
   return {
     hero: state.hero.map((c) => (c === card ? null : c)) as [string | null, string | null],
     board: state.board.map((c) => (c === card ? null : c)),
+    deadCards: state.deadCards.map((c) => (c === card ? null : c)),
   };
 }
 

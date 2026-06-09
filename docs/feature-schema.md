@@ -104,6 +104,17 @@ Requires `equityRunoutAvailable = 1`.
 
 **Production budget:** balanced-small generation sets these fields to neutral zeros and `equityRunoutAvailable = 0`. Use `--exact-feature-budget full` only for small research runs. `poker-calculations` rejects board length > 3 for this API; turn/river use neutral zeros.
 
+### Viewer-derived runout spread
+
+When exact quantiles are available, the inspector computes:
+
+```text
+intervalWidth = equityP95 - equityP05
+tailSkew = (equityP95 - equityP50) - (equityP50 - equityP05)
+```
+
+`intervalWidth` is the central 90% runout-equity spread under the engine's uniform runout model. `tailSkew` is positive when the upper tail from median to P95 is wider than the lower tail from P05 to median.
+
 ---
 
 ## Runout vulnerability
@@ -121,6 +132,16 @@ Requires `runoutVulnerabilityAvailable = 1`.
 | **Type** | Exact |
 
 **Production budget:** balanced-small generation sets these fields to neutral zeros and `runoutVulnerabilityAvailable = 0`. Use `--exact-feature-budget full` only for small research runs. Not defined for preflop or river (requires incomplete board 3–4).
+
+### Viewer-derived vulnerability edge
+
+The inspector reports:
+
+```text
+nutsEdge = pNuts - pDominated
+```
+
+This is an exact difference of two engine-produced runout fractions. It is not an EV claim; it only compares how often the selected state reaches the nuts versus dominated outcomes in the declared runout universe.
 
 ---
 
@@ -230,6 +251,26 @@ Improvement outs excluding `exactVillainLeapfrogOutCounts.leapfrogDeckIndices`. 
 
 ---
 
+### Viewer-derived draw pressure
+
+The inspector derives additional display metrics from the exact draw counts without changing the feature vector:
+
+```text
+r = unseen next-card deck size
+o = improvementOutCount
+c = cleanImprovementOutCount
+dirtyOuts = o - c
+blankCards = r - o
+P(improve next) = o / r
+P(clean next) = c / r
+P(dirty next) = (o - c) / r
+P(miss next) = (r - o) / r
+```
+
+These are exact one-card probabilities over the currently live next-card deck. The clean and dirty improvement sets are disjoint by definition; blank cards are the complement of all improvement outs.
+
+---
+
 ## Card-removal gradient summaries
 
 Default villain range: uniform `Float64Array(1326)` unless `options.villainRange` supplied.
@@ -251,6 +292,23 @@ Summaries computed over **active** (non-blocked) indices only:
 | `removalGradientNegativeMass` | \(\sum_{\nabla<0} \|\nabla\|\) | `[0, ∞)` |
 
 **Source:** `exactEquityCardRemovalGradient(hero, board, range)` — Exact.
+
+### Viewer-derived removal pressure
+
+The inspector computes additional display metrics from the compact summaries without changing the feature vector:
+
+```text
+signedMass = removalGradientPositiveMass - removalGradientNegativeMass
+concentration = removalGradientL2 / removalGradientL1
+```
+
+For a nonzero active gradient vector \(g \in R^n\):
+
+```text
+1 / sqrt(n) <= ||g||_2 / ||g||_1 <= 1
+```
+
+Proof: the upper bound follows from `sum g_c^2 <= (sum |g_c|)^2`. The lower bound follows from Cauchy-Schwarz: `(sum |g_c|)^2 <= n * sum g_c^2`. Rearranging gives `||g||_2 / ||g||_1 >= 1 / sqrt(n)`.
 
 ### Extended only: `removalGradientDeck0` … `removalGradientDeck51`
 
@@ -276,6 +334,23 @@ From `exactHeroCategoryJointFlopToRiver(hero, flop, dead).jointMatrix` — 9×9 
 | `transitionRiverFlushOrBetterMass` | River column ≥ flush | `[0, 1]` |
 
 **Streets:** Flop only. Turn/preflop/river neutral.
+
+### Viewer-derived transition pressure
+
+The inspector normalizes transition entropy and reports directional mass:
+
+```text
+normalizedEntropy = transitionEntropy / log(81)
+upgradeEdge = transitionUpgradeMass - transitionDowngradeMass
+```
+
+Because the joint matrix has 81 probability cells, entropy satisfies:
+
+```text
+0 <= -sum p_ij log(p_ij) <= log(81)
+```
+
+The lower bound occurs when all mass is in one cell. The upper bound is the uniform distribution over 81 cells, by the standard finite entropy maximum.
 
 ### Extended only: `categoryJointTurn{i}River{j}`
 

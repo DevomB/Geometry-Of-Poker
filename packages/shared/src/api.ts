@@ -59,6 +59,7 @@ export interface ProjectResponse {
   state: {
     hero: [string, string];
     board: string[];
+    deadCards: string[];
     street: Street;
   };
   projectedPoint: ProjectedPoint;

@@ -73,6 +73,7 @@ export async function POST(request: Request) {
       projection = projectIntoGeometry(dataset, {
         hero: validated.hero,
         board: validated.board,
+        deadCards: validated.deadCards,
         featureVector,
         featureNames,
         features: extractedFeatures,
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
       state: {
         hero: validated.hero,
         board: validated.board,
+        deadCards: validated.deadCards,
         street: validated.street,
       },
       projectedPoint: {

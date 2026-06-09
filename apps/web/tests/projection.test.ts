@@ -60,6 +60,21 @@ describe("projection", () => {
     expect(result.neighborIds.length).toBe(3);
   });
 
+  it("projects exact cards with dead-card blockers through PCA interpolation", () => {
+    const dataset = loadFixtureDataset(fixture.root, "flop");
+    const first = dataset.metadata[0]!;
+    const result = projectIntoGeometry(dataset, {
+      hero: first.hero,
+      board: first.board,
+      deadCards: ["Qs"],
+      featureVector: [first.equityVsRandom, 1],
+      featureNames: ["equityVsRandom", "categoryIndex"],
+    });
+
+    expect(result.method).toBe("pca_knn_interpolation");
+    expect(result.position.every(Number.isFinite)).toBe(true);
+  });
+
   it("requires projection artifacts for non-exact manual hands", () => {
     const dataset = loadFixtureDataset(fixture.root, "flop");
     dataset.projectionIndex = undefined;

@@ -23,12 +23,25 @@ import {
 import { computeRemovalPressure } from "@/lib/inspector/removal-pressure";
 import { computeCategoryTransitionSummary } from "@/lib/inspector/category-transition";
 import { computeRunoutDistribution } from "@/lib/inspector/runout-distribution";
+import {
+  enrichSummaryFromChannels,
+  isEquityVarianceDefined,
+  isFeatureAvailable,
+  isVulnerabilityDefined,
+  mergeExactRunoutMetrics,
+} from "@/lib/inspector/resolve-summary";
+import { useExactRunoutMetrics } from "@/lib/inspector/use-exact-runout-metrics";
 import { computeDrawPressure } from "@/lib/inspector/draw-pressure";
 import {
   computeStateCombinatorics,
   formatBigInt,
 } from "@/lib/poker/combinatorics";
-import type { BrowserPointMeta, ManualMarker, StreetDataset } from "@/lib/types";
+import type {
+  BrowserPointMeta,
+  ManualMarker,
+  PointSummary,
+  StreetDataset,
+} from "@/lib/types";
 import {
   describeProjectionMethod,
   summarizeProjectionLocality,
@@ -351,6 +364,19 @@ function SelectedStateCard({
     () => computeClusterProfile(dataset, index),
     [dataset, index],
   );
+  const baseSummary = useMemo(
+    () => enrichSummaryFromChannels(point.summary, index, dataset.channels),
+    [point.summary, index, dataset.channels],
+  );
+  const { exact, loading: exactLoading } = useExactRunoutMetrics(
+    point,
+    dataset.street,
+    baseSummary,
+  );
+  const resolvedSummary = useMemo(
+    () => mergeExactRunoutMetrics(baseSummary, exact),
+    [baseSummary, exact],
+  );
 
   return (
     <section className="gop-fade-in space-y-3">
@@ -385,9 +411,13 @@ function SelectedStateCard({
         </div>
       </div>
 
-      <KeyMetrics point={point} />
+      <KeyMetrics
+        point={point}
+        summary={resolvedSummary}
+        exactLoading={exactLoading}
+      />
 
-      <RunoutDistributionSection point={point} />
+      <RunoutDistributionSection summary={resolvedSummary} />
 
       {standing && <PopulationStandingSection standing={standing} />}
 
@@ -718,9 +748,24 @@ function CombinatoricsSection({
   );
 }
 
-function KeyMetrics({ point }: { point: BrowserPointMeta }) {
+function KeyMetrics({
+  point,
+  summary,
+  exactLoading,
+}: {
+  point: BrowserPointMeta;
+  summary: PointSummary;
+  exactLoading: boolean;
+}) {
   const eq = point.equityVsRandom;
-  const equityVar = point.summary.equityVariance ?? 0;
+  const boardLength = point.board.length;
+  const showEquityVariance =
+    isEquityVarianceDefined(boardLength) &&
+    (isFeatureAvailable(summary.equityRunoutAvailable) || exactLoading);
+  const showVulnerability =
+    isVulnerabilityDefined(boardLength) &&
+    (isFeatureAvailable(summary.runoutVulnerabilityAvailable) || exactLoading);
+
   return (
     <div className="grid grid-cols-2 gap-2">
       <Metric label="Category" value={humanCategory(point.category)} />
@@ -734,34 +779,48 @@ function KeyMetrics({ point }: { point: BrowserPointMeta }) {
         sub={equityBarFromValue(eq)}
         mono
       />
-      <Metric
-        label="Equity variance"
-        value={equityVar.toFixed(4)}
-        mono
-        title="Spread of equity across hypothetical runouts"
-      />
-      {point.summary.pNuts != null && (
+      {showEquityVariance && (
         <Metric
-          label="pNuts"
-          value={point.summary.pNuts.toFixed(3)}
+          label="Equity variance"
+          value={
+            exactLoading && !isFeatureAvailable(summary.equityRunoutAvailable)
+              ? "…"
+              : summary.equityVariance!.toFixed(4)
+          }
           mono
-          title="Probability of being the nuts"
+          title="Spread of equity across hypothetical runouts"
         />
       )}
-      {point.summary.pDominated != null && (
-        <Metric
-          label="pDominated"
-          value={point.summary.pDominated.toFixed(3)}
-          mono
-          title="Probability of being dominated"
-        />
+      {showVulnerability && (
+        <>
+          <Metric
+            label="pNuts"
+            value={
+              exactLoading && !isFeatureAvailable(summary.runoutVulnerabilityAvailable)
+                ? "…"
+                : summary.pNuts!.toFixed(3)
+            }
+            mono
+            title="Probability of being the nuts"
+          />
+          <Metric
+            label="pDominated"
+            value={
+              exactLoading && !isFeatureAvailable(summary.runoutVulnerabilityAvailable)
+                ? "…"
+                : summary.pDominated!.toFixed(3)
+            }
+            mono
+            title="Probability of being dominated"
+          />
+        </>
       )}
     </div>
   );
 }
 
-function RunoutDistributionSection({ point }: { point: BrowserPointMeta }) {
-  const runout = computeRunoutDistribution(point.summary);
+function RunoutDistributionSection({ summary }: { summary: PointSummary }) {
+  const runout = computeRunoutDistribution(summary);
   if (!runout) return null;
 
   return (

@@ -368,7 +368,7 @@ function SelectedStateCard({
     () => enrichSummaryFromChannels(point.summary, index, dataset.channels),
     [point.summary, index, dataset.channels],
   );
-  const { exact, loading: exactLoading } = useExactRunoutMetrics(
+  const { exact, loading: exactLoading, error: exactError } = useExactRunoutMetrics(
     point,
     dataset.street,
     baseSummary,
@@ -415,6 +415,7 @@ function SelectedStateCard({
         point={point}
         summary={resolvedSummary}
         exactLoading={exactLoading}
+        exactError={exactError}
       />
 
       <RunoutDistributionSection summary={resolvedSummary} />
@@ -748,72 +749,95 @@ function CombinatoricsSection({
   );
 }
 
+function formatMetricValue(
+  value: number | undefined,
+  loading: boolean,
+  available: boolean,
+  format: (n: number) => string,
+): string {
+  if (loading && !available) return "…";
+  if (typeof value === "number" && Number.isFinite(value) && available) {
+    return format(value);
+  }
+  return "—";
+}
+
 function KeyMetrics({
   point,
   summary,
   exactLoading,
+  exactError,
 }: {
   point: BrowserPointMeta;
   summary: PointSummary;
   exactLoading: boolean;
+  exactError: string | null;
 }) {
   const eq = point.equityVsRandom;
   const boardLength = point.board.length;
-  const showEquityVariance =
-    isEquityVarianceDefined(boardLength) &&
-    (isFeatureAvailable(summary.equityRunoutAvailable) || exactLoading);
-  const showVulnerability =
-    isVulnerabilityDefined(boardLength) &&
-    (isFeatureAvailable(summary.runoutVulnerabilityAvailable) || exactLoading);
+  const showEquityVariance = isEquityVarianceDefined(boardLength);
+  const showVulnerability = isVulnerabilityDefined(boardLength);
+  const runoutReady = isFeatureAvailable(summary.equityRunoutAvailable);
+  const vulnerabilityReady = isFeatureAvailable(summary.runoutVulnerabilityAvailable);
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <Metric label="Category" value={humanCategory(point.category)} />
-      <Metric
-        label="Cluster"
-        value={point.clusterId >= 0 ? `C${point.clusterId}` : "noise"}
-      />
-      <Metric
-        label="Equity vs random"
-        value={`${(eq * 100).toFixed(2)}%`}
-        sub={equityBarFromValue(eq)}
-        mono
-      />
-      {showEquityVariance && (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Category" value={humanCategory(point.category)} />
         <Metric
-          label="Equity variance"
-          value={
-            exactLoading && !isFeatureAvailable(summary.equityRunoutAvailable)
-              ? "…"
-              : summary.equityVariance!.toFixed(4)
-          }
-          mono
-          title="Spread of equity across hypothetical runouts"
+          label="Cluster"
+          value={point.clusterId >= 0 ? `C${point.clusterId}` : "noise"}
         />
-      )}
-      {showVulnerability && (
-        <>
+        <Metric
+          label="Equity vs random"
+          value={`${(eq * 100).toFixed(2)}%`}
+          sub={equityBarFromValue(eq)}
+          mono
+        />
+        {showEquityVariance && (
           <Metric
-            label="pNuts"
-            value={
-              exactLoading && !isFeatureAvailable(summary.runoutVulnerabilityAvailable)
-                ? "…"
-                : summary.pNuts!.toFixed(3)
-            }
+            label="Equity variance"
+            value={formatMetricValue(
+              summary.equityVariance,
+              exactLoading,
+              runoutReady,
+              (n) => n.toFixed(4),
+            )}
             mono
-            title="Probability of being the nuts"
+            title="Spread of equity across hypothetical runouts"
           />
-          <Metric
-            label="pDominated"
-            value={
-              exactLoading && !isFeatureAvailable(summary.runoutVulnerabilityAvailable)
-                ? "…"
-                : summary.pDominated!.toFixed(3)
-            }
-            mono
-            title="Probability of being dominated"
-          />
-        </>
+        )}
+        {showVulnerability && (
+          <>
+            <Metric
+              label="pNuts"
+              value={formatMetricValue(
+                summary.pNuts,
+                exactLoading,
+                vulnerabilityReady,
+                (n) => n.toFixed(3),
+              )}
+              mono
+              title="Probability of being the nuts"
+            />
+            <Metric
+              label="pDominated"
+              value={formatMetricValue(
+                summary.pDominated,
+                exactLoading,
+                vulnerabilityReady,
+                (n) => n.toFixed(3),
+              )}
+              mono
+              title="Probability of being dominated"
+            />
+          </>
+        )}
+      </div>
+      {exactError && (showEquityVariance || showVulnerability) && (
+        <p className="text-[10px] leading-relaxed text-rose-300/80" title={exactError}>
+          Exact runout metrics unavailable: {exactError}
+        </p>
       )}
     </div>
   );

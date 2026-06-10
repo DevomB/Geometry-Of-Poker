@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Street } from "@geometry-of-poker/shared";
+import type { Street, StateResponse } from "@geometry-of-poker/shared";
 import type { BrowserPointMeta } from "@/lib/types";
 import {
   needsExactRunoutMetrics,
   type ExactRunoutMetrics,
 } from "@/lib/inspector/resolve-summary";
 import type { PointSummary } from "@/lib/types";
+
+function metricsFromStateResponse(body: StateResponse): ExactRunoutMetrics {
+  return {
+    ...body.features.runouts,
+    ...body.features.vulnerability,
+  };
+}
 
 export function useExactRunoutMetrics(
   point: BrowserPointMeta,
@@ -33,13 +40,14 @@ export function useExactRunoutMetrics(
     setLoading(true);
     setError(null);
 
-    void fetch("/api/state-metrics", {
+    void fetch("/api/state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         hero: point.hero,
         board: point.board,
         street,
+        exactFeatureBudget: "full",
       }),
     })
       .then(async (res) => {
@@ -49,14 +57,15 @@ export function useExactRunoutMetrics(
           } | null;
           throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
         }
-        return res.json() as Promise<{ metrics: ExactRunoutMetrics }>;
+        return res.json() as Promise<StateResponse>;
       })
       .then((data) => {
-        if (!cancelled) setExact(data.metrics);
+        if (!cancelled) setExact(metricsFromStateResponse(data));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
+          setExact(null);
         }
       })
       .finally(() => {

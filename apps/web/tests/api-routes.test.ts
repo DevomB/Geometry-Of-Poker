@@ -5,6 +5,7 @@ import type {
   ApiErrorResponse,
   HealthResponse,
   ProjectResponse,
+  StateResponse,
   Street,
 } from "@geometry-of-poker/shared";
 import type { BrowserMetadata } from "@/lib/types";
@@ -14,6 +15,7 @@ const fixture = createArtifactFixture();
 let healthGET: typeof import("@/app/api/health/route").GET;
 let manifestsGET: typeof import("@/app/api/manifests/route").GET;
 let projectPOST: typeof import("@/app/api/project/route").POST;
+let statePOST: typeof import("@/app/api/state/route").POST;
 
 beforeAll(async () => {
   process.env.GOP_PUBLIC_ARTIFACTS_ROOT = fixture.root;
@@ -21,7 +23,8 @@ beforeAll(async () => {
   healthGET = (await import("@/app/api/health/route")).GET;
   manifestsGET = (await import("@/app/api/manifests/route")).GET;
   projectPOST = (await import("@/app/api/project/route")).POST;
-});
+  statePOST = (await import("@/app/api/state/route")).POST;
+}, 30_000);
 
 afterAll(() => {
   delete process.env.GOP_PUBLIC_ARTIFACTS_ROOT;
@@ -136,4 +139,24 @@ describe("api routes", () => {
       expect((body as ApiErrorResponse).error.code).toBe("FEATURE_ENGINE_UNAVAILABLE");
     }
   });
+
+  it("analyzes a poker state without artifacts", async () => {
+    const res = await statePOST(
+      new Request("http://localhost/api/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hero: ["8d", "2d"], board: ["4h", "9h", "Tc", "3d"] }),
+      }),
+    );
+    if (res.status === 503) {
+      const body = (await res.json()) as ApiErrorResponse;
+      expect(body.error.code).toBe("FEATURE_ENGINE_UNAVAILABLE");
+      return;
+    }
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as StateResponse;
+    expect(body.state.street).toBe("turn");
+    expect(body.combinatorics.knownCards).toBe(6);
+    expect(body.features.draws).toBeDefined();
+  }, 30_000);
 });

@@ -1,12 +1,18 @@
 export type {
   ApiErrorResponse,
   ArtifactMode,
+  ExactFeatureBudget,
   HealthResponse,
   ProjectNeighbor,
   ProjectRequest,
   ProjectResponse,
   ProjectedPoint,
   ProjectionMethod,
+  StateAvailability,
+  StateCombinatoricsResponse,
+  StateFeatureGroups,
+  StateRequest,
+  StateResponse,
 } from "./api.js";
 
 export type {

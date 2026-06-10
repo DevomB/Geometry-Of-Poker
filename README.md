@@ -6,13 +6,36 @@ The project is built as a reproducible poker-math system: real release artifacts
 
 ## Live System
 
-- App host: Vercel
+- App host: Vercel (Node.js **22.x**, pnpm **9.x** via `packageManager` in root `package.json`)
 - Artifact host: private S3 bucket behind CloudFront
 - Current release base: `https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1`
 - Release size: `1,326` preflop states plus `25,000` flop, `25,000` turn, and `25,000` river states
-- Runtime projection: `/api/project`
-- Health check: `/api/health`
+- State analysis API: `POST /api/state` (no artifacts required)
+- Runtime projection: `POST /api/project`
+- Health check: `GET /api/health`
 - Presentation page: `/map`
+- API docs: `/api-docs` (interactive reference) · `/research/state-api` (markdown)
+
+### Try the viewer
+
+1. Open the deployed app and pick a street (preflop / flop / turn / river).
+2. Click a point in the 3D cloud — the inspector shows equity, category, combinatorics, and cluster context.
+3. Use the card picker to project a custom hand onto the map.
+4. Read methodology and limits under **Research**.
+
+### Try the API
+
+```bash
+curl -sS -X POST "https://<your-app-host>/api/state" \
+  -H "Content-Type: application/json" \
+  -d '{"hero":["8d","2d"],"board":["4h","9h","Tc","3d"]}'
+```
+
+Returns category, equity vs random, full compact feature groups, combinatorics, and availability flags. See [docs/state-api.md](docs/state-api.md).
+
+### GOP subdomain
+
+Add `gop.<your-domain>` as a **domain alias** on the same Vercel project — `/api/*` works on both hostnames with no separate codebase. Or use a path-preserving DNS redirect to the canonical host.
 
 ## What This Demonstrates
 
@@ -103,6 +126,13 @@ Vercel production requires:
 GOP_ARTIFACT_BASE_URL=https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1
 ```
 
+Also set in the Vercel project:
+
+- **Node.js version:** 22.x (matches `engines.node` in root `package.json`)
+- **Package manager:** pnpm 9 (enable `ENABLE_EXPERIMENTAL_COREPACK=1` or use Corepack with `packageManager: pnpm@9.15.0`)
+
+`GOP_ARTIFACT_BASE_URL` is required for the 3D viewer build. `POST /api/state` runs without artifacts.
+
 CloudFront must serve release artifacts with:
 
 ```text
@@ -190,6 +220,7 @@ The current balanced-small release is intended to be usable on laptops with inte
 | `docs/performance-analysis.md` | Performance model and benchmarks |
 | `docs/limitations.md` | Research and engineering boundaries |
 | `docs/feature-schema.md` | Compact feature schema reference |
+| `docs/state-api.md` | Public `POST /api/state` contract and examples |
 | `deploy/aws/README.md` | AWS artifact and Batch workflow |
 
 ## Research Talking Points

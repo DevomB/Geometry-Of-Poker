@@ -128,6 +128,14 @@ export function TopNav() {
           </button>
 
           <Link
+            href="/api-docs"
+            className="hidden rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06] md:inline-block"
+            title="Open API reference"
+          >
+            API
+          </Link>
+
+          <Link
             href="/map"
             className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
             title="Open research map"

@@ -28,6 +28,12 @@ export default function ResearchPage() {
             </p>
           </div>
           <Link
+            href="/api-docs"
+            className="hidden text-xs text-zinc-500 transition hover:text-zinc-300 md:inline-block"
+          >
+            API
+          </Link>
+          <Link
             href="/"
             className="hidden text-xs text-zinc-500 transition hover:text-zinc-300 md:inline-block"
           >

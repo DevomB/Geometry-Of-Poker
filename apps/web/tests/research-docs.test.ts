@@ -19,6 +19,7 @@ describe("research docs", () => {
     expect(docs.some((doc) => doc.slug === "street-atlas")).toBe(true);
     expect(docs.some((doc) => doc.slug === "cluster-profiles")).toBe(true);
     expect(docs.some((doc) => doc.slug === "release-dashboard")).toBe(true);
+    expect(docs.some((doc) => doc.slug === "state-api")).toBe(true);
 
     const proofDoc = getResearchDoc("combinatorial-proofs");
     expect(proofDoc?.title).toBe("Combinatorial Proofs - Geometry of Poker");

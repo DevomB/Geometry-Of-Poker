@@ -30,6 +30,7 @@ export interface ResearchDoc extends ResearchDocSummary {
 }
 
 const DOC_ORDER = [
+  "state-api",
   "research-methodology",
   "math-showpiece",
   "combinatorial-proofs",
@@ -122,7 +123,8 @@ export function categoryForSlug(slug: string): ResearchDocCategory {
     slug === "performance-analysis" ||
     slug === "pipeline" ||
     slug === "pipeline-embedding" ||
-    slug === "release-dashboard"
+    slug === "release-dashboard" ||
+    slug === "state-api"
   ) {
     return "Engineering";
   }

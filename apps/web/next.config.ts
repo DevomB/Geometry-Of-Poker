@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/health": nativePokerPackageFiles,
     "/api/project": nativePokerPackageFiles,
+    "/api/state": nativePokerPackageFiles,
+    "/api/state-metrics": nativePokerPackageFiles,
   },
 };
 

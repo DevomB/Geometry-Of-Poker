@@ -90,16 +90,16 @@ pnpm aws:push-worker -- \
 Then run one AWS Batch job with:
 
 ```text
-GOP_RELEASE_ID=2026-06-balanced-small-1
+GOP_RELEASE_ID=<release-id>
 GOP_ARTIFACT_BUCKET=<private-artifact-bucket>
 GOP_S3_PREFIX=
 GOP_SEED=42
 GOP_FEATURE_MODE=compact
 GOP_EXACT_FEATURE_BUDGET=production
 GOP_PREFLOP_COUNT=1326
-GOP_FLOP_COUNT=25000
-GOP_TURN_COUNT=25000
-GOP_RIVER_COUNT=25000
+GOP_FLOP_COUNT=50000
+GOP_TURN_COUNT=50000
+GOP_RIVER_COUNT=50000
 ```
 
 The job writes:
@@ -115,7 +115,13 @@ Submit the release job:
 ```bash
 pnpm aws:submit-release -- \
   --region us-east-1 \
-  --release-id 2026-06-balanced-small-1
+  --release-id <release-id> \
+  --bucket <private-artifact-bucket> \
+  --flop-count 50000 \
+  --turn-count 50000 \
+  --river-count 50000 \
+  --vcpus 4 \
+  --memory-mb 30720
 ```
 
 Before running balanced-small, run a tiny no-upload canary and inspect logs:
@@ -146,7 +152,7 @@ Read the CloudFormation outputs for:
 Generate one street:
 
 ```bash
-pnpm generate -- --street flop --count 25000 --seed 42 --mode compact --artifacts /work/artifacts --resume
+pnpm generate -- --street flop --count 50000 --seed 42 --mode compact --artifacts /work/artifacts --resume
 ```
 
 Embed one street:

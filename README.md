@@ -8,8 +8,8 @@ The project is built as a reproducible poker-math system: real release artifacts
 
 - App host: Vercel (Node.js **22.x**, pnpm **9.x** via `packageManager` in root `package.json`)
 - Artifact host: private S3 bucket behind CloudFront
-- Current release base: `https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1`
-- Release size: `1,326` preflop states plus `25,000` flop, `25,000` turn, and `25,000` river states
+- Release base: configured with `GOP_ARTIFACT_BASE_URL`, for example `https://<cloudfront-domain>/releases/<release-id>`
+- Release size: read from each street's server-hosted `viewer-manifest.json`
 - State analysis API: `POST /api/state` (no artifacts required)
 - Runtime projection: `POST /api/project`
 - Health check: `GET /api/health`
@@ -110,7 +110,7 @@ Allowed local work:
 
 Remote-only by default:
 
-- Balanced-small release generation: `1,326 + 25,000 + 25,000 + 25,000`
+- Balanced or larger release generation
 - Full dataset generation
 - Full embedding/clustering runs
 - Release validation over complete generated artifacts
@@ -123,7 +123,7 @@ Preferred remote compute is short-lived AWS Batch or CodeBuild-backed image cons
 Vercel production requires:
 
 ```text
-GOP_ARTIFACT_BASE_URL=https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1
+GOP_ARTIFACT_BASE_URL=https://<cloudfront-domain>/releases/<release-id>
 ```
 
 Also set in the Vercel project:
@@ -154,7 +154,7 @@ For a production-equivalent local build:
 
 ```bash
 $env:VERCEL_ENV="production"
-$env:GOP_ARTIFACT_BASE_URL="https://d38kt2l1nex9vr.cloudfront.net/releases/2026-06-balanced-small-1"
+$env:GOP_ARTIFACT_BASE_URL="https://<cloudfront-domain>/releases/<release-id>"
 pnpm --filter @geometry-of-poker/web... build
 ```
 

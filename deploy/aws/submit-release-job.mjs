@@ -24,6 +24,8 @@ Optional:
   --flop-count 20
   --turn-count 20
   --river-count 20
+  --vcpus 4
+  --memory-mb 30720
   --exact-feature-budget production
 `;
 }
@@ -45,6 +47,8 @@ function main() {
   const flopCount = argValue("--flop-count");
   const turnCount = argValue("--turn-count");
   const riverCount = argValue("--river-count");
+  const vcpus = argValue("--vcpus");
+  const memoryMb = argValue("--memory-mb");
   const skipUpload = process.argv.includes("--skip-upload");
 
   const environment = [{ name: "GOP_RELEASE_ID", value: releaseId }];
@@ -58,7 +62,14 @@ function main() {
   if (turnCount) environment.push({ name: "GOP_TURN_COUNT", value: turnCount });
   if (riverCount) environment.push({ name: "GOP_RIVER_COUNT", value: riverCount });
 
-  const containerOverrides = JSON.stringify({ environment });
+  const resourceRequirements = [];
+  if (vcpus) resourceRequirements.push({ type: "VCPU", value: vcpus });
+  if (memoryMb) resourceRequirements.push({ type: "MEMORY", value: memoryMb });
+
+  const containerOverrides = JSON.stringify({
+    environment,
+    ...(resourceRequirements.length > 0 ? { resourceRequirements } : {}),
+  });
   const jobName = `gop-${releaseId}`.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 128);
 
   const result = spawnSync(

@@ -1,4 +1,10 @@
 import Link from "next/link";
+import {
+  AVAILABLE_STREETS,
+  loadStreetManifest,
+  streetArtifactsExist,
+} from "@/lib/server/artifacts";
+import type { Street } from "@geometry-of-poker/shared";
 
 export const metadata = {
   title: "Map Behind the Project - Geometry of Poker",
@@ -6,12 +12,14 @@ export const metadata = {
     "A technical walkthrough of the state-space map, feature geometry, embedding pipeline, and projection method behind Geometry of Poker.",
 };
 
-const RELEASE_STATS = [
-  ["Preflop", "1,326", "Complete two-card hero state enumeration"],
-  ["Flop", "25,000", "Seeded balanced-small sample"],
-  ["Turn", "25,000", "Seeded balanced-small sample"],
-  ["River", "25,000", "Seeded balanced-small sample"],
-];
+export const dynamic = "force-dynamic";
+
+const STREET_DETAILS: Record<Street, string> = {
+  preflop: "Complete two-card hero state enumeration",
+  flop: "Seeded release sample",
+  turn: "Seeded release sample",
+  river: "Seeded release sample",
+};
 
 const PIPELINE = [
   {
@@ -80,7 +88,9 @@ const RESEARCH_NOTES = [
   "The production viewer serves immutable binary artifacts from S3/CloudFront; Vercel only hosts the app and APIs.",
 ];
 
-export default function MapPage() {
+export default async function MapPage() {
+  const releaseStats = await loadReleaseStats();
+
   return (
     <main className="min-h-screen bg-[#08080c] text-zinc-200">
       <div className="mx-auto max-w-6xl px-6 py-8">
@@ -102,7 +112,7 @@ export default function MapPage() {
         </header>
 
         <section className="grid gap-4 border-b border-white/10 py-8 md:grid-cols-4">
-          {RELEASE_STATS.map(([street, count, detail]) => (
+          {releaseStats.map(({ street, count, detail }) => (
             <div key={street} className="border-l border-white/10 pl-4">
               <div className="gop-mono text-2xl text-zinc-50">{count}</div>
               <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-zinc-500">
@@ -220,4 +230,36 @@ export default function MapPage() {
       </div>
     </main>
   );
+}
+
+async function loadReleaseStats() {
+  return Promise.all(
+    AVAILABLE_STREETS.map(async (street) => {
+      try {
+        if (!streetArtifactsExist(street)) {
+          return {
+            street: titleCase(street),
+            count: "-",
+            detail: "Release manifest unavailable",
+          };
+        }
+        const manifest = await loadStreetManifest(street);
+        return {
+          street: titleCase(street),
+          count: manifest.pointCount.toLocaleString(),
+          detail: STREET_DETAILS[street],
+        };
+      } catch {
+        return {
+          street: titleCase(street),
+          count: "-",
+          detail: "Release manifest unavailable",
+        };
+      }
+    }),
+  );
+}
+
+function titleCase(street: Street) {
+  return `${street.charAt(0).toUpperCase()}${street.slice(1)}`;
 }

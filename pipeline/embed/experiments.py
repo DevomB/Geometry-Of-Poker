@@ -61,6 +61,7 @@ def run_experiment_variant(
             n_neighbors=min(config.umap_n_neighbors, len(X_sub) - 1),
             min_dist=config.umap_min_dist,
             metric=config.umap_metric,
+            init=config.umap_init,
             random_state=config.random_state,
         )
         coords = umap_model.fit_transform(X_pca)
@@ -125,6 +126,7 @@ def seed_stability(
             n_neighbors=min(config.umap_n_neighbors, len(X_sub) - 1),
             min_dist=config.umap_min_dist,
             metric=config.umap_metric,
+            init=config.umap_init,
             random_state=seed,
         )
         embeddings.append(umap_model.fit_transform(X_pca))

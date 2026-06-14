@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:22-bookworm
+FROM public.ecr.aws/docker/library/node:22.20.0-bookworm
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -26,16 +26,10 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY packages/feature-engine/package.json packages/feature-engine/package.json
 COPY packages/dataset-generator/package.json packages/dataset-generator/package.json
 COPY apps/web/package.json apps/web/package.json
-COPY vendor/poker-calculations /tmp/poker-calculations
 
 RUN pnpm install --frozen-lockfile
 
-RUN cd /tmp/poker-calculations \
-  && npm ci \
-  && npm run build:native \
-  && node scripts/stage-prebuild.js linux-x64 \
-  && cp prebuilds/linux-x64/node.napi.node /work/node_modules/poker-calculations/prebuilds/linux-x64/node.napi.node \
-  && node -e "const pc = require('/work/node_modules/poker-calculations'); console.log('poker-calculations native ok', pc.evaluateHandStrengthFast(['As','Kd'], ['2c','7d','9h','Ts','Jc']));"
+RUN node -e "const pc = require('/work/node_modules/poker-calculations'); console.log('poker-calculations native ok', pc.evaluateHandStrengthFast(['As','Kd'], ['2c','7d','9h','Ts','Jc']));"
 
 COPY packages packages
 COPY apps/web apps/web

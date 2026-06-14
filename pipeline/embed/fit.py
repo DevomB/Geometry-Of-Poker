@@ -45,25 +45,37 @@ def fit_embedding_pipeline(
     retained_features: list[str],
     config: EmbedConfig,
 ) -> FitResult:
+    print("[fit] scale features", flush=True)
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
+    print("[fit] fit PCA", flush=True)
     pca_full = PCA(random_state=config.random_state)
     pca_full.fit(X_scaled)
     n_components = choose_pca_components(pca_full, config.pca_variance, config.pca_max_components)
 
     pca = PCA(n_components=n_components, random_state=config.random_state)
     X_pca = pca.fit_transform(X_scaled)
+    print(f"[fit] retained PCA components={n_components}", flush=True)
 
+    print(
+        f"[fit] fit UMAP n_neighbors={config.umap_n_neighbors} min_dist={config.umap_min_dist} init={config.umap_init}",
+        flush=True,
+    )
     umap_model = umap.UMAP(
         n_components=3,
         n_neighbors=config.umap_n_neighbors,
         min_dist=config.umap_min_dist,
         metric=config.umap_metric,
+        init=config.umap_init,
         random_state=config.random_state,
     )
     coords = umap_model.fit_transform(X_pca)
 
+    print(
+        f"[fit] fit HDBSCAN min_cluster_size={config.hdbscan_min_cluster_size} min_samples={config.hdbscan_min_samples}",
+        flush=True,
+    )
     clusterer = hdbscan.HDBSCAN(
         min_cluster_size=config.hdbscan_min_cluster_size,
         min_samples=config.hdbscan_min_samples,
@@ -71,6 +83,7 @@ def fit_embedding_pipeline(
         cluster_selection_method="eom",
     )
     labels = clusterer.fit_predict(coords)
+    print("[fit] embedding fit complete", flush=True)
 
     return FitResult(
         scaler=scaler,

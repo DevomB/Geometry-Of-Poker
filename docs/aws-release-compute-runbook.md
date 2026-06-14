@@ -19,7 +19,17 @@ The important detail is that dataset generation was not the failing part. The Py
 
 Because the release worker uses Fargate ephemeral storage and uploads only after the full release validates, completed intermediate files from the failed attempt were lost when the container exited.
 
-## Immediate Fix
+The follow-up release `2026-06-balanced-50k-2` used the maximum memory available to the existing 4-vCPU Fargate job shape (`30720` MiB) and failed at the same point. That made the failure look less like a simple memory limit and more like a repeatable crash in the UMAP native stack.
+
+The key log clue was immediately before the segfault:
+
+```text
+Graph is not fully connected, spectral embedding may not work as expected.
+```
+
+UMAP's default initialization uses a spectral embedding. For a disconnected 50k poker-state graph, that path produced a repeatable segfault in the container. The embedding pipeline was changed to use `init="random"` for UMAP and to print explicit `[fit]` stage logs around scaling, PCA, UMAP, and HDBSCAN.
+
+## Immediate Mitigation
 
 The submit helper now supports per-job Batch resource overrides:
 
@@ -36,6 +46,20 @@ pnpm aws:submit-release -- `
 ```
 
 For the current 4-vCPU Fargate job shape, `30720` MiB is the practical max memory setting. Use this for 50k postflop runs unless the stack is redeployed with a larger job shape.
+
+The code-level fix must be built into a fresh release-worker image before another 50k attempt:
+
+```powershell
+pnpm aws:build-worker -- `
+  --region us-east-1 `
+  --account-id 211125325681
+```
+
+After CodeBuild pushes the new `latest` image, submit a new immutable release id with the same max-memory settings.
+
+The release-worker Docker base image is pinned to `node:22.20.0-bookworm`. Do not use a floating `node:22-bookworm` tag for release compute.
+
+The worker image should use the installed `poker-calculations@2.2.1` package prebuild from `pnpm install`. Do not rebuild or overwrite the package from a sibling native source checkout during release-worker construction. A stale sibling source build failed the native addon smoke test in CodeBuild with `Original error: Invalid argument`.
 
 ## Monitoring A Run
 
@@ -119,7 +143,7 @@ pnpm aws:submit-release -- `
 
 Keep `GOP_EXACT_FEATURE_BUDGET=production` for balanced or larger runs. The `full` budget is for small research jobs only.
 
-If another run segfaults during UMAP/HDBSCAN even with max memory, stop rerunning the same job. The next engineering fix should be one of:
+If another run segfaults during UMAP/HDBSCAN after the `init="random"` worker image is deployed, stop rerunning the same job. The next engineering fix should be one of:
 
 - split the release worker into per-street jobs so one failed embedding does not discard other completed streets
 - upload generated datasets as private intermediate checkpoints before embedding

@@ -23,6 +23,7 @@ class EmbedConfig:
     umap_n_neighbors: int = 30
     umap_min_dist: float = 0.1
     umap_metric: str = "euclidean"
+    umap_init: str = "random"
     hdbscan_min_cluster_size: int = 50
     hdbscan_min_samples: int | None = 10
     knn_k: int = 15

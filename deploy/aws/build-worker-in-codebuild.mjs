@@ -14,7 +14,6 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const WORKSPACE_ROOT = resolve(ROOT, "..");
 const BUILD_DIR = join(ROOT, ".aws-build");
 const STAGE_DIR = join(BUILD_DIR, "release-worker-source");
 const ZIP_PATH = join(BUILD_DIR, "release-worker-source.zip");
@@ -118,27 +117,6 @@ function copySource() {
     });
   }
 
-  const pokerCalculationsSource = join(WORKSPACE_ROOT, "NPM");
-  if (!existsSync(pokerCalculationsSource)) {
-    throw new Error(
-      "Missing sibling NPM/ repo. The AWS worker build needs it to compile poker-calculations natively in CodeBuild.",
-    );
-  }
-
-  cpSync(pokerCalculationsSource, join(STAGE_DIR, "vendor", "poker-calculations"), {
-    recursive: true,
-    filter: (path) => {
-      const relativePath = relative(pokerCalculationsSource, path).replace(/\\/g, "/");
-      const segments = relativePath.split("/");
-      if (segments.includes(".git")) return false;
-      if (segments.includes("node_modules")) return false;
-      if (segments.includes("build")) return false;
-      if (segments.includes("build_native_tests")) return false;
-      if (segments.includes("prebuilds")) return false;
-      if (relativePath === "Poker-Calculations-Image.png") return false;
-      return true;
-    },
-  });
 }
 
 const CRC_TABLE = new Uint32Array(256);

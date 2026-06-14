@@ -129,6 +129,7 @@ def build_analysis_context(
             "n_neighbors": config.umap_n_neighbors,
             "min_dist": config.umap_min_dist,
             "metric": config.umap_metric,
+            "init": config.umap_init,
             "random_state": config.random_state,
         },
         "hdbscan": cstats,

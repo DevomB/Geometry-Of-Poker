@@ -57,14 +57,14 @@ describe("extractGeometryFeatures", { skip: !nativeOk }, () => {
   });
 
   it("classifies dry rainbow flop board texture", () => {
-    const result = spot(["As", "Kd"], ["2c", "7h", "Jh"]);
+    const result = spot(["As", "Kd"], ["2c", "7h", "Js"]);
     assert.equal(result.groups.board.boardRainbowFlag, 1);
     assert.equal(result.groups.board.boardMonotoneFlag, 0);
     assert.equal(result.groups.board.boardFeaturesAvailable, 1);
   });
 
   it("detects monotone-heavy flop", () => {
-    const result = spot(["As", "Ks"], ["2s", "7s", "Jh"]);
+    const result = spot(["Ah", "Kh"], ["2s", "7s", "Js"]);
     assert.equal(result.groups.board.boardMaxSuitCount, 3);
   });
 

@@ -45,6 +45,16 @@ export const API_ENDPOINTS: ApiEndpointDoc[] = [
     requiresArtifacts: false,
   },
   {
+    slug: "manifests",
+    method: "GET",
+    path: "/api/manifests",
+    title: "Artifact manifests",
+    summary:
+      "Browser-safe release manifest URLs for each reachable street. Used by the viewer to load point-cloud and projection artifacts.",
+    tags: ["artifacts", "viewer"],
+    requiresArtifacts: true,
+  },
+  {
     slug: "state-metrics",
     method: "POST",
     path: "/api/state-metrics",

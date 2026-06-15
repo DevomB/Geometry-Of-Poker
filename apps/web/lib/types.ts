@@ -188,7 +188,7 @@ export interface ManualMarker {
   neighborIds: string[];
   neighborDistances: number[];
   clusterId: number | null;
-  features: Record<string, number | string | boolean>;
+  features: Record<string, number | string | null>;
   warnings?: string[];
 }
 

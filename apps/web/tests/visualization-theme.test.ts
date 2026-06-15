@@ -29,9 +29,6 @@ describe("visualization theme metadata", () => {
 
   it("describes known projection methods in human terms", () => {
     expect(describeProjectionMethod("pca-knn-interpolation")).toMatch(/PCA/);
-    expect(describeProjectionMethod("precomputed-nearest-neighbor")).toMatch(
-      /precomputed/i,
-    );
     expect(describeProjectionMethod("exact_match")).toMatch(/exact/i);
   });
 

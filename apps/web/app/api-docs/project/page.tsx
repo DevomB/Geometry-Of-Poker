@@ -61,7 +61,8 @@ export default function ProjectApiDocsPage() {
         Requires release artifacts (<code className="gop-mono">projection-index.bin</code> and
         street datasets). Returns{" "}
         <code className="gop-mono">503 FEATURE_ENGINE_UNAVAILABLE</code> when native extraction is
-        needed but unavailable.
+        needed but unavailable, or <code className="gop-mono">503 ARTIFACTS_UNAVAILABLE</code>{" "}
+        when configured remote artifacts cannot be reached.
       </Callout>
 
       <Section id="request" title="Request">
@@ -83,7 +84,7 @@ export default function ProjectApiDocsPage() {
               name: "deadCards",
               type: "string[]",
               required: false,
-              description: "Known dead cards. Non-exact projection may be unavailable with dead cards.",
+              description: "Known dead cards. Dead-card-conditioned hands use PCA interpolation even when the raw hero+board exists in the dataset.",
             },
             {
               name: "street",
@@ -117,7 +118,22 @@ export default function ProjectApiDocsPage() {
             {
               name: "projectionMethod",
               type: "string",
-              description: "exact-match | pca-knn-interpolation | precomputed-nearest-neighbor",
+              description: "exact-match | pca-knn-interpolation.",
+            },
+            {
+              name: "metrics.sourceMethod",
+              type: "string",
+              description: "Internal provenance: exact_match | pca_knn_interpolation.",
+            },
+            {
+              name: "metrics.equityVsRandom",
+              type: "number | null",
+              description: "Projected hand equity when feature extraction or dataset metadata provides it.",
+            },
+            {
+              name: "metrics.clusterId",
+              type: "number | null",
+              description: "Cluster id for exact matches or plurality interpolations; null means noise/unknown.",
             },
             {
               name: "warnings",
@@ -134,6 +150,7 @@ export default function ProjectApiDocsPage() {
           rows={[
             { status: "400", code: "DUPLICATE_CARD", meaning: "Overlapping cards." },
             { status: "404", code: "MISSING_ARTIFACTS", meaning: "No artifacts for requested street." },
+            { status: "503", code: "ARTIFACTS_UNAVAILABLE", meaning: "Configured remote release artifacts cannot be reached." },
             { status: "503", code: "FEATURE_ENGINE_UNAVAILABLE", meaning: "Non-exact path needs native engine." },
             { status: "422", code: "PROJECTION_FAILED", meaning: "Projection pipeline error." },
           ]}

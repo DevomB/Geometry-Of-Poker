@@ -74,7 +74,20 @@ function isBackdoorFlushPossible(hero: [string, string], board: string[], dead: 
   return false;
 }
 
-function classifyStraightDrawType(straightOutCount: number, outCards: string[]): {
+function straightWindows(): number[][] {
+  const windows: number[][] = [];
+  for (let start = 0; start <= 8; start++) {
+    windows.push([start, start + 1, start + 2, start + 3, start + 4]);
+  }
+  windows.push([12, 0, 1, 2, 3]);
+  return windows;
+}
+
+function classifyStraightDrawType(
+  straightOutCount: number,
+  outCards: string[],
+  currentCards: string[],
+): {
   oesd: number;
   gutshot: number;
   doubleGutshot: number;
@@ -83,11 +96,27 @@ function classifyStraightDrawType(straightOutCount: number, outCards: string[]):
     return { oesd: 0, gutshot: 0, doubleGutshot: 0 };
   }
   if (straightOutCount === 8) {
-    const ranks = outCards.map(cardRankIndex);
-    const unique = [...new Set(ranks)].sort((a, b) => a - b);
-    const span = unique[unique.length - 1]! - unique[0]!;
-    if (span <= 4) {
+    const outRanks = new Set(outCards.map(cardRankIndex));
+    const currentRanks = new Set(currentCards.map(cardRankIndex));
+    const edgeMisses = new Set<number>();
+    const internalMisses = new Set<number>();
+
+    for (const window of straightWindows()) {
+      const missing = window.filter((rank) => !currentRanks.has(rank));
+      if (missing.length !== 1 || !outRanks.has(missing[0]!)) continue;
+      const missingIndex = window.indexOf(missing[0]!);
+      if (missingIndex === 0 || missingIndex === window.length - 1) {
+        edgeMisses.add(missing[0]!);
+      } else {
+        internalMisses.add(missing[0]!);
+      }
+    }
+
+    if (edgeMisses.size >= 2) {
       return { oesd: 1, gutshot: 0, doubleGutshot: 0 };
+    }
+    if (internalMisses.size >= 2) {
+      return { oesd: 0, gutshot: 0, doubleGutshot: 1 };
     }
     return { oesd: 0, gutshot: 0, doubleGutshot: 1 };
   }
@@ -148,7 +177,11 @@ export function computeDrawFeatures(state: ValidatedState): DrawFeatureResult {
 
   const flushOutCount = flushOutCards.length;
   const straightOutCount = straightOutCards.length;
-  const straightType = classifyStraightDrawType(straightOutCount, straightOutCards);
+  const straightType = classifyStraightDrawType(
+    straightOutCount,
+    straightOutCards,
+    [...state.hero, ...state.board],
+  );
 
   const backdoorFlushFlag =
     state.street === "flop" && flushOutCount === 0 && isBackdoorFlushPossible(

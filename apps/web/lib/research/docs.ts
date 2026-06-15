@@ -44,6 +44,8 @@ const DOC_ORDER = [
   "dataset-generation",
   "pipeline",
   "pipeline-embedding",
+  "release-dashboard",
+  "aws-release-compute-runbook",
   "architecture",
   "research-notes",
 ];

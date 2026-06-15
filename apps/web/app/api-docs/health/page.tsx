@@ -44,7 +44,7 @@ export default function HealthApiDocsPage() {
             {
               name: "ok",
               type: "boolean",
-              description: "True when status is ready and at least one street is available.",
+              description: "True when status is ready and at least one street manifest is reachable.",
             },
             {
               name: "status",
@@ -64,7 +64,7 @@ export default function HealthApiDocsPage() {
             {
               name: "availableStreets",
               type: "Street[]",
-              description: "Streets with loadable release artifacts.",
+              description: "Streets with reachable manifests in blob mode or complete local files in public mode.",
             },
             {
               name: "pokerCalculations",

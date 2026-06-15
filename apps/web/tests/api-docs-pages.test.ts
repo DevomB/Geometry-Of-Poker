@@ -5,6 +5,7 @@ describe("api docs catalog", () => {
   it("lists all documented endpoints", () => {
     expect(API_ENDPOINTS.map((endpoint) => endpoint.slug).sort()).toEqual([
       "health",
+      "manifests",
       "project",
       "state",
       "state-metrics",

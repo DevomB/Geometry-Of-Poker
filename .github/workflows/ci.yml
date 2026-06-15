@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Web tests
+        run: pnpm --filter @geometry-of-poker/web test
+
+      - name: Feature engine tests
+        run: pnpm --filter @geometry-of-poker/feature-engine test
+        env:
+          GOP_REQUIRE_NATIVE: "1"
+
+      - name: Dataset generator tests
+        run: pnpm --filter @geometry-of-poker/dataset-generator test
+
+      - name: Artifact validator smoke
+        run: pnpm validate:artifacts -- --help

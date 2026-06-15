@@ -10,10 +10,14 @@ The project is built as a reproducible poker-math system: real release artifacts
 - Artifact host: private S3 bucket behind CloudFront
 - Release base: configured with `GOP_ARTIFACT_BASE_URL`, for example `https://<cloudfront-domain>/releases/<release-id>`
 - Release size: read from each street's server-hosted `viewer-manifest.json`
+- Viewer: `/`
 - State analysis API: `POST /api/state` (no artifacts required)
 - Runtime projection: `POST /api/project`
 - Health check: `GET /api/health`
-- Presentation page: `/map`
+- Artifact manifests: `GET /api/manifests`
+- Methodology map: `/map`
+- Release dashboard: `/release`
+- Research docs: `/research`
 - API docs: `/api-docs` (interactive reference) · `/research/state-api` (markdown)
 
 ### Try the viewer
@@ -214,6 +218,10 @@ The current balanced-small release is intended to be usable on laptops with inte
 | File | Description |
 | --- | --- |
 | `docs/math-showpiece.md` | Compact mathematical narrative for the poker-state geometry |
+| `docs/combinatorial-proofs.md` | Exact-count poker combinatorics behind visible UI math |
+| `docs/statistical-standing.md` | Statistical interpretation of population-level summaries |
+| `docs/street-atlas.md` | Street-level atlas and slice methodology |
+| `docs/cluster-profiles.md` | Cluster summaries and interpretation limits |
 | `docs/topology-and-clustering-audit.md` | Honest audit of whether the learned geometry supports a sphere or clustered structure |
 | `docs/research-methodology.md` | Feature and embedding methodology |
 | `docs/architecture.md` | System design and data flow |
@@ -221,6 +229,12 @@ The current balanced-small release is intended to be usable on laptops with inte
 | `docs/limitations.md` | Research and engineering boundaries |
 | `docs/feature-schema.md` | Compact feature schema reference |
 | `docs/state-api.md` | Public `POST /api/state` contract and examples |
+| `docs/release-dashboard.md` | Release dashboard data sources and artifact-readiness notes |
+| `docs/pipeline.md` | End-to-end artifact pipeline overview |
+| `docs/pipeline-embedding.md` | Embedding pipeline implementation details |
+| `docs/dataset-generation.md` | Dataset generation contract and reproducibility notes |
+| `docs/research-notes.md` | Additional research notes surfaced under `/research` |
+| `docs/aws-release-compute-runbook.md` | AWS release-compute runbook |
 | `deploy/aws/README.md` | AWS artifact and Batch workflow |
 
 ## Research Talking Points

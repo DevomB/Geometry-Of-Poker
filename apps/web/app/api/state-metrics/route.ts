@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     const metrics = computeExactRunoutMetrics({
       hero: validated.hero,
       board: validated.board,
+      deadCards: validated.deadCards.length > 0 ? validated.deadCards : undefined,
     });
 
     return NextResponse.json({ metrics });

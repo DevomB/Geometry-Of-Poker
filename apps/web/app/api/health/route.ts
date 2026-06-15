@@ -15,7 +15,10 @@ export async function GET() {
   let status: HealthResponse["status"] = pokerCalculations.available ? "ready" : "degraded";
 
   try {
-    availableStreets = availableArtifactStreets();
+    availableStreets = await availableArtifactStreets();
+    if (ARTIFACT_MODE === "blob" && availableStreets.length === 0) {
+      status = "misconfigured";
+    }
   } catch {
     status = "misconfigured";
   }

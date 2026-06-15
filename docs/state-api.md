@@ -92,9 +92,11 @@ curl -sS -X POST "https://geometry-of-poker.vercel.app/api/state" \
 }
 ```
 
-Large combinatorial counts (`legalVillainHands`, `terminalLeaves`) are serialized as decimal strings.
+Large combinatorial counts (`legalVillainHands`, `terminalLeaves`) are serialized as decimal strings. `combinatorics.flushOuts` is the API alias for the feature field `features.draws.flushOutCount`.
 
 Check `availability` before interpreting feature groups — neutral zeros mean the metric was not computed for this street or budget.
+
+The `limitations` array is dynamic; clients should display it as advisory text rather than relying on a fixed length.
 
 ## Errors
 
@@ -124,6 +126,7 @@ Structured JSON errors match other API routes:
 | `POST /api/project` | Feature extract + 3D map projection (requires release artifacts) |
 | `POST /api/state-metrics` | Runout/vulnerability only (legacy backfill) |
 | `GET /api/health` | Engine and artifact status |
+| `GET /api/manifests` | Browser-safe artifact manifests for reachable streets |
 
 ## GOP subdomain
 

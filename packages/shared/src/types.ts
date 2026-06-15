@@ -6,7 +6,9 @@
  * - Python embedding pipeline
  * - web viewer (Next.js)
  *
- * Implementation is deferred to later phases.
+ * The public HTTP APIs use hero/board/deadCards. These legacy UI and artifact
+ * interfaces keep heroHoleCards/communityCards until older local adapters are
+ * retired.
  */
 
 /** Canonical card encoding: rank + suit, e.g. "As", "Td", "2c". */
@@ -108,7 +110,7 @@ export interface ViewerArtifacts {
   clusterSummaryPath?: string;
 }
 
-/** Result of embedding a manually entered hand into the learned geometry. */
+/** @deprecated Use ProjectResponse from api.ts for the runtime projection API. */
 export interface ManualHandProjection {
   state: PokerState;
   normalizedFeatures: FeatureVector;
@@ -118,7 +120,7 @@ export interface ManualHandProjection {
   distances: number[];
 }
 
-/** Application mode selector. */
+/** @deprecated Planned UI mode selector; not used by the current viewer. */
 export type AppMode = "research-explorer" | "manual-hand-explorer";
 
 /** Camera fly-to target for manual hand exploration. */
@@ -146,11 +148,11 @@ export interface PointCloudBuffers {
 /** Feature extraction input — wraps poker-calculations primitives. */
 export interface FeatureExtractionContext {
   state: PokerState;
-  /** Reserved for villain range configuration in Mode 2. */
+  /** @deprecated Reserved for a future range-aware extractor. */
   villainRangeId?: string;
 }
 
-/** Placeholder result from feature-engine (not yet implemented). */
+/** Feature extraction output shape used by embedding and validation tooling. */
 export interface FeatureExtractionResult {
   state: PokerState;
   vector: FeatureVector;

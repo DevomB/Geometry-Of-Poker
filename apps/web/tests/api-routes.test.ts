@@ -74,6 +74,8 @@ describe("api routes", () => {
       expect(Number.isFinite(body.projectedPoint.x)).toBe(true);
       expect(body.nearestNeighbors.length).toBeGreaterThan(0);
       expect(body.projectionMethod).toBe("exact-match");
+      expect(typeof body.metrics.equityVsRandom).toBe("number");
+      expect(typeof body.metrics.clusterId).toBe("number");
     });
   }
 
@@ -85,6 +87,8 @@ describe("api routes", () => {
     if (res.status === 200) {
       expect((body as ProjectResponse).projectionMethod).toBe("pca-knn-interpolation");
       expect(Number.isFinite((body as ProjectResponse).projectedPoint.x)).toBe(true);
+      expect((body as ProjectResponse).metrics.equityVsRandom).not.toBe(false);
+      expect((body as ProjectResponse).metrics.clusterId).not.toBe("noise");
     } else {
       expect(res.status).toBe(503);
       expect((body as ApiErrorResponse).error.code).toBe("FEATURE_ENGINE_UNAVAILABLE");

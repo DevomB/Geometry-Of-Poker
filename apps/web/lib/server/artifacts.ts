@@ -21,6 +21,11 @@ const cache = new Map<Street, StreetDataset>();
 const remoteManifestCache = new Map<Street, Promise<StreetManifest>>();
 const remoteDatasetCache = new Map<Street, Promise<StreetDataset>>();
 
+export function isArtifactUnavailableError(err: unknown) {
+  if (!(err instanceof Error)) return false;
+  return /Failed to fetch .*: (403|404|500|502|503|504)/.test(err.message);
+}
+
 function assertProductionArtifactConfig() {
   if (process.env.VERCEL_ENV === "production" && !process.env.GOP_ARTIFACT_BASE_URL) {
     throw new Error(
@@ -319,9 +324,22 @@ export async function loadStreetDatasetForApi(street: Street): Promise<StreetDat
   return promise;
 }
 
-export function availableArtifactStreets() {
+export async function availableArtifactStreets() {
   assertProductionArtifactConfig();
-  if (ARTIFACT_MODE === "blob") return AVAILABLE_STREETS;
+  if (ARTIFACT_MODE === "blob") {
+    const checks = await Promise.all(
+      AVAILABLE_STREETS.map(async (street) => {
+        try {
+          await loadStreetManifest(street);
+          return street;
+        } catch (err) {
+          if (isArtifactUnavailableError(err)) return null;
+          throw err;
+        }
+      }),
+    );
+    return checks.filter((street): street is Street => street !== null);
+  }
   return AVAILABLE_STREETS.filter(streetArtifactsExist);
 }
 

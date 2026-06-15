@@ -60,7 +60,7 @@ User enters exactly two hero cards and 0/3/4/5 community cards.
 
 Runtime flow:
 
-1. **Validate** — structural checks (`feature-engine/validate-state`)
+1. **Validate** — structural checks (`packages/feature-engine/src/validate-input.ts`, `validatePokerStateInput`)
 2. **Extract** — feature vector via `poker-calculations` primitives
 3. **Normalize** — apply saved `StandardScaler` from training
 4. **Project** — scaler/PCA transform and bounded kNN interpolation via `projection-index.bin`
@@ -104,7 +104,7 @@ sequenceDiagram
 
 | Layer | Choice | Rationale |
 | --- | --- | --- |
-| Math primitives | `poker-calculations@2.2.0` (npm) | C++20 core, already covers equity/MC/vulnerability |
+| Math primitives | `poker-calculations@2.2.1` (npm) | C++20 core, already covers equity/MC/vulnerability |
 | Feature extraction | TypeScript in `feature-engine` | Same language as web; direct package import |
 | Embedding | Python (NumPy, sklearn, umap-learn) | Mature ML stack; joblib for scaler/UMAP persistence |
 | Web | Next.js 15 App Router | SSR for app and Node API routes |
@@ -164,7 +164,7 @@ Target: subdomain of personal website (e.g. `geometry.poker-calculations.devomb.
 
 ## Phase map
 
-See [README.md](../README.md#implementation-checklist) for the full checklist.
+See [NEXT_STEPS.md](../NEXT_STEPS.md) for the active checklist.
 
 | Phase | Scope |
 | --- | --- |
@@ -178,4 +178,4 @@ See [README.md](../README.md#implementation-checklist) for the full checklist.
 
 ## Open technical risks
 
-Documented in [README.md](../README.md#open-technical-risks).
+Documented in [docs/limitations.md](limitations.md) and [NEXT_STEPS.md](../NEXT_STEPS.md).

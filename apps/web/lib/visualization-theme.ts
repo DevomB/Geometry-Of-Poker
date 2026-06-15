@@ -118,8 +118,6 @@ export function describeProjectionMethod(method: string): string {
       return "Exact dataset match";
     case "pca-knn-interpolation":
       return "PCA kNN interpolation";
-    case "precomputed-nearest-neighbor":
-      return "Nearest precomputed state";
     default:
       return method;
   }

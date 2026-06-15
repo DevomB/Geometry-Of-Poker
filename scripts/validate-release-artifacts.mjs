@@ -15,6 +15,11 @@ const GOPC_MAGIC = "GOPC";
 const GOPI_MAGIC = "GOPI";
 const FORBIDDEN_PROVENANCE_MARKERS = ["de" + "mo", "syn" + "thetic", "place" + "holder"];
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log("Usage: node scripts/validate-release-artifacts.mjs --root <embeddings-dir> | --release-id <release-id>");
+  process.exit(0);
+}
+
 function argValue(name) {
   const index = process.argv.indexOf(name);
   if (index < 0) return null;

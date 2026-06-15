@@ -107,8 +107,16 @@ export interface ProjectNeighbor {
 
 export type ProjectionMethod =
   | "exact-match"
-  | "pca-knn-interpolation"
-  | "precomputed-nearest-neighbor";
+  | "pca-knn-interpolation";
+
+export type ProjectionSourceMethod = "exact_match" | "pca_knn_interpolation";
+
+export interface ProjectMetrics extends Record<string, number | string | null> {
+  category: string;
+  equityVsRandom: number | null;
+  clusterId: number | null;
+  sourceMethod: ProjectionSourceMethod;
+}
 
 export interface ProjectResponse {
   state: {
@@ -119,7 +127,7 @@ export interface ProjectResponse {
   };
   projectedPoint: ProjectedPoint;
   nearestNeighbors: ProjectNeighbor[];
-  metrics: Record<string, number | string | boolean>;
+  metrics: ProjectMetrics;
   projectionMethod: ProjectionMethod;
   warnings: string[];
 }

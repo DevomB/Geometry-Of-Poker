@@ -3,7 +3,12 @@ import { extractGeometryFeatures } from "@geometry-of-poker/feature-engine";
 import type { ProjectNeighbor, ProjectResponse } from "@geometry-of-poker/shared";
 import { projectIntoGeometry } from "@/lib/projection/project-point";
 import { apiError } from "@/lib/server/api-errors";
-import { loadStreetDatasetForApi, streetArtifactsExist } from "@/lib/server/artifacts";
+import {
+  ARTIFACT_MODE,
+  isArtifactUnavailableError,
+  loadStreetDatasetForApi,
+  streetArtifactsExist,
+} from "@/lib/server/artifacts";
 import {
   isValidationFailure,
   readProjectBody,
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
       return apiError(validated.status, validated.code, validated.message, validated.field);
     }
 
-    if (!streetArtifactsExist(validated.street)) {
+    if (ARTIFACT_MODE === "public" && !streetArtifactsExist(validated.street)) {
       return apiError(
         404,
         "MISSING_ARTIFACTS",
@@ -130,21 +135,26 @@ export async function POST(request: Request) {
       metrics: {
         ...projection.features,
         category: projection.category,
-        equityVsRandom: projection.equityVsRandom ?? false,
-        clusterId: projection.clusterId ?? "noise",
+        equityVsRandom: projection.equityVsRandom ?? null,
+        clusterId: projection.clusterId ?? null,
         sourceMethod: projection.method,
       },
       projectionMethod:
         projection.method === "exact_match"
           ? "exact-match"
-          : projection.method === "pca_knn_interpolation"
-            ? "pca-knn-interpolation"
-            : "precomputed-nearest-neighbor",
+          : "pca-knn-interpolation",
       warnings,
     };
 
     return NextResponse.json(payload);
   } catch (err) {
+    if (isArtifactUnavailableError(err)) {
+      return apiError(
+        503,
+        "ARTIFACTS_UNAVAILABLE",
+        err instanceof Error ? err.message : "Artifact release is unavailable.",
+      );
+    }
     const message = err instanceof Error ? err.message : "Projection failed.";
     return apiError(422, "PROJECTION_FAILED", message);
   }

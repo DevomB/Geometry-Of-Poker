@@ -759,7 +759,7 @@ function formatMetricValue(
   if (typeof value === "number" && Number.isFinite(value) && available) {
     return format(value);
   }
-  return "—";
+  return "N/A";
 }
 
 function KeyMetrics({

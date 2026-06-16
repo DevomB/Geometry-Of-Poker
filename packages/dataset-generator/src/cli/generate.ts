@@ -18,6 +18,10 @@ function repoArtifactsRoot(): string {
   return join(here, "..", "..", "..", "artifacts");
 }
 
+function kebabToCamel(key: string): string {
+  return key.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
 function parseArgs(argv: string[]) {
   const args: Record<string, string | boolean> = {
     seed: "42",
@@ -39,7 +43,7 @@ function parseArgs(argv: string[]) {
       continue;
     }
     if (arg.startsWith("--")) {
-      const key = arg.slice(2);
+      const key = kebabToCamel(arg.slice(2));
       const value = argv[i + 1];
       if (value && !value.startsWith("--")) {
         args[key] = value;
@@ -55,10 +59,12 @@ function usage(): string {
   return `Usage:
   pnpm generate --street flop --count 25000 --seed 42 --mode compact [--batch-size 1000] [--resume]
   pnpm generate --all [--seed 42] [--mode compact] [--exact-feature-budget production]
+  pnpm generate --street preflop --preflop-mode canonical169 [--count 169]
 
 Streets: preflop | flop | turn | river
 Preflop default count: 1326 (enumerate all hole-card combos)
 Postflop default count: 25000
+Preflop mode: enumerate1326 | canonical169 | random
 Exact feature budget: production | full`;
 }
 
@@ -71,6 +77,7 @@ async function runOne(
   batchSize: number,
   resume: boolean,
   artifactsRoot: string,
+  preflopMode: "enumerate1326" | "canonical169" | "random",
 ) {
   const outputDir = streetOutputDir(artifactsRoot, street);
   return generateStreetDataset({
@@ -83,7 +90,7 @@ async function runOne(
     outputDir,
     resume,
     artifactsRoot,
-    preflopMode: street === "preflop" ? "enumerate1326" : "random",
+    preflopMode: street === "preflop" ? preflopMode : "random",
   });
 }
 
@@ -96,15 +103,32 @@ async function main() {
 
   const seed = Number(args.seed ?? 42);
   const mode = (args.mode ?? "compact") as FeatureMode;
-  const exactFeatureBudget = (args.exactFeatureBudget ?? "production") as ExactFeatureBudget;
+  const exactFeatureBudget = (
+    args.exactFeatureBudget ??
+    (mode === "extended" ? "full" : "production")
+  ) as ExactFeatureBudget;
   const batchSize = Number(args.batchSize ?? 1000);
   const resume = Boolean(args.resume);
   const artifactsRoot = String(args.artifacts ?? repoArtifactsRoot());
+  const preflopMode = (args.preflopMode ?? "enumerate1326") as
+    | "enumerate1326"
+    | "canonical169"
+    | "random";
 
   if (args.all) {
     for (const street of STREETS) {
       const count = Number(args.count ?? DEFAULT_COUNTS[street]);
-      await runOne(street, count, seed, mode, exactFeatureBudget, batchSize, resume, artifactsRoot);
+      await runOne(
+        street,
+        count,
+        seed,
+        mode,
+        exactFeatureBudget,
+        batchSize,
+        resume,
+        artifactsRoot,
+        preflopMode,
+      );
     }
     return;
   }
@@ -116,7 +140,17 @@ async function main() {
   }
 
   const count = Number(args.count ?? DEFAULT_COUNTS[street]);
-  await runOne(street, count, seed, mode, exactFeatureBudget, batchSize, resume, artifactsRoot);
+  await runOne(
+    street,
+    count,
+    seed,
+    mode,
+    exactFeatureBudget,
+    batchSize,
+    resume,
+    artifactsRoot,
+    preflopMode,
+  );
 }
 
 main().catch((err) => {

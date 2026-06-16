@@ -32,11 +32,3 @@ export class SeededRng {
     return child;
   }
 }
-
-export function shardSeed(baseSeed: number, street: string, batchIndex: number): number {
-  let h = baseSeed >>> 0;
-  for (const ch of street) {
-    h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
-  }
-  return (h ^ batchIndex) >>> 0;
-}

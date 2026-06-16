@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { loadStreetDatasetProgressive } from "@/lib/artifacts/load-street";
+import { loadStreetDatasetProgressive, clearManifestCache } from "@/lib/artifacts/load-street";
 import { applyColorMode, applyFilters, buildLodIndices } from "@/lib/colors/color-modes";
 import { computeBounds } from "@/lib/artifacts/parse-points-bin";
 import type { Street } from "@geometry-of-poker/shared";
@@ -230,6 +230,8 @@ function adaptRenderQuality(state: ViewerState, fps: number): Partial<ViewerStat
   return patch;
 }
 
+let streetLoadGeneration = 0;
+
 export const useViewerStore = create<ViewerState>((set, get) => ({
   street: "flop",
   dataset: null,
@@ -345,11 +347,19 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   },
 
   loadStreet: async () => {
-    const { street, isLoading } = get();
-    if (isLoading) return;
-    set({ isLoading: true, loadError: null });
+    const street = get().street;
+    const generation = ++streetLoadGeneration;
+    clearManifestCache();
+    set({
+      isLoading: true,
+      loadError: null,
+      dataset: null,
+      spatialIndex: null,
+      bounds: null,
+    });
     try {
       const dataset = await loadStreetDatasetProgressive(street, (partial) => {
+        if (get().street !== street || generation !== streetLoadGeneration) return;
         const bounds = computeBounds(partial.positions, partial.count);
         const spatialIndex = new GridSpatialIndex(bounds.radius / 20);
         spatialIndex.build(partial.positions, partial.count);
@@ -368,6 +378,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         });
         set(rebuildVisualization(get()));
       });
+      if (get().street !== street || generation !== streetLoadGeneration) return;
+
       const bounds = computeBounds(dataset.positions, dataset.count);
 
       const spatialIndex = new GridSpatialIndex(bounds.radius / 20);
@@ -391,9 +403,13 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       });
       set(rebuildVisualization(get()));
     } catch (err) {
+      if (generation !== streetLoadGeneration) return;
       set({
         isLoading: false,
         loadError: err instanceof Error ? err.message : String(err),
+        dataset: null,
+        spatialIndex: null,
+        bounds: null,
       });
     }
   },

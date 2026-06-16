@@ -3,7 +3,6 @@ import {
   featureOrderForMode,
   isPokerCalculationsAvailable,
   profileFeatureGroups,
-  validatePokerStateInput,
   type FeatureMode,
   type ExactFeatureBudget,
   type Street,
@@ -13,6 +12,7 @@ import {
   emptyTimingReport,
   ensureDir,
   readProgress,
+  clearShardDir,
   shardsDir,
   streetOutputDir,
   writeJson,
@@ -24,7 +24,6 @@ import {
   formatRecordId,
   resolveStateBatch,
   shardFileName,
-  type PreflopMode,
 } from "./sample-state.js";
 import {
   DATASET_VERSION,
@@ -87,7 +86,6 @@ function recordsFromSampled(
   profileEvery: number,
   featureAgg: FeatureGroupTimingAggregate,
 ): { records: DatasetRecord[]; extractMs: number; featureAgg: FeatureGroupTimingAggregate } {
-  const featureNames = featureOrderForMode(mode);
   const records: DatasetRecord[] = [];
   let extractMs = 0;
   let agg = featureAgg;
@@ -161,7 +159,8 @@ export async function generateStreetDataset(
   }
 
   const mode = options.mode ?? "compact";
-  const exactFeatureBudget = options.exactFeatureBudget ?? "production";
+  const exactFeatureBudget =
+    options.exactFeatureBudget ?? (mode === "extended" ? "full" : "production");
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
   const profileEvery = options.profileSampleEvery ?? DEFAULT_PROFILE_EVERY;
   const sampleJsonCount = options.sampleJsonCount ?? DEFAULT_SAMPLE_COUNT;
@@ -172,6 +171,9 @@ export async function generateStreetDataset(
   const progressPath = join(outputDir, ".generation-progress.json");
 
   await ensureDir(outputDir);
+  if (!options.resume) {
+    await clearShardDir(outputDir);
+  }
   await ensureDir(shardDir);
 
   const featureNames = [...featureOrderForMode(mode)];
@@ -179,6 +181,24 @@ export async function generateStreetDataset(
   const batchCount = Math.ceil(options.count / batchSize);
 
   let progress: GenerationProgress | null = options.resume ? await readProgress(progressPath) : null;
+  if (progress) {
+    const mismatches: string[] = [];
+    if (progress.street !== options.street) mismatches.push("street");
+    if (progress.seed !== options.seed) mismatches.push("seed");
+    if (progress.mode !== mode) mismatches.push("mode");
+    if (progress.exactFeatureBudget !== undefined && progress.exactFeatureBudget !== exactFeatureBudget) {
+      mismatches.push("exactFeatureBudget");
+    }
+    if (progress.targetCount !== options.count) mismatches.push("count");
+    if (progress.batchSize !== batchSize) mismatches.push("batchSize");
+    if (mismatches.length > 0) {
+      throw new Error(
+        `Resume refused: progress file does not match current options (${mismatches.join(", ")}). ` +
+          "Delete .generation-progress.json and shards/ or run without --resume.",
+      );
+    }
+  }
+
   const completedBatches = new Set(progress?.completedBatches ?? []);
 
   if (!progress) {
@@ -186,6 +206,7 @@ export async function generateStreetDataset(
       street: options.street,
       seed: options.seed,
       mode,
+      exactFeatureBudget,
       targetCount: options.count,
       completedCount: 0,
       completedBatches: [],
@@ -195,9 +216,9 @@ export async function generateStreetDataset(
     };
   }
 
-  let timing = emptyTimingReport();
+  let timing = progress.timing ?? emptyTimingReport();
   timing.profileSampleEvery = profileEvery;
-  let featureAgg: FeatureGroupTimingAggregate = {
+  let featureAgg: FeatureGroupTimingAggregate = progress.timing?.featureGroups ?? {
     core: 0,
     board: 0,
     draws: 0,
@@ -268,6 +289,7 @@ export async function generateStreetDataset(
 
     progress.completedCount += records.length;
     progress.completedBatches = [...(progress.completedBatches ?? []), batchIndex];
+    progress.timing = timing;
     completedBatches.add(batchIndex);
     await writeProgress(progressPath, progress);
 
@@ -282,7 +304,10 @@ export async function generateStreetDataset(
 
   const mergedCount = await mergeParquetShards(shardDir, parquetPath, featureNames);
   if (mergedCount !== options.count) {
-    console.warn(`[generate] merged parquet count ${mergedCount} != target ${options.count}`);
+    throw new Error(
+      `Merged parquet count ${mergedCount} does not match target ${options.count}. ` +
+        "Stale shard files may remain in shards/ — delete shards/ and re-run without --resume.",
+    );
   }
 
   const validation = await validateDatasetFromManifest({
@@ -329,6 +354,12 @@ export async function generateStreetDataset(
 
   console.log(`[generate] done ${options.street}: ${options.count} records -> ${outputDir}`);
   console.log(`[generate] validation: ${validation.valid ? "PASS" : "FAIL"}`);
+  if (!validation.valid) {
+    for (const err of validation.errors) {
+      console.error(`[generate] validation error: ${err}`);
+    }
+    throw new Error(`Dataset validation failed for ${options.street}`);
+  }
   console.log(`[generate] throughput: ${timing.statesPerSecond.toFixed(2)} states/s`);
 
   return { manifest, summary, outputDir };

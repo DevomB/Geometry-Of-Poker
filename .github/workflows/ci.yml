@@ -26,14 +26,28 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: |
+          pnpm --filter @geometry-of-poker/shared build
+          pnpm --filter @geometry-of-poker/feature-engine build
+          pnpm --filter @geometry-of-poker/dataset-generator build
+
+      - name: Prepare CI fixture artifacts
+        run: node scripts/ci-prepare-fixture-artifacts.mjs
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
 
+      - name: Shared tests
+        run: pnpm --filter @geometry-of-poker/shared test
+
       - name: Web tests
         run: pnpm --filter @geometry-of-poker/web test
+        env:
+          GOP_REQUIRE_NATIVE: "1"
 
       - name: Feature engine tests
         run: pnpm --filter @geometry-of-poker/feature-engine test
@@ -43,5 +57,10 @@ jobs:
       - name: Dataset generator tests
         run: pnpm --filter @geometry-of-poker/dataset-generator test
 
-      - name: Artifact validator smoke
-        run: pnpm validate:artifacts -- --help
+      - name: Validate CI fixture release
+        run: pnpm validate:artifacts -- --release-id ci-fixture
+
+      - name: Build web app
+        run: pnpm --filter @geometry-of-poker/web build
+        env:
+          CI: "true"

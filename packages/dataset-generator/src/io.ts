@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
   DatasetManifest,
@@ -17,6 +17,10 @@ export function streetOutputDir(artifactsRoot: string, street: string): string {
 
 export function shardsDir(outputDir: string): string {
   return join(outputDir, "shards");
+}
+
+export async function clearShardDir(outputDir: string): Promise<void> {
+  await rm(shardsDir(outputDir), { recursive: true, force: true });
 }
 
 export async function writeJson(filePath: string, data: unknown): Promise<void> {

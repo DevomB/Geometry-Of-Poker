@@ -12,6 +12,7 @@ import type { BrowserMetadata } from "@/lib/types";
 import { createArtifactFixture } from "./fixture-artifacts";
 
 const fixture = createArtifactFixture();
+const requireNative = process.env.GOP_REQUIRE_NATIVE === "1";
 let healthGET: typeof import("@/app/api/health/route").GET;
 let manifestsGET: typeof import("@/app/api/manifests/route").GET;
 let projectPOST: typeof import("@/app/api/project/route").POST;
@@ -84,6 +85,11 @@ describe("api routes", () => {
       request({ hero: ["Ah", "Ad"], board: ["2c", "7h", "Jh"], street: "flop" }),
     );
     const body = (await res.json()) as ProjectResponse | ApiErrorResponse;
+    if (requireNative) {
+      expect(res.status).toBe(200);
+      expect((body as ProjectResponse).projectionMethod).toBe("pca-knn-interpolation");
+      return;
+    }
     if (res.status === 200) {
       expect((body as ProjectResponse).projectionMethod).toBe("pca-knn-interpolation");
       expect(Number.isFinite((body as ProjectResponse).projectedPoint.x)).toBe(true);
@@ -136,6 +142,11 @@ describe("api routes", () => {
       request({ hero: ["Ah", "Ad"], board: ["2c", "7h", "Jh"], deadCards: ["Qs"], street: "flop" }),
     );
     const body = (await res.json()) as ProjectResponse | ApiErrorResponse;
+    if (requireNative) {
+      expect(res.status).toBe(200);
+      expect((body as ProjectResponse).state.deadCards).toEqual(["Qs"]);
+      return;
+    }
     if (res.status === 200) {
       expect((body as ProjectResponse).state.deadCards).toEqual(["Qs"]);
     } else {
@@ -152,6 +163,14 @@ describe("api routes", () => {
         body: JSON.stringify({ hero: ["8d", "2d"], board: ["4h", "9h", "Tc", "3d"] }),
       }),
     );
+    if (requireNative) {
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as StateResponse;
+      expect(body.state.street).toBe("turn");
+      expect(body.combinatorics.knownCards).toBe(6);
+      expect(body.features.draws).toBeDefined();
+      return;
+    }
     if (res.status === 503) {
       const body = (await res.json()) as ApiErrorResponse;
       expect(body.error.code).toBe("FEATURE_ENGINE_UNAVAILABLE");

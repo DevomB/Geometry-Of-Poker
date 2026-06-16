@@ -7,6 +7,7 @@ import type { Street } from "@geometry-of-poker/shared";
 import { resetCameraView } from "@/features/scene/SceneShell";
 import { CardPickerPanel } from "@/features/card-picker/CardPickerPanel";
 import { ColorLegend } from "@/components/ColorLegend";
+import { humanCategory } from "@/lib/poker/human-category";
 import {
   computeStreetAtlas,
   formatAtlasValue,
@@ -579,10 +580,6 @@ function FilterChip({
       {label}
     </button>
   );
-}
-
-function humanCategory(name: string): string {
-  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
 function Toggle({

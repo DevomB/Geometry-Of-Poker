@@ -24,6 +24,9 @@ Optional:
   --flop-count 20
   --turn-count 20
   --river-count 20
+  --streets preflop,flop,turn,river
+  --resume
+  --batch-size 1000
   --vcpus 4
   --memory-mb 30720
   --exact-feature-budget production
@@ -47,13 +50,17 @@ function main() {
   const flopCount = argValue("--flop-count");
   const turnCount = argValue("--turn-count");
   const riverCount = argValue("--river-count");
+  const streets = argValue("--streets");
+  const batchSize = argValue("--batch-size");
   const vcpus = argValue("--vcpus");
   const memoryMb = argValue("--memory-mb");
   const skipUpload = process.argv.includes("--skip-upload");
+  const resume = process.argv.includes("--resume");
 
   const environment = [{ name: "GOP_RELEASE_ID", value: releaseId }];
   if (bucket) environment.push({ name: "GOP_ARTIFACT_BUCKET", value: bucket });
   if (skipUpload) environment.push({ name: "GOP_SKIP_UPLOAD", value: "1" });
+  if (resume) environment.push({ name: "GOP_RESUME", value: "1" });
   if (exactFeatureBudget) {
     environment.push({ name: "GOP_EXACT_FEATURE_BUDGET", value: exactFeatureBudget });
   }
@@ -61,6 +68,8 @@ function main() {
   if (flopCount) environment.push({ name: "GOP_FLOP_COUNT", value: flopCount });
   if (turnCount) environment.push({ name: "GOP_TURN_COUNT", value: turnCount });
   if (riverCount) environment.push({ name: "GOP_RIVER_COUNT", value: riverCount });
+  if (streets) environment.push({ name: "GOP_STREETS", value: streets });
+  if (batchSize) environment.push({ name: "GOP_BATCH_SIZE", value: batchSize });
 
   const resourceRequirements = [];
   if (vcpus) resourceRequirements.push({ type: "VCPU", value: vcpus });

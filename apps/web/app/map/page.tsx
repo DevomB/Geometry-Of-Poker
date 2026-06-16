@@ -92,7 +92,7 @@ export default async function MapPage() {
   const releaseStats = await loadReleaseStats();
 
   return (
-    <main className="min-h-screen bg-[#08080c] text-zinc-200">
+    <main className="min-h-screen bg-[var(--surface-base)] text-zinc-200">
       <div className="mx-auto max-w-6xl px-6 py-8">
         <header className="border-b border-white/10 pb-8">
           <Link href="/" className="text-xs text-zinc-500 transition hover:text-zinc-300">

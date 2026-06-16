@@ -9,8 +9,8 @@ export function ApiDocsShell({
   activeSlug?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[#08080c] text-zinc-200">
-      <div className="border-b border-white/10 bg-[#0a0a0f]/90 backdrop-blur-md">
+    <div className="min-h-screen bg-[var(--surface-base)] text-zinc-200">
+      <div className="border-b border-white/10 bg-[var(--surface-1)]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">

@@ -12,7 +12,7 @@ export default function ResearchPage() {
   const docs = getResearchDocs();
 
   return (
-    <main className="min-h-screen bg-[#0a0a0f]">
+    <main className="min-h-screen bg-[var(--surface-base)] text-zinc-200">
       <AboutResearchContent />
 
       <section className="mx-auto max-w-5xl border-t border-white/10 px-6 py-10">

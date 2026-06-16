@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Street } from "@geometry-of-poker/shared";
+import { categoryIndexForLabel } from "@geometry-of-poker/shared";
 import { parseChannelsBin } from "@/lib/artifacts/parse-channels-bin";
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";
 import { parseProjectionIndex } from "@/lib/artifacts/parse-projection-index";
@@ -34,7 +35,7 @@ function pointsFor(street: Street) {
       hero: ["Qh", "Qs"] as [string, string],
       board: board[street],
       clusterId: 1,
-      category: "pair",
+      category: "onePair",
       equityVsRandom: 0.74,
       x: 1,
       y: 0.5,
@@ -87,7 +88,7 @@ function writeChannels(path: string, points: ReturnType<typeof pointsFor>) {
   points.forEach((p, i) => {
     equity.writeFloatLE(p.equityVsRandom, i * 4);
     clusterId.writeInt16LE(p.clusterId, i * 2);
-    categoryIndex.writeUInt8(p.category === "pair" ? 1 : 0, i);
+    categoryIndex.writeUInt8(categoryIndexForLabel(p.category), i);
     pNuts.writeFloatLE(p.summary.pNuts ?? 0, i * 4);
   });
   writeFileSync(
@@ -131,7 +132,7 @@ function writeProjectionIndex(path: string, points: ReturnType<typeof pointsFor>
   const labels = Buffer.alloc(points.length * 2);
   points.forEach((p, i) => {
     pca.writeFloatLE(p.equityVsRandom, i * 8);
-    pca.writeFloatLE(p.category === "pair" ? 1 : 0, i * 8 + 4);
+    pca.writeFloatLE(categoryIndexForLabel(p.category), i * 8 + 4);
     embedding.writeFloatLE(p.x, i * 12);
     embedding.writeFloatLE(p.y, i * 12 + 4);
     embedding.writeFloatLE(p.z, i * 12 + 8);
@@ -161,7 +162,7 @@ export function createArtifactFixture() {
       retainedFeatures: ["equityVsRandom", "categoryIndex"],
       retainedDimension: 2,
       originalDimension: 2,
-      categories: ["highCard", "pair"],
+      categories: ["highCard", "onePair"],
       clusters: [{ id: 0, size: 1, centroid: [0, 0, 0] }],
       artifacts: {
         pointsBin: "browser-points.bin",

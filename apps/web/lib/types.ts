@@ -211,7 +211,7 @@ export interface CameraFlyTarget {
 
 export const CATEGORY_PALETTE: Record<string, [number, number, number]> = {
   highCard: [0.55, 0.58, 0.62],
-  pair: [0.35, 0.62, 0.95],
+  onePair: [0.35, 0.62, 0.95],
   twoPair: [0.42, 0.78, 0.72],
   threeOfAKind: [0.92, 0.62, 0.28],
   straight: [0.78, 0.42, 0.88],

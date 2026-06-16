@@ -14,6 +14,8 @@ RIVER_COUNT="${GOP_RIVER_COUNT:-25000}"
 SKIP_UPLOAD="${GOP_SKIP_UPLOAD:-0}"
 S3_BUCKET="${GOP_ARTIFACT_BUCKET:-}"
 S3_PREFIX="${GOP_S3_PREFIX:-}"
+RESUME_GENERATION="${GOP_RESUME:-0}"
+STREETS_FILTER="${GOP_STREETS:-preflop,flop,turn,river}"
 
 if [[ -z "$RELEASE_ID" ]]; then
   echo "GOP_RELEASE_ID is required, for example 2026-06-balanced-small-1." >&2
@@ -24,6 +26,8 @@ if [[ "$SKIP_UPLOAD" != "1" && -z "$S3_BUCKET" ]]; then
   echo "GOP_ARTIFACT_BUCKET is required unless GOP_SKIP_UPLOAD=1." >&2
   exit 2
 fi
+
+IFS=',' read -r -a STREETS <<< "$STREETS_FILTER"
 
 street_count() {
   case "$1" in
@@ -39,6 +43,10 @@ generate_street() {
   local street="$1"
   local count
   count="$(street_count "$street")"
+  local resume_args=()
+  if [[ "$RESUME_GENERATION" == "1" ]]; then
+    resume_args+=(--resume)
+  fi
   echo "[release-worker] generate $street count=$count seed=$SEED mode=$MODE exactFeatureBudget=$EXACT_FEATURE_BUDGET"
   pnpm generate -- \
     --street "$street" \
@@ -48,7 +56,26 @@ generate_street() {
     --exact-feature-budget "$EXACT_FEATURE_BUDGET" \
     --batch-size "$BATCH_SIZE" \
     --artifacts "$ARTIFACTS_ROOT" \
-    --resume
+    "${resume_args[@]}"
+}
+
+upload_dataset_checkpoint() {
+  local street="$1"
+  if [[ "$SKIP_UPLOAD" == "1" || -z "$S3_BUCKET" ]]; then
+    return 0
+  fi
+  local dest_prefix="${S3_PREFIX%/}"
+  local dest
+  if [[ -n "$dest_prefix" ]]; then
+    dest="s3://$S3_BUCKET/$dest_prefix/releases/$RELEASE_ID/datasets/$street/"
+  else
+    dest="s3://$S3_BUCKET/releases/$RELEASE_ID/datasets/$street/"
+  fi
+  echo "[release-worker] checkpoint dataset $street -> $dest"
+  aws s3 cp "$ARTIFACTS_ROOT/datasets/$street/" "$dest" \
+    --recursive \
+    --only-show-errors \
+    --cache-control "private,max-age=0"
 }
 
 embed_street() {
@@ -62,8 +89,9 @@ embed_street() {
     --skip-analysis
 }
 
-for street in preflop flop turn river; do
+for street in "${STREETS[@]}"; do
   generate_street "$street"
+  upload_dataset_checkpoint "$street"
   embed_street "$street"
 done
 

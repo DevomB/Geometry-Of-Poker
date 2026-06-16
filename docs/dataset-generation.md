@@ -4,7 +4,7 @@ Reproducible per-street datasets via `@geometry-of-poker/dataset-generator`.
 
 ## Requirements
 
-- Working `poker-calculations` native addon (Node 18-22 with matching prebuild)
+- Working `poker-calculations` native addon (Node 22 with matching prebuild)
 - ~2 GB RAM for 25k postflop streets (compact mode)
 
 Production-sized dataset generation must run on AWS Batch or another approved remote compute target. Laptop runs are limited to tiny smoke tests, typically tens of records.

@@ -30,6 +30,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ metrics });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("Unable to load poker-calculations")) {
+      return apiError(
+        503,
+        "FEATURE_ENGINE_UNAVAILABLE",
+        "Native poker-calculations binding is required for exact runout metrics.",
+      );
+    }
     return apiError(500, "STATE_METRICS_FAILED", message);
   }
 }

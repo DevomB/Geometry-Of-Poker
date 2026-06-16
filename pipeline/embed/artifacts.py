@@ -8,23 +8,12 @@ import numpy as np
 import pandas as pd
 
 from .load import metadata_frame, parse_board, summary_metrics_row
+from .categories import category_index_for_label
 
 
 BINARY_MAGIC = b"GOPK"
 CHANNEL_MAGIC = b"GOPC"
 BINARY_VERSION = 1
-CATEGORY_INDEX = {
-    "highCard": 0,
-    "pair": 1,
-    "twoPair": 2,
-    "threeOfAKind": 3,
-    "straight": 4,
-    "flush": 5,
-    "fullHouse": 6,
-    "fourOfAKind": 7,
-    "straightFlush": 8,
-    "royalFlush": 9,
-}
 
 
 def write_browser_points(path: Path, coords: np.ndarray) -> None:
@@ -44,7 +33,7 @@ def write_browser_channels(path: Path, embedding_df: pd.DataFrame) -> None:
         embedding_df["equity_vs_random"].to_numpy(dtype=np.float32).tobytes(order="C"),
         embedding_df["cluster_id"].to_numpy(dtype=np.int16).tobytes(order="C"),
         np.array(
-            [CATEGORY_INDEX.get(str(v), 0) for v in embedding_df["category"]],
+            [category_index_for_label(str(v)) for v in embedding_df["category"]],
             dtype=np.uint8,
         ).tobytes(order="C"),
         embedding_df.get("summary_pNuts", pd.Series(np.zeros(count))).to_numpy(dtype=np.float32).tobytes(order="C"),

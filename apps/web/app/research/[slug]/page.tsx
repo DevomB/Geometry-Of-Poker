@@ -27,7 +27,7 @@ export default async function ResearchDocPage({ params }: ResearchDocPageProps) 
   if (!doc) notFound();
 
   return (
-    <main className="min-h-screen bg-[#08080c] text-zinc-200">
+    <main className="min-h-screen bg-[var(--surface-base)] text-zinc-200">
       <article className="mx-auto max-w-4xl px-6 py-8">
         <header className="border-b border-white/10 pb-8">
           <div className="flex items-center justify-between gap-4">

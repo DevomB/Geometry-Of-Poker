@@ -46,6 +46,7 @@ import {
   describeProjectionMethod,
   summarizeProjectionLocality,
 } from "@/lib/visualization-theme";
+import { humanCategory } from "@/lib/poker/human-category";
 
 export function InspectorPanel() {
   const dataset = useViewerStore((s) => s.dataset);
@@ -1273,10 +1274,6 @@ function equityBarFromValue(eq: number) {
       />
     </div>
   );
-}
-
-function humanCategory(name: string): string {
-  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
 function formatSignedPercent(value: number) {

@@ -1,4 +1,5 @@
 import type { Street } from "@geometry-of-poker/shared";
+import { categoryIndexForLabel, INDEX_CATEGORY } from "@geometry-of-poker/shared";
 import type {
   BrowserMetadata,
   BrowserPointMeta,
@@ -6,20 +7,13 @@ import type {
   StreetManifest,
 } from "@/lib/types";
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";
-import { parseChannelsBin, type BrowserChannels } from "@/lib/artifacts/parse-channels-bin";
+import { parseChannelsBin } from "@/lib/artifacts/parse-channels-bin";
+import {
+  buildChannelsFromMetadata,
+  buildEmptyChannels,
+} from "@/lib/artifacts/build-channels";
 
-const CATEGORY_INDEX: Record<string, number> = {
-  highCard: 0,
-  pair: 1,
-  twoPair: 2,
-  threeOfAKind: 3,
-  straight: 4,
-  flush: 5,
-  fullHouse: 6,
-  fourOfAKind: 7,
-  straightFlush: 8,
-  royalFlush: 9,
-};
+export { INDEX_CATEGORY, categoryIndexForLabel };
 
 interface ManifestsResponse {
   artifactMode: "public" | "blob";
@@ -28,18 +22,29 @@ interface ManifestsResponse {
 
 let manifestCache: Promise<ManifestsResponse> | null = null;
 
+export function clearManifestCache(): void {
+  manifestCache = null;
+}
+
 function loadManifests() {
-  manifestCache ??= fetch("/api/manifests").then(async (res) => {
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      const message =
-        typeof body?.error?.message === "string"
-          ? body.error.message
-          : `Failed to load artifact manifests: ${res.status}`;
-      throw new Error(message);
-    }
-    return res.json() as Promise<ManifestsResponse>;
-  });
+  if (!manifestCache) {
+    manifestCache = fetch("/api/manifests")
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          const message =
+            typeof body?.error?.message === "string"
+              ? body.error.message
+              : `Failed to load artifact manifests: ${res.status}`;
+          throw new Error(message);
+        }
+        return res.json() as Promise<ManifestsResponse>;
+      })
+      .catch((err) => {
+        manifestCache = null;
+        throw err;
+      });
+  }
   return manifestCache;
 }
 
@@ -80,60 +85,7 @@ export async function fetchChannelsBin(street: Street): Promise<ArrayBuffer | nu
   return res.arrayBuffer();
 }
 
-export function buildChannels(metadata: BrowserPointMeta[], count: number): BrowserChannels {
-  const equity = new Float32Array(count);
-  const clusterId = new Int16Array(count);
-  const categoryIndex = new Uint8Array(count);
-  const pNuts = new Float32Array(count);
-  const equityVariance = new Float32Array(count);
-  const boardConnectivity = new Float32Array(count);
-  const boardRainbow = new Uint8Array(count);
-  const boardTwoTone = new Uint8Array(count);
-  const boardMonotone = new Uint8Array(count);
-  const boardPairedness = new Float32Array(count);
-
-  for (let i = 0; i < count; i++) {
-    const p = metadata[i]!;
-    equity[i] = p.equityVsRandom;
-    clusterId[i] = p.clusterId;
-    categoryIndex[i] = CATEGORY_INDEX[p.category] ?? 0;
-    pNuts[i] = p.summary.pNuts ?? 0;
-    equityVariance[i] = p.summary.equityVariance ?? 0;
-    boardConnectivity[i] = p.summary.boardConnectivityScore ?? 0;
-    boardRainbow[i] = (p.summary.boardRainbowFlag ?? 0) > 0.5 ? 1 : 0;
-    boardTwoTone[i] = (p.summary.boardTwoToneFlag ?? 0) > 0.5 ? 1 : 0;
-    boardMonotone[i] = (p.summary.boardMonotoneFlag ?? 0) > 0.5 ? 1 : 0;
-    boardPairedness[i] = p.summary.boardPairednessScore ?? 0;
-  }
-
-  return {
-    equity,
-    clusterId,
-    categoryIndex,
-    pNuts,
-    equityVariance,
-    boardConnectivity,
-    boardRainbow,
-    boardTwoTone,
-    boardMonotone,
-    boardPairedness,
-  };
-}
-
-function buildEmptyChannels(count: number): BrowserChannels {
-  return {
-    equity: new Float32Array(count),
-    clusterId: new Int16Array(count),
-    categoryIndex: new Uint8Array(count),
-    pNuts: new Float32Array(count),
-    equityVariance: new Float32Array(count),
-    boardConnectivity: new Float32Array(count),
-    boardRainbow: new Uint8Array(count),
-    boardTwoTone: new Uint8Array(count),
-    boardMonotone: new Uint8Array(count),
-    boardPairedness: new Float32Array(count),
-  };
-}
+export const buildChannels = buildChannelsFromMetadata;
 
 function idToIndex(metadata: BrowserPointMeta[]) {
   const map = new Map<string, number>();
@@ -254,4 +206,4 @@ export async function loadStreetDatasetProgressive(
   };
 }
 
-export { parsePointsBin, CATEGORY_INDEX };
+export { parsePointsBin };

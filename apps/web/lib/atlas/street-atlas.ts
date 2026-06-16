@@ -1,4 +1,5 @@
 import type { StreetDataset } from "@/lib/types";
+import { humanCategory } from "@/lib/poker/human-category";
 
 export interface AtlasMetric {
   id: string;
@@ -102,8 +103,4 @@ function slicesFromMap<T>(
       share: total > 0 ? count / total : 0,
     }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-}
-
-function humanCategory(name: string): string {
-  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }

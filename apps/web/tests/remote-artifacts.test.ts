@@ -39,7 +39,7 @@ describe("remote artifact availability", () => {
     expect(body.availableStreets).toEqual([]);
   });
 
-  it("maps missing remote manifests to ARTIFACTS_UNAVAILABLE", async () => {
+  it("returns empty streets when remote manifests are unavailable", async () => {
     process.env.GOP_ARTIFACT_BASE_URL = "https://artifacts.example/releases/test";
     vi.stubGlobal(
       "fetch",
@@ -53,9 +53,9 @@ describe("remote artifact availability", () => {
     ]);
 
     const manifests = await GET();
-    const manifestsBody = (await manifests.json()) as ApiErrorResponse;
-    expect(manifests.status).toBe(503);
-    expect(manifestsBody.error.code).toBe("ARTIFACTS_UNAVAILABLE");
+    const manifestsBody = (await manifests.json()) as { streets: Record<string, unknown> };
+    expect(manifests.status).toBe(200);
+    expect(manifestsBody.streets).toEqual({});
 
     const project = await POST(projectRequest());
     const projectBody = (await project.json()) as ApiErrorResponse;

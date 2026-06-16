@@ -25,7 +25,7 @@ function fixtureDataset(): StreetDataset {
       hero: ["Qh", "Qs"] as [string, string],
       board: ["2c", "7h", "Jh"],
       clusterId: 0,
-      category: "pair",
+      category: "onePair",
       equityVsRandom: 0.6,
       x: 1,
       y: 0,
@@ -56,7 +56,7 @@ function fixtureDataset(): StreetDataset {
       retainedFeatures: [],
       retainedDimension: 0,
       originalDimension: 0,
-      categories: ["highCard", "pair"],
+      categories: ["highCard", "onePair"],
       clusters: [],
       artifacts: { pointsBin: "", metadataJson: "" },
     },
@@ -102,7 +102,7 @@ describe("cluster profile", () => {
     expect(equity?.streetMean).toBeCloseTo((0.2 + 0.6 + 0.9) / 3);
     expect(profile?.categories.map((category) => category.label).sort()).toEqual([
       "highCard",
-      "pair",
+      "onePair",
     ]);
   });
 

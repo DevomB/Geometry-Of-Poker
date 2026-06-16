@@ -138,6 +138,26 @@ pnpm aws:submit-release -- \
   --exact-feature-budget production
 ```
 
+To canary **one street at target N** (for example flop at 50k) without re-running the full release loop, set `GOP_STREETS` on the worker:
+
+```bash
+# Batch job env (or local docker run):
+GOP_STREETS=flop GOP_FLOP_COUNT=50000 GOP_SKIP_UPLOAD=1 GOP_RESUME=0
+```
+
+Or via `submit-release-job`:
+
+```bash
+pnpm aws:submit-release -- \
+  --region us-east-1 \
+  --release-id canary-flop-50k \
+  --skip-upload \
+  --streets flop \
+  --flop-count 50000
+```
+
+The worker checkpoints each street's dataset to S3 after generation (`upload_dataset_checkpoint`) so a per-street embed failure does not discard completed parquet.
+
 Do not submit a balanced-small job with `GOP_EXACT_FEATURE_BUDGET=full` without an explicit cost/runtime review. Full exact equity, runout, card-removal, and transition features are intended for small research runs; production balanced-small uses bounded compact features. The release worker also passes `--skip-analysis` so production jobs do not rerun research-only UMAP feature-group and seed-stability experiments.
 
 Read the CloudFormation outputs for:

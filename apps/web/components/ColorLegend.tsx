@@ -3,6 +3,7 @@
 import type { ColorMode, StreetDataset } from "@/lib/types";
 import { CATEGORY_PALETTE, CLUSTER_PALETTE } from "@/lib/types";
 import { COLOR_MODE_META, rgbCss } from "@/lib/visualization-theme";
+import { humanCategory } from "@/lib/poker/human-category";
 
 interface ColorLegendProps {
   mode: ColorMode;
@@ -123,8 +124,4 @@ function ClusterSwatches({ dataset }: { dataset: StreetDataset | null }) {
       </li>
     </ul>
   );
-}
-
-function humanCategory(name: string): string {
-  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }

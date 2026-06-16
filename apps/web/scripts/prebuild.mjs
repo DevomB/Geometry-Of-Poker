@@ -15,9 +15,10 @@ run("pnpm", ["--filter", "@geometry-of-poker/shared", "build"]);
 run("pnpm", ["--filter", "@geometry-of-poker/feature-engine", "build"]);
 
 const isVercelBuild = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+const hasRemoteArtifacts = Boolean(process.env.GOP_ARTIFACT_BASE_URL?.trim());
 
 if (isVercelBuild) {
-  if (!process.env.GOP_ARTIFACT_BASE_URL?.trim()) {
+  if (!hasRemoteArtifacts) {
     if (process.env.VERCEL_ENV !== "production") {
       console.warn("Skipping local artifact sync; Vercel preview build has no GOP_ARTIFACT_BASE_URL.");
       process.exit(0);
@@ -27,6 +28,11 @@ if (isVercelBuild) {
     );
   }
   console.log("Skipping local artifact sync; Vercel uses GOP_ARTIFACT_BASE_URL.");
+  process.exit(0);
+}
+
+if (process.env.CI === "true" && !hasRemoteArtifacts) {
+  console.log("Skipping local artifact sync; CI uses prepared fixture artifacts.");
   process.exit(0);
 }
 

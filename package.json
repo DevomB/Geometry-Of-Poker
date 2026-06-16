@@ -8,7 +8,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm --filter @geometry-of-poker/web lint && eslint packages/shared/src packages/feature-engine/src packages/dataset-generator/src",
     "generate": "pnpm --filter @geometry-of-poker/dataset-generator generate",
     "generate:all": "pnpm generate -- --all --seed 42 --mode compact",
     "pipeline:extract": "pnpm --filter @geometry-of-poker/feature-engine extract",
@@ -26,5 +26,9 @@
     "node": ">=22 <23",
     "pnpm": ">=9"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "eslint": "^9.28.0",
+    "typescript-eslint": "^8.32.0"
+  }
 }

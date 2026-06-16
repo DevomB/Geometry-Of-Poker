@@ -28,12 +28,14 @@ export interface GenerationProgress {
   street: Street;
   seed: number;
   mode: FeatureMode;
+  exactFeatureBudget: ExactFeatureBudget;
   targetCount: number;
   completedCount: number;
   completedBatches: number[];
   batchSize: number;
   startedAt: string;
   updatedAt: string;
+  timing?: GenerationTimingReport;
 }
 
 export interface BatchTimingStats {

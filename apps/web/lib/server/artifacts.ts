@@ -9,7 +9,7 @@ import type { BrowserMetadata, StreetDataset, StreetManifest } from "@/lib/types
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";
 import { parseChannelsBin } from "@/lib/artifacts/parse-channels-bin";
 import { parseProjectionIndex } from "@/lib/artifacts/parse-projection-index";
-import { CATEGORY_INDEX } from "@/lib/artifacts/load-street";
+import { buildChannelsFromMetadata } from "@/lib/artifacts/build-channels";
 
 export const AVAILABLE_STREETS: Street[] = ["preflop", "flop", "turn", "river"];
 export const APP_VERSION = "0.1.0";
@@ -120,93 +120,22 @@ export function loadStreetDatasetSync(street: Street): StreetDataset {
   const channelsPath = join(dir, "browser-channels.bin");
   const channelsBin = existsSync(channelsPath) ? readFileSync(channelsPath) : null;
   const projectionIndexBin = readFileSync(join(dir, "projection-index.bin"));
-  const arrayBuffer = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
-  const projectionArrayBuffer = projectionIndexBin.buffer.slice(
-    projectionIndexBin.byteOffset,
-    projectionIndexBin.byteOffset + projectionIndexBin.byteLength,
-  );
-  const parsed = parsePointsBin(arrayBuffer as ArrayBuffer);
-  const projectionIndex = parseProjectionIndex(projectionArrayBuffer as ArrayBuffer);
-  const count = parsed.count;
-  const points = metadata.points;
-
-  if (manifest.street !== street || metadata.street !== street) {
-    throw new Error(`Artifact street mismatch for ${street}.`);
-  }
-  if (manifest.pointCount !== count || metadata.count !== count || points.length !== count) {
-    throw new Error(`Artifact point-count mismatch for ${street}.`);
-  }
-  if (projectionIndex.count !== count) {
-    throw new Error(`Projection index point-count mismatch for ${street}.`);
-  }
-
-  const idToIndex = new Map<string, number>();
-  points.forEach((p, i) => idToIndex.set(p.id, i));
-
-  let channels: StreetDataset["channels"];
-  if (channelsBin) {
-    const channelArrayBuffer = channelsBin.buffer.slice(
-      channelsBin.byteOffset,
-      channelsBin.byteOffset + channelsBin.byteLength,
-    );
-    const parsedChannels = parseChannelsBin(channelArrayBuffer as ArrayBuffer);
-    if (parsedChannels.count !== count) {
-      throw new Error(`Channel point-count mismatch for ${street}.`);
-    }
-    channels = parsedChannels.channels;
-  } else {
-    const equity = new Float32Array(count);
-    const clusterId = new Int16Array(count);
-    const categoryIndex = new Uint8Array(count);
-    const pNuts = new Float32Array(count);
-    const equityVariance = new Float32Array(count);
-    const boardConnectivity = new Float32Array(count);
-    const boardRainbow = new Uint8Array(count);
-    const boardTwoTone = new Uint8Array(count);
-    const boardMonotone = new Uint8Array(count);
-    const boardPairedness = new Float32Array(count);
-
-    points.forEach((p, i) => {
-      equity[i] = p.equityVsRandom;
-      clusterId[i] = p.clusterId;
-      categoryIndex[i] = CATEGORY_INDEX[p.category] ?? 0;
-      pNuts[i] = p.summary.pNuts ?? 0;
-      equityVariance[i] = p.summary.equityVariance ?? 0;
-      boardConnectivity[i] = p.summary.boardConnectivityScore ?? 0;
-      boardRainbow[i] = (p.summary.boardRainbowFlag ?? 0) > 0.5 ? 1 : 0;
-      boardTwoTone[i] = (p.summary.boardTwoToneFlag ?? 0) > 0.5 ? 1 : 0;
-      boardMonotone[i] = (p.summary.boardMonotoneFlag ?? 0) > 0.5 ? 1 : 0;
-      boardPairedness[i] = p.summary.boardPairednessScore ?? 0;
-    });
-    channels = {
-      equity,
-      clusterId,
-      categoryIndex,
-      pNuts,
-      equityVariance,
-      boardConnectivity,
-      boardRainbow,
-      boardTwoTone,
-      boardMonotone,
-      boardPairedness,
-    };
-  }
-
-  const dataset: StreetDataset = {
+  const dataset = buildDataset(
     street,
     manifest,
-    positions: parsed.positions,
-    baseColors: new Float32Array(count * 3),
-    baseSizes: new Float32Array(count),
-    colors: new Float32Array(count * 3),
-    sizes: new Float32Array(count),
-    visible: new Uint8Array(count),
-    count,
-    metadata: points,
-    channels,
-    idToIndex,
-    projectionIndex,
-  };
+    metadata,
+    bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength) as ArrayBuffer,
+    channelsBin
+      ? (channelsBin.buffer.slice(
+          channelsBin.byteOffset,
+          channelsBin.byteOffset + channelsBin.byteLength,
+        ) as ArrayBuffer)
+      : null,
+    projectionIndexBin.buffer.slice(
+      projectionIndexBin.byteOffset,
+      projectionIndexBin.byteOffset + projectionIndexBin.byteLength,
+    ) as ArrayBuffer,
+  );
   cache.set(street, dataset);
   return dataset;
 }
@@ -248,41 +177,7 @@ function buildDataset(
     }
     channels = parsedChannels.channels;
   } else {
-    const equity = new Float32Array(count);
-    const clusterId = new Int16Array(count);
-    const categoryIndex = new Uint8Array(count);
-    const pNuts = new Float32Array(count);
-    const equityVariance = new Float32Array(count);
-    const boardConnectivity = new Float32Array(count);
-    const boardRainbow = new Uint8Array(count);
-    const boardTwoTone = new Uint8Array(count);
-    const boardMonotone = new Uint8Array(count);
-    const boardPairedness = new Float32Array(count);
-
-    points.forEach((p, i) => {
-      equity[i] = p.equityVsRandom;
-      clusterId[i] = p.clusterId;
-      categoryIndex[i] = CATEGORY_INDEX[p.category] ?? 0;
-      pNuts[i] = p.summary.pNuts ?? 0;
-      equityVariance[i] = p.summary.equityVariance ?? 0;
-      boardConnectivity[i] = p.summary.boardConnectivityScore ?? 0;
-      boardRainbow[i] = (p.summary.boardRainbowFlag ?? 0) > 0.5 ? 1 : 0;
-      boardTwoTone[i] = (p.summary.boardTwoToneFlag ?? 0) > 0.5 ? 1 : 0;
-      boardMonotone[i] = (p.summary.boardMonotoneFlag ?? 0) > 0.5 ? 1 : 0;
-      boardPairedness[i] = p.summary.boardPairednessScore ?? 0;
-    });
-    channels = {
-      equity,
-      clusterId,
-      categoryIndex,
-      pNuts,
-      equityVariance,
-      boardConnectivity,
-      boardRainbow,
-      boardTwoTone,
-      boardMonotone,
-      boardPairedness,
-    };
+    channels = buildChannelsFromMetadata(points, count);
   }
 
   return {

@@ -8,6 +8,21 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const HAND_CATEGORIES = JSON.parse(
+  readFileSync(join(__dirname, "../../../packages/shared/src/hand-categories.json"), "utf8"),
+);
+const CATEGORY_INDEX = Object.fromEntries(
+  HAND_CATEGORIES.labels.map((label, index) => [label, index]),
+);
+for (const [alias, canonical] of Object.entries(HAND_CATEGORIES.aliases ?? {})) {
+  if (canonical in CATEGORY_INDEX) {
+    CATEGORY_INDEX[alias] = CATEGORY_INDEX[canonical];
+  }
+}
+
+function categoryIndexForLabel(label) {
+  return CATEGORY_INDEX[label] ?? 0;
+}
 const EMBEDDINGS_ROOT = join(__dirname, "../../../artifacts/embeddings");
 function argValue(name) {
   const index = process.argv.indexOf(name);
@@ -28,18 +43,6 @@ const STREETS = ["preflop", "flop", "turn", "river"];
 const BINARY_MAGIC = Buffer.from("GOPK");
 const CHANNEL_MAGIC = Buffer.from("GOPC");
 const BINARY_VERSION = 1;
-const CATEGORY_INDEX = {
-  highCard: 0,
-  pair: 1,
-  twoPair: 2,
-  threeOfAKind: 3,
-  straight: 4,
-  flush: 5,
-  fullHouse: 6,
-  fourOfAKind: 7,
-  straightFlush: 8,
-  royalFlush: 9,
-};
 
 function writeBrowserPoints(outPath, coords) {
   const count = coords.length;
@@ -81,7 +84,7 @@ function writeBrowserChannels(outPath, points) {
     const summary = point.summary ?? {};
     equity.writeFloatLE(point.equityVsRandom ?? 0, i * 4);
     clusterId.writeInt16LE(point.clusterId ?? -1, i * 2);
-    categoryIndex.writeUInt8(CATEGORY_INDEX[point.category] ?? 0, i);
+    categoryIndex.writeUInt8(categoryIndexForLabel(point.category), i);
     pNuts.writeFloatLE(summary.pNuts ?? 0, i * 4);
     equityVariance.writeFloatLE(summary.equityVariance ?? 0, i * 4);
     boardConnectivity.writeFloatLE(summary.boardConnectivityScore ?? 0, i * 4);

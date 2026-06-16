@@ -1,10 +1,6 @@
 import type { ColorMode, StreetDataset, ViewerFilters } from "@/lib/types";
 import { CATEGORY_PALETTE, CLUSTER_PALETTE } from "@/lib/types";
-import { CATEGORY_INDEX } from "@/lib/artifacts/load-street";
-
-const INDEX_CATEGORY = Object.fromEntries(
-  Object.entries(CATEGORY_INDEX).map(([name, index]) => [index, name]),
-) as Record<number, string>;
+import { INDEX_CATEGORY } from "@geometry-of-poker/shared";
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;

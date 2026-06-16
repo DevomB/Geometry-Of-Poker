@@ -11,32 +11,24 @@ import {
 export const runtime = "nodejs";
 
 export async function GET() {
-  try {
-    const entries = await Promise.all(
-      AVAILABLE_STREETS.filter(streetArtifactsExist).map(async (street) => [
-        street,
-        await loadStreetManifest(street),
-      ]),
-    );
-    const streets = Object.fromEntries(entries);
+  const streets: Partial<Record<string, Awaited<ReturnType<typeof loadStreetManifest>>>> = {};
 
-    return NextResponse.json({
-      artifactMode: ARTIFACT_MODE,
-      streets,
-    });
-  } catch (err) {
-    if (isArtifactUnavailableError(err)) {
-      return apiError(
-        503,
-        "ARTIFACTS_UNAVAILABLE",
-        err instanceof Error ? err.message : "Artifact release is unavailable.",
-      );
+  for (const street of AVAILABLE_STREETS.filter(streetArtifactsExist)) {
+    try {
+      streets[street] = await loadStreetManifest(street);
+    } catch (err) {
+      if (!isArtifactUnavailableError(err)) {
+        return apiError(
+          500,
+          "MANIFEST_LOAD_FAILED",
+          err instanceof Error ? err.message : "Failed to load manifests.",
+        );
+      }
     }
-
-    return apiError(
-      500,
-      "MANIFEST_LOAD_FAILED",
-      err instanceof Error ? err.message : "Failed to load manifests.",
-    );
   }
+
+  return NextResponse.json({
+    artifactMode: ARTIFACT_MODE,
+    streets,
+  });
 }

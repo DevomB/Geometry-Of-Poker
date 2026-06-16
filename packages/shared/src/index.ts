@@ -49,3 +49,11 @@ export {
 export {
   ARTIFACT_PATHS,
 } from "./artifacts.js";
+
+export {
+  CATEGORY_INDEX,
+  HAND_CATEGORY_LABELS,
+  INDEX_CATEGORY,
+  canonicalCategoryLabel,
+  categoryIndexForLabel,
+} from "./poker-categories.js";

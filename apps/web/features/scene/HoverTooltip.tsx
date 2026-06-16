@@ -3,6 +3,7 @@
 import { Html } from "@react-three/drei";
 import { useViewerStore } from "@/stores/viewer-store";
 import { CardDisplay } from "@/components/CardDisplay";
+import { humanCategory } from "@/lib/poker/human-category";
 
 export function HoverTooltip() {
   const hoverIndex = useViewerStore((s) => s.hoverIndex);
@@ -52,8 +53,4 @@ export function HoverTooltip() {
       </div>
     </Html>
   );
-}
-
-function humanCategory(name: string): string {
-  return name.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }

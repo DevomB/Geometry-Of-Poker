@@ -58,25 +58,4 @@ export async function writeRecordsParquet(
   }
 }
 
-export async function appendRecordsParquet(
-  filePath: string,
-  records: DatasetRecord[],
-  featureNames: readonly string[],
-  create: boolean,
-): Promise<void> {
-  if (create) {
-    await writeRecordsParquet(filePath, records, featureNames);
-    return;
-  }
-  const schema = buildSchema(featureNames);
-  const writer = await parquet.ParquetWriter.openFile(schema, filePath, { append: true } as never);
-  try {
-    for (const record of records) {
-      await writer.appendRow(recordToParquetRow(record, featureNames));
-    }
-  } finally {
-    await writer.close();
-  }
-}
-
 export { sanitizeColumn };

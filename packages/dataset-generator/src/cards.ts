@@ -1,4 +1,4 @@
-import { cardStringToDeckIndex, deckIndexToCardString } from "poker-calculations/encode";
+import { deckIndexToCardString } from "poker-calculations/encode";
 import type { Street } from "@geometry-of-poker/feature-engine";
 
 const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"] as const;

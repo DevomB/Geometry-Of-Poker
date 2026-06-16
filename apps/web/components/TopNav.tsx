@@ -60,15 +60,15 @@ export function TopNav() {
 
   return (
     <>
-      <header className="pointer-events-auto absolute left-72 right-80 top-0 z-10 flex h-14 items-center justify-between border-b border-[var(--border-default)] bg-[var(--surface-glass-strong)] px-5 backdrop-blur-md">
-        <div className="flex flex-col">
-          <h1 className="text-sm font-semibold tracking-tight text-zinc-100">
+      <header className="pointer-events-auto absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-between gap-4 overflow-hidden border-b border-[var(--border-default)] bg-[var(--surface-glass-strong)] px-5 backdrop-blur-md">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-sm font-semibold tracking-tight text-zinc-100">
             Geometry of Poker{" "}
             <span className="ml-1 text-[10px] font-normal uppercase tracking-[0.2em] text-zinc-500">
               research
             </span>
           </h1>
-          <p className="gop-mono text-[10px] text-zinc-500">
+          <p className="gop-mono truncate text-[10px] text-zinc-500">
             Texas Hold&apos;em state-space manifold
             <span className="mx-2 text-zinc-700">·</span>
             <span className="text-zinc-400">{street}</span>
@@ -87,11 +87,11 @@ export function TopNav() {
           </p>
         </div>
 
-        <div className="flex items-center gap-4 gop-mono text-[11px] text-zinc-400">
+        <div className="flex shrink-0 items-center gap-3 gop-mono text-[11px] text-zinc-400">
           {dataset?.manifest.version && (
             <span
               title="Active artifact version"
-              className="hidden rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-0.5 tabular-nums text-zinc-400 lg:inline-block"
+              className="hidden rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-0.5 tabular-nums text-zinc-400 xl:inline-block"
             >
               v{dataset.manifest.version}
             </span>
@@ -105,13 +105,13 @@ export function TopNav() {
               color={statusColor}
               pulsing={health.status === "loading" || isLoading}
             />
-            <span className="text-zinc-400">{engineLabel}</span>
+            <span className="hidden text-zinc-400 xl:inline">{engineLabel}</span>
           </span>
 
           {!isLoading && fps > 0 && (
             <span
               title={`Render rate; target floor ${targetFps} fps; quality ${renderQuality.tier}`}
-              className="hidden tabular-nums text-zinc-500 md:inline-block"
+              className="hidden tabular-nums text-zinc-500 xl:inline-block"
             >
               {fps} fps / {renderQuality.tier}
             </span>
@@ -123,8 +123,9 @@ export function TopNav() {
             className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
             aria-haspopup="dialog"
             aria-expanded={aboutOpen}
+            title="About this research"
           >
-            About research
+            About
           </button>
 
           <Link
@@ -145,7 +146,7 @@ export function TopNav() {
 
           <Link
             href="/release"
-            className="hidden rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06] lg:inline-block"
+            className="hidden rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06] xl:inline-block"
             title="Open release dashboard"
           >
             Release
@@ -153,7 +154,7 @@ export function TopNav() {
 
           <Link
             href="/research"
-            className="hidden text-zinc-500 transition hover:text-zinc-200 md:inline-block"
+            className="hidden text-zinc-500 transition hover:text-zinc-200 2xl:inline-block"
             title="Open full research page"
           >
             ↗

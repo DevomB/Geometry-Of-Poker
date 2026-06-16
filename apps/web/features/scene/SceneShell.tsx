@@ -92,7 +92,7 @@ export function SceneShell() {
   const showRefresh = isLoading && dataset;
 
   return (
-    <div className="absolute inset-0 pt-14">
+    <div className="absolute inset-x-0 bottom-0 top-14">
       <div className="gop-grid-bg pointer-events-none absolute inset-0 opacity-40" />
 
       {webglAvailable === false && (

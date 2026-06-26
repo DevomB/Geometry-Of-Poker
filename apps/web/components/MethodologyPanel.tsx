@@ -28,7 +28,7 @@ export function MethodologyPanel() {
         <Row label="Points" value={m.pointCount.toLocaleString()} mono />
         <Row
           label="Features"
-          value={`${m.retainedDimension ?? "—"} retained / ${m.originalDimension ?? "—"} total`}
+          value={`${m.retainedDimension ?? "-"} retained / ${m.originalDimension ?? "-"} total`}
           mono
         />
         <Row
@@ -40,10 +40,10 @@ export function MethodologyPanel() {
         {m.pcaDimensions != null && (
           <Row
             label="PCA"
-            value={`${m.pcaDimensions}D · ${
+            value={`${m.pcaDimensions}D / ${
               m.pcaVariance != null
                 ? `${(m.pcaVariance * 100).toFixed(1)}% var`
-                : "—"
+                : "-"
             }`}
             mono
           />
@@ -51,10 +51,10 @@ export function MethodologyPanel() {
         {m.hdbscan?.clusters != null && (
           <Row
             label="Clusters"
-            value={`${m.hdbscan.clusters} · ${
+            value={`${m.hdbscan.clusters} / ${
               m.hdbscan.noiseFraction != null
                 ? `${(m.hdbscan.noiseFraction * 100).toFixed(0)}% noise`
-                : "—"
+                : "-"
             }`}
             mono
           />
@@ -64,13 +64,47 @@ export function MethodologyPanel() {
             label="Trust"
             value={m.trustworthiness.toFixed(3)}
             mono
-            title="Trustworthiness — neighborhood preservation, higher is better"
+            title="Trustworthiness - neighborhood preservation, higher is better"
           />
         )}
         <Row label="Version" value={`v${m.version}`} mono />
       </dl>
+      {m.dimensionProfile && (
+        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+          <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+            Geometry interpretation
+          </p>
+          {m.dimensionProfile.topFeatureGroups.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-zinc-400">
+              Drivers:{" "}
+              {m.dimensionProfile.topFeatureGroups
+                .slice(0, 3)
+                .map((group) => `${labelGroup(group.group)} ${(group.share * 100).toFixed(0)}%`)
+                .join(" / ")}
+            </p>
+          )}
+          {m.dimensionProfile.topPcaLoadings.length > 0 && (
+            <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+              PC1:{" "}
+              {m.dimensionProfile.topPcaLoadings
+                .slice(0, 3)
+                .map((loading) => loading.feature)
+                .join(" / ")}
+            </p>
+          )}
+          {m.dimensionProfile.axisCaveat && (
+            <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+              {m.dimensionProfile.axisCaveat}
+            </p>
+          )}
+        </div>
+      )}
     </section>
   );
+}
+
+function labelGroup(group: string) {
+  return group.replace(/^\w/, (c) => c.toUpperCase());
 }
 
 function Row({

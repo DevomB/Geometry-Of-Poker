@@ -9,6 +9,7 @@ const REQUIRED_FILES = [
   "browser-metadata.json",
   "retained-features.json",
   "projection-index.bin",
+  "dimension-profile.json",
 ];
 const GOPK_MAGIC = 0x4b504f47;
 const GOPC_MAGIC = "GOPC";
@@ -111,7 +112,7 @@ function parseProjectionIndexCount(path) {
 }
 
 function assertNoForbiddenProvenance(streetDir) {
-  for (const file of ["viewer-manifest.json", "retained-features.json"]) {
+  for (const file of ["viewer-manifest.json", "retained-features.json", "dimension-profile.json"]) {
     const text = readFileSync(join(streetDir, file), "utf8").toLowerCase();
     if (FORBIDDEN_PROVENANCE_MARKERS.some((marker) => text.includes(marker))) {
       throw new Error(`${join(streetDir, file)} contains forbidden non-production provenance text.`);
@@ -158,6 +159,17 @@ function validateStreet(root, street) {
   }
   if (!manifest.artifacts?.projectionIndexBin) {
     throw new Error(`${street}: viewer-manifest.json must include artifacts.projectionIndexBin.`);
+  }
+  if (!manifest.artifacts?.dimensionProfileJson) {
+    throw new Error(`${street}: viewer-manifest.json must include artifacts.dimensionProfileJson.`);
+  }
+  const dimensionProfile = readJson(join(streetDir, "dimension-profile.json"));
+  if (dimensionProfile.street !== street) throw new Error(`${street}: dimension profile street mismatch.`);
+  if (dimensionProfile.pointCount !== pointsCount) {
+    throw new Error(`${street}: dimension profile pointCount != GOPK count.`);
+  }
+  if (!dimensionProfile.interpretation?.axisCaveat?.includes("nonlinear")) {
+    throw new Error(`${street}: dimension profile must describe nonlinear coordinate interpretation.`);
   }
 
   return { street, points: pointsCount, features: projection.featureCount };

@@ -2,6 +2,7 @@ export type {
   DatasetManifest,
   DatasetRecord,
   DatasetSummaryReport,
+  DatasetSegmentManifest,
   DatasetValidationReport,
   GenerateStreetDatasetOptions,
   GenerateStreetDatasetResult,
@@ -19,6 +20,11 @@ export {
 } from "./sample-state.js";
 
 export { generateStreetDataset, streetOutputDir } from "./generate-street-dataset.js";
+export {
+  segmentFileName,
+  validateContiguousSegments,
+  validateSegmentCompatibility,
+} from "./segments.js";
 export { validateDatasetFromManifest } from "./validate-dataset.js";
 export { buildSummaryReport } from "./summary-report.js";
 export { SeededRng } from "./rng.js";

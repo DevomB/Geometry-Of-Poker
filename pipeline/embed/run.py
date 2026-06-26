@@ -11,6 +11,7 @@ import numpy as np
 from .analyze import build_analysis_context
 from .artifacts import save_artifacts
 from .config import STREETS, resolve_paths
+from .dimension_profile import write_dimension_profile
 from .experiments import ExperimentResult, run_experiment_variant, seed_stability
 from .features import EXPERIMENT_VARIANTS
 from .fit import fit_embedding_pipeline, save_models
@@ -56,6 +57,7 @@ def embed_street(
 
     save_models(result, str(output_dir), ids)
     embedding_df = save_artifacts(output_dir, street, df, result.coords, result.labels, prep.retained_features)
+    write_dimension_profile(output_dir / "dimension-profile.json", street, result, config)
 
     retained_info = json.loads((output_dir / "retained-features.json").read_text(encoding="utf-8"))
     context = build_analysis_context(street, result, embedding_df, config)

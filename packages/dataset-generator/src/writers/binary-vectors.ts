@@ -1,4 +1,4 @@
-import { open, readFile, writeFile } from "node:fs/promises";
+import { open, writeFile } from "node:fs/promises";
 import { BINARY_MAGIC, BINARY_VERSION } from "../types.js";
 
 export interface BinaryVectorHeader {
@@ -39,16 +39,24 @@ export async function appendBinaryVectors(
     return;
   }
 
-  const existing = await readFile(filePath);
-  const prevCount = existing.readUInt32LE(8);
-  const dim = existing.readUInt32LE(12);
-  if (dim !== dimension) {
-    throw new Error(`Vector dimension mismatch during append: ${dim} vs ${dimension}`);
+  const fh = await open(filePath, "r+");
+  try {
+    const header = Buffer.alloc(16);
+    await fh.read(header, 0, 16, 0);
+    const prevCount = header.readUInt32LE(8);
+    const dim = header.readUInt32LE(12);
+    if (dim !== dimension) {
+      throw new Error(`Vector dimension mismatch during append: ${dim} vs ${dimension}`);
+    }
+    const nextCount = prevCount + count;
+    const countHeader = Buffer.alloc(4);
+    countHeader.writeUInt32LE(nextCount, 0);
+    await fh.write(countHeader, 0, countHeader.length, 8);
+    const body = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+    await fh.write(body, 0, body.length, 16 + prevCount * dimension * 4);
+  } finally {
+    await fh.close();
   }
-  const merged = new Float32Array((prevCount + count) * dimension);
-  merged.set(new Float32Array(existing.buffer, existing.byteOffset + 16, prevCount * dimension), 0);
-  merged.set(chunk, prevCount * dimension);
-  await writeBinaryVectors(filePath, merged, prevCount + count, dimension);
 }
 
 export async function readBinaryVectorHeader(filePath: string): Promise<BinaryVectorHeader> {

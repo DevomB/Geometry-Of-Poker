@@ -99,6 +99,25 @@ export interface ClusterCentroid {
   centroid: [number, number, number];
 }
 
+export interface DimensionFeatureGroup {
+  group: string;
+  share: number;
+  score?: number;
+}
+
+export interface DimensionLoading {
+  feature: string;
+  group: string;
+  loading: number;
+  direction: "positive" | "negative";
+}
+
+export interface DimensionProfileSummary {
+  topFeatureGroups: DimensionFeatureGroup[];
+  axisCaveat: string | null;
+  topPcaLoadings: DimensionLoading[];
+}
+
 export interface StreetManifest {
   version: string;
   street: Street;
@@ -120,7 +139,9 @@ export interface StreetManifest {
     channelsBin?: string;
     metadataJson: string;
     projectionIndexBin?: string;
+    dimensionProfileJson?: string;
   };
+  dimensionProfile?: DimensionProfileSummary;
 }
 
 export interface StreetDataset {

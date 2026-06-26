@@ -149,10 +149,35 @@ for (const street of STREETS) {
       channelsBin: "browser-channels.bin",
       metadataJson: "browser-metadata.json",
       projectionIndexBin: "projection-index.bin",
+      dimensionProfileJson: "dimension-profile.json",
     },
+    dimensionProfile: {
+      topFeatureGroups: [{ group: "equity", share: 0.6 }],
+      axisCaveat:
+        "UMAP coordinates are nonlinear layout coordinates; use feature loadings and correlations as descriptive diagnostics.",
+      topPcaLoadings: [
+        {
+          feature: "equityVsRandom",
+          group: "equity",
+          loading: 0.8,
+          direction: "positive",
+        },
+      ],
+    },
+  };
+  const dimensionProfile = {
+    version: "1.0.0",
+    street,
+    pointCount: points.length,
+    interpretation: {
+      axisCaveat:
+        "UMAP coordinates are nonlinear layout coordinates; use feature loadings and correlations as descriptive diagnostics.",
+    },
+    featureGroups: manifest.dimensionProfile.topFeatureGroups,
   };
   writeFileSync(join(dir, "browser-metadata.json"), JSON.stringify(metadata));
   writeFileSync(join(dir, "viewer-manifest.json"), JSON.stringify(manifest));
+  writeFileSync(join(dir, "dimension-profile.json"), JSON.stringify(dimensionProfile));
   writeFileSync(
     join(dir, "retained-features.json"),
     JSON.stringify({
@@ -179,6 +204,7 @@ for (const street of STREETS) {
     "browser-points.bin",
     "browser-channels.bin",
     "projection-index.bin",
+    "dimension-profile.json",
   ]) {
     writeFileSync(join(dst, file), readFileSync(join(src, file)));
   }

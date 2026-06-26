@@ -19,8 +19,13 @@ export function shardsDir(outputDir: string): string {
   return join(outputDir, "shards");
 }
 
+export function segmentsDir(outputDir: string): string {
+  return join(outputDir, "segments");
+}
+
 export async function clearShardDir(outputDir: string): Promise<void> {
   await rm(shardsDir(outputDir), { recursive: true, force: true });
+  await rm(segmentsDir(outputDir), { recursive: true, force: true });
 }
 
 export async function writeJson(filePath: string, data: unknown): Promise<void> {

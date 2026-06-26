@@ -92,6 +92,26 @@ export interface DatasetManifest {
   };
   timing: GenerationTimingReport;
   validation: DatasetValidationReport;
+  segments?: DatasetSegmentManifest[];
+}
+
+export interface DatasetSegmentManifest {
+  version: string;
+  street: Street;
+  seed: number;
+  mode: FeatureMode;
+  exactFeatureBudget: ExactFeatureBudget;
+  featureSchemaVersion: string;
+  preflopMode?: "enumerate1326" | "canonical169" | "random";
+  startOrdinal: number;
+  endOrdinalExclusive: number;
+  count: number;
+  parquetFile: string;
+  parquetSha256: string;
+  vectorSha256: string;
+  firstRecordId: string;
+  lastRecordId: string;
+  generatedAt: string;
 }
 
 export interface FeatureDistributionStats {
@@ -150,6 +170,7 @@ export interface GenerateStreetDatasetOptions {
   profileSampleEvery?: number;
   sampleJsonCount?: number;
   artifactsRoot?: string;
+  extendFrom?: string;
 }
 
 export interface GenerateStreetDatasetResult {

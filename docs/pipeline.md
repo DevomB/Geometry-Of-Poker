@@ -16,6 +16,8 @@ flowchart TD
   D --> G[browser-channels.bin]
   D --> H[browser-metadata.json]
   D --> I[projection-index.bin]
+  D --> L[dimension-profile.json]
+  L --> J
   E --> J[pnpm release:artifacts -- --release-id <release-id>]
   F --> J
   G --> J
@@ -59,5 +61,7 @@ Each street release must contain:
 - `browser-metadata.json`
 - `retained-features.json`
 - `projection-index.bin` (`GOPI`)
+- `dimension-profile.json`
 
 The app fails closed for missing projection indexes. This prevents non-exact manual hands from using partial summary features.
+New releases also require `dimension-profile.json` so viewer and release surfaces can explain PCA drivers and nonlinear UMAP diagnostics from structured artifact metadata.

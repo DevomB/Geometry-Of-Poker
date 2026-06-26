@@ -58,12 +58,14 @@ function parseArgs(argv: string[]) {
 function usage(): string {
   return `Usage:
   pnpm generate --street flop --count 25000 --seed 42 --mode compact [--batch-size 1000] [--resume]
+  pnpm generate --street flop --target-count 50000 --extend-from artifacts/datasets/flop --seed 42 --mode compact
   pnpm generate --all [--seed 42] [--mode compact] [--exact-feature-budget production]
   pnpm generate --street preflop --preflop-mode canonical169 [--count 169]
 
 Streets: preflop | flop | turn | river
 Preflop default count: 1326 (enumerate all hole-card combos)
 Postflop default count: 25000
+Dataset growth: --target-count is an alias for --count and --extend-from points at a compatible raw checkpoint
 Preflop mode: enumerate1326 | canonical169 | random
 Exact feature budget: production | full`;
 }
@@ -78,6 +80,7 @@ async function runOne(
   resume: boolean,
   artifactsRoot: string,
   preflopMode: "enumerate1326" | "canonical169" | "random",
+  extendFrom?: string,
 ) {
   const outputDir = streetOutputDir(artifactsRoot, street);
   return generateStreetDataset({
@@ -91,6 +94,7 @@ async function runOne(
     resume,
     artifactsRoot,
     preflopMode: street === "preflop" ? preflopMode : "random",
+    extendFrom,
   });
 }
 
@@ -117,7 +121,7 @@ async function main() {
 
   if (args.all) {
     for (const street of STREETS) {
-      const count = Number(args.count ?? DEFAULT_COUNTS[street]);
+      const count = Number(args.targetCount ?? args.count ?? DEFAULT_COUNTS[street]);
       await runOne(
         street,
         count,
@@ -128,6 +132,7 @@ async function main() {
         resume,
         artifactsRoot,
         preflopMode,
+        args.extendFrom ? String(args.extendFrom) : undefined,
       );
     }
     return;
@@ -139,7 +144,7 @@ async function main() {
     process.exit(1);
   }
 
-  const count = Number(args.count ?? DEFAULT_COUNTS[street]);
+  const count = Number(args.targetCount ?? args.count ?? DEFAULT_COUNTS[street]);
   await runOne(
     street,
     count,
@@ -150,6 +155,7 @@ async function main() {
     resume,
     artifactsRoot,
     preflopMode,
+    args.extendFrom ? String(args.extendFrom) : undefined,
   );
 }
 

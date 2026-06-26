@@ -141,6 +141,28 @@ pnpm aws:submit-release -- `
   --memory-mb 30720
 ```
 
+To grow from a prior raw dataset checkpoint, keep the new release immutable and
+name the prior release explicitly:
+
+```powershell
+pnpm aws:submit-release -- `
+  --region us-east-1 `
+  --release-id <new-release-id> `
+  --source-release-id <prior-release-id> `
+  --bucket geometry-of-poker-artifacts-artifactbucket-cvx4jrn7qvrz `
+  --flop-count <target-count> `
+  --turn-count <target-count> `
+  --river-count <target-count> `
+  --vcpus 4 `
+  --memory-mb 30720
+```
+
+The worker restores `releases/<source-release-id>/datasets/<street>/`, validates
+the checkpoint metadata and contiguous ordinal ranges, generates only the
+missing ranges up to the target count, uploads the grown private dataset
+checkpoint, and then refits the embedding over the combined dataset. Browser
+embedding artifacts are never appended directly.
+
 Keep `GOP_EXACT_FEATURE_BUDGET=production` for balanced or larger runs. The `full` budget is for small research jobs only.
 
 If another run segfaults during UMAP/HDBSCAN after the `init="random"` worker image is deployed, stop rerunning the same job. The next engineering fix should be one of:

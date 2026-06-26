@@ -71,6 +71,9 @@ export function browserSafeManifest(street: Street): StreetManifest {
       channelsBin: `${base}/browser-channels.bin`,
       metadataJson: `${base}/browser-metadata.json`,
       projectionIndexBin: `${base}/projection-index.bin`,
+      ...(manifest.artifacts.dimensionProfileJson
+        ? { dimensionProfileJson: `${base}/dimension-profile.json` }
+        : {}),
     },
   };
 }
@@ -100,6 +103,9 @@ export async function loadStreetManifest(street: Street): Promise<StreetManifest
         channelsBin: `${publicArtifactBase(street)}/browser-channels.bin`,
         metadataJson: `${publicArtifactBase(street)}/browser-metadata.json`,
         projectionIndexBin: `${publicArtifactBase(street)}/projection-index.bin`,
+        ...(manifest.artifacts.dimensionProfileJson
+          ? { dimensionProfileJson: `${publicArtifactBase(street)}/dimension-profile.json` }
+          : {}),
       },
     }),
   );

@@ -25,6 +25,7 @@ Optional:
   --turn-count 20
   --river-count 20
   --streets preflop,flop,turn,river
+  --source-release-id <prior-release-id>
   --resume
   --batch-size 1000
   --vcpus 4
@@ -51,6 +52,7 @@ function main() {
   const turnCount = argValue("--turn-count");
   const riverCount = argValue("--river-count");
   const streets = argValue("--streets");
+  const sourceReleaseId = argValue("--source-release-id");
   const batchSize = argValue("--batch-size");
   const vcpus = argValue("--vcpus");
   const memoryMb = argValue("--memory-mb");
@@ -69,6 +71,7 @@ function main() {
   if (turnCount) environment.push({ name: "GOP_TURN_COUNT", value: turnCount });
   if (riverCount) environment.push({ name: "GOP_RIVER_COUNT", value: riverCount });
   if (streets) environment.push({ name: "GOP_STREETS", value: streets });
+  if (sourceReleaseId) environment.push({ name: "GOP_SOURCE_RELEASE_ID", value: sourceReleaseId });
   if (batchSize) environment.push({ name: "GOP_BATCH_SIZE", value: batchSize });
 
   const resourceRequirements = [];

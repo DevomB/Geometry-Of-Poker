@@ -72,3 +72,17 @@ export async function readAllRecordsFromParquet(filePath: string): Promise<Datas
     await reader.close();
   }
 }
+
+export async function* streamRecordsFromParquet(filePath: string): AsyncGenerator<DatasetRecord> {
+  const reader = await parquet.ParquetReader.openFile(filePath);
+  try {
+    const cursor = reader.getCursor();
+    const columns = schemaColumnNames(reader);
+    let row: Record<string, unknown> | null;
+    while ((row = (await cursor.next()) as Record<string, unknown> | null)) {
+      yield parquetRowToRecord(row, columns);
+    }
+  } finally {
+    await reader.close();
+  }
+}

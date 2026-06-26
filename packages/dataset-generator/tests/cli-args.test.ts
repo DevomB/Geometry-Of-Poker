@@ -10,5 +10,7 @@ describe("CLI kebab-case flags", () => {
     assert.equal(kebabToCamel("exact-feature-budget"), "exactFeatureBudget");
     assert.equal(kebabToCamel("batch-size"), "batchSize");
     assert.equal(kebabToCamel("preflop-mode"), "preflopMode");
+    assert.equal(kebabToCamel("target-count"), "targetCount");
+    assert.equal(kebabToCamel("extend-from"), "extendFrom");
   });
 });

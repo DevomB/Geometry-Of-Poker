@@ -13,6 +13,7 @@ import {
   ensureDir,
   readProgress,
   clearShardDir,
+  segmentsDir,
   shardsDir,
   streetOutputDir,
   writeJson,
@@ -23,8 +24,18 @@ import {
 import {
   formatRecordId,
   resolveStateBatch,
-  shardFileName,
 } from "./sample-state.js";
+import {
+  completedCountFromSegments,
+  importExtensionSource,
+  readSegmentManifests,
+  segmentFileName,
+  sha256Buffer,
+  validateContiguousSegments,
+  validateSegmentCompatibility,
+  verifySegmentFiles,
+  writeSegmentManifest,
+} from "./segments.js";
 import {
   DATASET_VERSION,
   FEATURE_SCHEMA_VERSION,
@@ -39,8 +50,8 @@ import {
 } from "./types.js";
 import { validateDatasetFromManifest } from "./validate-dataset.js";
 import { buildSummaryReport } from "./summary-report.js";
-import { appendBinaryVectors, vectorsToFloat32 } from "./writers/binary-vectors.js";
-import { mergeParquetShards } from "./writers/merge-shards.js";
+import { vectorsToFloat32 } from "./writers/binary-vectors.js";
+import { mergeSegmentParquetShards } from "./writers/merge-shards.js";
 import { writeRecordsParquet } from "./writers/parquet-writer.js";
 
 const DEFAULT_BATCH_SIZE = 1000;
@@ -168,13 +179,25 @@ export async function generateStreetDataset(
   const artifactsRoot = options.artifactsRoot ?? join(options.outputDir, "..", "..");
   const outputDir = options.outputDir || streetOutputDir(artifactsRoot, options.street);
   const shardDir = shardsDir(outputDir);
+  const segmentDir = segmentsDir(outputDir);
   const progressPath = join(outputDir, ".generation-progress.json");
+  const segmentContext = {
+    street: options.street,
+    seed: options.seed,
+    mode,
+    exactFeatureBudget,
+    preflopMode: options.street === "preflop" ? preflopMode : undefined,
+  };
 
   await ensureDir(outputDir);
   if (!options.resume) {
     await clearShardDir(outputDir);
   }
   await ensureDir(shardDir);
+  await ensureDir(segmentDir);
+  if (options.extendFrom) {
+    await importExtensionSource(options.extendFrom, outputDir, segmentContext);
+  }
 
   const featureNames = [...featureOrderForMode(mode)];
   const dimension = featureNames.length;
@@ -199,7 +222,33 @@ export async function generateStreetDataset(
     }
   }
 
+  let segments = await readSegmentManifests(outputDir);
+  validateSegmentCompatibility(segments, segmentContext);
+  validateContiguousSegments(segments, options.count);
+  await verifySegmentFiles(outputDir, segments);
+  const segmentCompletedCount = completedCountFromSegments(segments);
+  if (
+    segmentCompletedCount > 0 &&
+    segmentCompletedCount < options.count &&
+    segmentCompletedCount % batchSize !== 0
+  ) {
+    throw new Error(
+      `Dataset growth refused: source count ${segmentCompletedCount} is not aligned to range size ${batchSize}. ` +
+        "Use the original range size or run a full recompute.",
+    );
+  }
   const completedBatches = new Set(progress?.completedBatches ?? []);
+  for (const segment of segments) {
+    if (segment.startOrdinal % batchSize === 0 && segment.count % batchSize === 0) {
+      for (
+        let batchIndex = segment.startOrdinal / batchSize;
+        batchIndex < segment.endOrdinalExclusive / batchSize;
+        batchIndex++
+      ) {
+        completedBatches.add(batchIndex);
+      }
+    }
+  }
 
   if (!progress) {
     progress = {
@@ -208,7 +257,7 @@ export async function generateStreetDataset(
       mode,
       exactFeatureBudget,
       targetCount: options.count,
-      completedCount: 0,
+      completedCount: segmentCompletedCount,
       completedBatches: [],
       batchSize,
       startedAt: new Date().toISOString(),
@@ -230,15 +279,21 @@ export async function generateStreetDataset(
 
   const parquetPath = join(outputDir, "records.parquet");
   const vectorsPath = join(outputDir, "vectors.f32.bin");
-  let vectorsInitialized = completedBatches.size > 0;
 
   console.log(
-    `[generate] street=${options.street} count=${options.count} seed=${options.seed} mode=${mode} batches=${batchCount} batchSize=${batchSize}`,
+    `[generate] street=${options.street} targetCount=${options.count} seed=${options.seed} mode=${mode} batches=${batchCount} batchSize=${batchSize}`,
   );
 
   for (let batchIndex = 0; batchIndex < batchCount; batchIndex++) {
-    if (completedBatches.has(batchIndex)) {
-      console.log(`[generate] skip completed batch ${batchIndex + 1}/${batchCount}`);
+    const startOrdinal = batchIndex * batchSize;
+    const endOrdinalExclusive = Math.min(startOrdinal + batchSize, options.count);
+    const coveredBySegment = segments.some(
+      (segment) =>
+        segment.startOrdinal <= startOrdinal &&
+        segment.endOrdinalExclusive >= endOrdinalExclusive,
+    );
+    if (completedBatches.has(batchIndex) || coveredBySegment) {
+      console.log(`[generate] skip completed range ${startOrdinal}-${endOrdinalExclusive}`);
       continue;
     }
 
@@ -264,15 +319,26 @@ export async function generateStreetDataset(
     );
     featureAgg = updatedAgg;
 
-    const shardPath = join(
-      shardDir,
-      shardFileName(options.street, options.seed, mode, batchIndex, states.length),
+    const parquetFile = segmentFileName(
+      options.street,
+      options.seed,
+      mode,
+      startOrdinal,
+      startOrdinal + states.length,
     );
+    const shardPath = join(shardDir, parquetFile);
     await writeRecordsParquet(shardPath, records, featureNames);
 
     const chunk = vectorsToFloat32(records, dimension);
-    await appendBinaryVectors(vectorsPath, chunk, records.length, dimension, vectorsInitialized);
-    vectorsInitialized = true;
+    await writeSegmentManifest(outputDir, segmentContext, {
+      startOrdinal,
+      endOrdinalExclusive: startOrdinal + states.length,
+      parquetFile,
+      parquetPath: shardPath,
+      vectorSha256: sha256Buffer(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)),
+      firstRecordId: records[0]!.id,
+      lastRecordId: records[records.length - 1]!.id,
+    });
 
     const wallMs = performance.now() - wallStart;
     const heapMb = process.memoryUsage().heapUsed / (1024 * 1024);
@@ -302,7 +368,12 @@ export async function generateStreetDataset(
 
   timing.featureGroups = finalizeFeatureTimings(timing.featureGroups);
 
-  const mergedCount = await mergeParquetShards(shardDir, parquetPath, featureNames);
+  segments = await readSegmentManifests(outputDir);
+  validateSegmentCompatibility(segments, segmentContext);
+  validateContiguousSegments(segments, options.count, true);
+  await verifySegmentFiles(outputDir, segments);
+
+  const mergedCount = await mergeSegmentParquetShards(shardDir, parquetPath, vectorsPath, featureNames, segments);
   if (mergedCount !== options.count) {
     throw new Error(
       `Merged parquet count ${mergedCount} does not match target ${options.count}. ` +
@@ -343,6 +414,7 @@ export async function generateStreetDataset(
     },
     timing,
     validation,
+    segments,
   };
 
   const summary = await buildSummaryReport(manifest, outputDir);

@@ -149,7 +149,22 @@ function StreetCard({ street }: { street: ArtifactStreetDashboard }) {
         <Row label="Noise" value={formatMaybePercent(street.noiseFraction)} mono />
         <Row label="Channels" value={street.hasChannels ? "yes" : "no"} />
         <Row label="Projection" value={street.hasProjectionIndex ? "yes" : "no"} />
+        <Row label="Dimension profile" value={street.hasDimensionProfile ? "yes" : "no"} />
       </dl>
+
+      {street.topFeatureGroups.length > 0 && (
+        <div className="mt-4 rounded border border-white/10 bg-black/20 px-3 py-2">
+          <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+            Geometry drivers
+          </p>
+          <p className="text-xs leading-5 text-zinc-400">
+            {street.topFeatureGroups
+              .slice(0, 4)
+              .map((group) => `${labelGroup(group.group)} ${(group.share * 100).toFixed(0)}%`)
+              .join(" / ")}
+          </p>
+        </div>
+      )}
 
       {street.embeddingMethod && (
         <p className="gop-mono mt-4 rounded border border-white/10 bg-black/20 px-3 py-2 text-[11px] leading-5 text-zinc-500">
@@ -158,6 +173,10 @@ function StreetCard({ street }: { street: ArtifactStreetDashboard }) {
       )}
     </article>
   );
+}
+
+function labelGroup(group: string) {
+  return group.replace(/^\w/, (c) => c.toUpperCase());
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

@@ -22,6 +22,9 @@ pnpm generate:all
 
 # Resume interrupted remote batch
 pnpm generate -- --street turn --count 25000 --seed 42 --resume
+
+# Grow a compatible raw checkpoint to a larger target count
+pnpm generate -- --street flop --target-count 50000 --seed 42 --mode compact --extend-from artifacts/datasets/flop
 ```
 
 ### Options
@@ -30,10 +33,12 @@ pnpm generate -- --street turn --count 25000 --seed 42 --resume
 | --- | --- | --- |
 | `--street` | required | `preflop` \| `flop` \| `turn` \| `river` |
 | `--count` | 1326 / 25000 | Target record count |
+| `--target-count` | `--count` | Product-facing alias for dataset growth targets |
 | `--seed` | 42 | PRNG seed (reproducible) |
 | `--mode` | `compact` | `compact` (66) or `extended` (199) |
 | `--batch-size` | 1000 | Records per resumable shard |
 | `--resume` | false | Skip completed batches |
+| `--extend-from` | unset | Reuse a compatible raw checkpoint, generate missing ranges, then rebuild merged outputs |
 | `--all` | false | Generate all four streets |
 | `--artifacts` | `artifacts/` | Output root |
 
@@ -47,8 +52,21 @@ artifacts/datasets/flop/
   vectors.f32.bin         # Float32 matrix for browser (GOPK header)
   sample.json             # 20-record debug subset
   shards/                 # resumable batch parquets
+  segments/               # range manifests with hashes for dataset growth
   .generation-progress.json
 ```
+
+## Dataset growth
+
+Dataset growth reuses raw checkpoint records only. It does not append browser
+embedding artifacts. A grown dataset is merged into a new `records.parquet`, and
+the embedding pipeline refits `StandardScaler -> PCA -> UMAP -> HDBSCAN` over the
+combined matrix.
+
+Growth is accepted only when the source checkpoint matches street, seed, feature
+schema version, feature mode, exact-feature budget, and preflop mode. Segment
+manifests are validated as contiguous ordinal ranges before parquet payloads are
+merged, and each segment carries SHA-256 hashes for checkpoint integrity.
 
 ## Dataset record schema
 

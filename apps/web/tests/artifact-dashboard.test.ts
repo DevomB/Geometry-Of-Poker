@@ -27,6 +27,20 @@ function manifest(patch: Partial<StreetManifest> = {}): StreetManifest {
       channelsBin: "/channels.bin",
       metadataJson: "/metadata.json",
       projectionIndexBin: "/projection-index.bin",
+      dimensionProfileJson: "/dimension-profile.json",
+    },
+    dimensionProfile: {
+      topFeatureGroups: [{ group: "equity", share: 0.7 }],
+      axisCaveat:
+        "UMAP coordinates are nonlinear layout coordinates; use feature loadings and correlations as descriptive diagnostics.",
+      topPcaLoadings: [
+        {
+          feature: "equityVsRandom",
+          group: "equity",
+          loading: 0.8,
+          direction: "positive",
+        },
+      ],
     },
     ...patch,
   };
@@ -40,8 +54,10 @@ describe("artifact dashboard summaries", () => {
     expect(summary.readiness).toBe("ready");
     expect(summary.hasChannels).toBe(true);
     expect(summary.hasProjectionIndex).toBe(true);
-    expect(summary.artifactCount).toBe(4);
+    expect(summary.hasDimensionProfile).toBe(true);
+    expect(summary.artifactCount).toBe(5);
     expect(summary.trustworthiness).toBe(0.93);
+    expect(summary.topFeatureGroups[0]?.group).toBe("equity");
   });
 
   it("marks manifests without projection index as partial", () => {
@@ -53,12 +69,14 @@ describe("artifact dashboard summaries", () => {
           pointsBin: "/points.bin",
           metadataJson: "/metadata.json",
         },
+        dimensionProfile: undefined,
       }),
     );
 
     expect(summary.readiness).toBe("partial");
     expect(summary.hasProjectionIndex).toBe(false);
     expect(summary.hasChannels).toBe(false);
+    expect(summary.hasDimensionProfile).toBe(false);
   });
 
   it("summarizes missing streets and aggregate readiness", () => {

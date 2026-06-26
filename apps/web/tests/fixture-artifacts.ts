@@ -154,6 +154,19 @@ export function createArtifactFixture() {
       count: points.length,
       points,
     };
+    const dimensionProfileSummary = {
+      topFeatureGroups: [{ group: "equity", share: 0.62 }],
+      axisCaveat:
+        "UMAP coordinates are nonlinear layout coordinates; use feature loadings and correlations as descriptive diagnostics.",
+      topPcaLoadings: [
+        {
+          feature: "equityVsRandom",
+          group: "equity",
+          loading: 0.8,
+          direction: "positive" as const,
+        },
+      ],
+    };
     const manifest: StreetManifest = {
       version: "1.0.0",
       street,
@@ -169,7 +182,19 @@ export function createArtifactFixture() {
         channelsBin: "browser-channels.bin",
         metadataJson: "browser-metadata.json",
         projectionIndexBin: "projection-index.bin",
+        dimensionProfileJson: "dimension-profile.json",
       },
+      dimensionProfile: dimensionProfileSummary,
+    };
+    const dimensionProfile = {
+      version: "1.0.0",
+      street,
+      pointCount: points.length,
+      interpretation: {
+        axisCaveat:
+          "UMAP coordinates are nonlinear layout coordinates; use feature loadings and correlations as descriptive diagnostics.",
+      },
+      featureGroups: dimensionProfileSummary.topFeatureGroups,
     };
     const retainedFeatures = {
       retained_features: manifest.retainedFeatures,
@@ -178,6 +203,7 @@ export function createArtifactFixture() {
     };
     writeFileSync(join(dir, "browser-metadata.json"), JSON.stringify(metadata), "utf8");
     writeFileSync(join(dir, "viewer-manifest.json"), JSON.stringify(manifest), "utf8");
+    writeFileSync(join(dir, "dimension-profile.json"), JSON.stringify(dimensionProfile), "utf8");
     writeFileSync(join(dir, "retained-features.json"), JSON.stringify(retainedFeatures), "utf8");
     writePoints(join(dir, "browser-points.bin"), points);
     writeChannels(join(dir, "browser-channels.bin"), points);

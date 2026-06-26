@@ -17,6 +17,8 @@ export interface ArtifactStreetDashboard {
   noiseFraction: number | null;
   hasChannels: boolean;
   hasProjectionIndex: boolean;
+  hasDimensionProfile: boolean;
+  topFeatureGroups: Array<{ group: string; share: number }>;
   artifactCount: number;
   readiness: "ready" | "partial" | "missing";
 }
@@ -42,6 +44,8 @@ export function summarizeArtifactStreet(
       noiseFraction: null,
       hasChannels: false,
       hasProjectionIndex: false,
+      hasDimensionProfile: false,
+      topFeatureGroups: [],
       artifactCount: 0,
       readiness: "missing",
     };
@@ -50,6 +54,7 @@ export function summarizeArtifactStreet(
   const artifactValues = Object.values(manifest.artifacts).filter(Boolean);
   const hasProjectionIndex = Boolean(manifest.artifacts.projectionIndexBin);
   const hasChannels = Boolean(manifest.artifacts.channelsBin);
+  const hasDimensionProfile = Boolean(manifest.artifacts.dimensionProfileJson);
   const readiness = hasProjectionIndex && manifest.pointCount > 0 ? "ready" : "partial";
 
   return {
@@ -68,6 +73,8 @@ export function summarizeArtifactStreet(
     noiseFraction: manifest.hdbscan?.noiseFraction ?? null,
     hasChannels,
     hasProjectionIndex,
+    hasDimensionProfile,
+    topFeatureGroups: manifest.dimensionProfile?.topFeatureGroups ?? [],
     artifactCount: artifactValues.length,
     readiness,
   };

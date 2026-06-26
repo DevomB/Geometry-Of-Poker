@@ -208,6 +208,10 @@ function syncStreet(street) {
   const analysis = existsSync(join(srcDir, "analysis-report.md"))
     ? parseAnalysisReport(readFileSync(join(srcDir, "analysis-report.md"), "utf8"))
     : {};
+  const dimensionProfilePath = join(srcDir, "dimension-profile.json");
+  const dimensionProfile = existsSync(dimensionProfilePath)
+    ? JSON.parse(readFileSync(dimensionProfilePath, "utf8"))
+    : null;
 
   const categories = [...new Set(metadata.points.map((p) => p.category))].sort();
   const clusters = computeClusterCentroids(metadata.points);
@@ -228,7 +232,18 @@ function syncStreet(street) {
       channelsBin: "browser-channels.bin",
       metadataJson: "browser-metadata.json",
       projectionIndexBin: "projection-index.bin",
+      ...(dimensionProfile ? { dimensionProfileJson: "dimension-profile.json" } : {}),
     },
+    ...(dimensionProfile
+      ? {
+          dimensionProfile: {
+            topFeatureGroups: (dimensionProfile.featureGroups ?? []).slice(0, 4),
+            axisCaveat: dimensionProfile.interpretation?.axisCaveat ?? null,
+            topPcaLoadings:
+              dimensionProfile.pca?.components?.[0]?.topLoadings?.slice(0, 6) ?? [],
+          },
+        }
+      : {}),
   };
 
   writeFileSync(join(dstDir, "viewer-manifest.json"), JSON.stringify(manifest, null, 2));
@@ -242,6 +257,10 @@ function syncStreet(street) {
       join(dstDir, "retained-features.json"),
       readFileSync(join(srcDir, "retained-features.json")),
     );
+  }
+
+  if (dimensionProfile) {
+    writeFileSync(join(dstDir, "dimension-profile.json"), readFileSync(dimensionProfilePath));
   }
 
   console.log(`Synced ${street}: ${metadata.count} points`);

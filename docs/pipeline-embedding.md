@@ -41,6 +41,7 @@ pnpm pipeline:embed
 | `hdbscan.joblib` | HDBSCAN clusterer |
 | `projection-index.bin` | Server-readable scaler/PCA/kNN projection sidecar |
 | `retained-features.json` | Feature order after constant removal |
+| `dimension-profile.json` | PCA loadings, feature-group drivers, nonlinear UMAP axis diagnostics |
 | `embedding.parquet` | Full embedded records |
 | `browser-points.bin` | Float32 XYZ (GOPK header) |
 | `browser-metadata.json` | Point metadata for viewer |

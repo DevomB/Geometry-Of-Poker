@@ -16,6 +16,7 @@ S3_BUCKET="${GOP_ARTIFACT_BUCKET:-}"
 S3_PREFIX="${GOP_S3_PREFIX:-}"
 RESUME_GENERATION="${GOP_RESUME:-0}"
 STREETS_FILTER="${GOP_STREETS:-preflop,flop,turn,river}"
+SOURCE_RELEASE_ID="${GOP_SOURCE_RELEASE_ID:-}"
 
 if [[ -z "$RELEASE_ID" ]]; then
   echo "GOP_RELEASE_ID is required, for example 2026-06-balanced-small-1." >&2
@@ -47,10 +48,13 @@ generate_street() {
   if [[ "$RESUME_GENERATION" == "1" ]]; then
     resume_args+=(--resume)
   fi
+  if [[ -n "$SOURCE_RELEASE_ID" ]]; then
+    resume_args+=(--extend-from "$ARTIFACTS_ROOT/datasets/$street")
+  fi
   echo "[release-worker] generate $street count=$count seed=$SEED mode=$MODE exactFeatureBudget=$EXACT_FEATURE_BUDGET"
   pnpm generate -- \
     --street "$street" \
-    --count "$count" \
+    --target-count "$count" \
     --seed "$SEED" \
     --mode "$MODE" \
     --exact-feature-budget "$EXACT_FEATURE_BUDGET" \
@@ -78,6 +82,30 @@ upload_dataset_checkpoint() {
     --cache-control "private,max-age=0"
 }
 
+restore_source_checkpoint() {
+  local street="$1"
+  if [[ -z "$SOURCE_RELEASE_ID" ]]; then
+    return 0
+  fi
+  if [[ -z "$S3_BUCKET" ]]; then
+    echo "GOP_ARTIFACT_BUCKET is required when GOP_SOURCE_RELEASE_ID is set." >&2
+    exit 2
+  fi
+  local src_prefix="${S3_PREFIX%/}"
+  local src
+  if [[ -n "$src_prefix" ]]; then
+    src="s3://$S3_BUCKET/$src_prefix/releases/$SOURCE_RELEASE_ID/datasets/$street/"
+  else
+    src="s3://$S3_BUCKET/releases/$SOURCE_RELEASE_ID/datasets/$street/"
+  fi
+  local dst="$ARTIFACTS_ROOT/datasets/$street/"
+  echo "[release-worker] restore source dataset $street <- $src"
+  mkdir -p "$dst"
+  aws s3 cp "$src" "$dst" \
+    --recursive \
+    --only-show-errors
+}
+
 embed_street() {
   local street="$1"
   echo "[release-worker] embed $street"
@@ -90,6 +118,7 @@ embed_street() {
 }
 
 for street in "${STREETS[@]}"; do
+  restore_source_checkpoint "$street"
   generate_street "$street"
   upload_dataset_checkpoint "$street"
   embed_street "$street"

@@ -58,4 +58,23 @@ export async function writeRecordsParquet(
   }
 }
 
+export async function writeRecordsParquetFromIterable(
+  filePath: string,
+  records: AsyncIterable<DatasetRecord>,
+  featureNames: readonly string[],
+): Promise<number> {
+  const schema = buildSchema(featureNames);
+  const writer = await parquet.ParquetWriter.openFile(schema, filePath);
+  let count = 0;
+  try {
+    for await (const record of records) {
+      await writer.appendRow(recordToParquetRow(record, featureNames));
+      count += 1;
+    }
+  } finally {
+    await writer.close();
+  }
+  return count;
+}
+
 export { sanitizeColumn };

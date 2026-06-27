@@ -4,7 +4,7 @@ import {
   loadStreetManifest,
   streetArtifactsExist,
 } from "@/lib/server/artifacts";
-import type { Street } from "@geometry-of-poker/shared";
+import type { Street } from "@/lib/types";
 
 export const metadata = {
   title: "Map Behind the Project - Geometry of Poker",

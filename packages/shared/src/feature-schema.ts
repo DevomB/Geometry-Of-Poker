@@ -72,46 +72,55 @@ export const COMPACT_FEATURE_ORDER = [
   "categoryTransitionAvailable",
 ] as const;
 
+const META_FEATURES = new Set(["streetIndex"]);
+const VULNERABILITY_FEATURES = new Set(["pNuts", "pDominated"]);
+const DRAW_FEATURES = new Set(["gutshotFlag"]);
+const DRAW_TOKENS = ["Draw", "OutCount", "Flush", "Straight"];
+const HIGHER_IS_BETTER_TOKENS = ["Equity", "Upgrade", "FlushOrBetter", "PairOrBetter"];
+
+function hasToken(name: string, tokens: readonly string[]): boolean {
+  return tokens.some((token) => name.includes(token));
+}
+
 function groupForFeature(name: string): FeatureDescriptor["group"] {
-  if (name === "streetIndex") return "meta";
+  if (META_FEATURES.has(name)) return "meta";
   if (name.startsWith("category")) return "category";
   if (name.startsWith("equity") && !name.includes("Runout")) return "equity";
   if (name.includes("Runout")) return "runout";
-  if (name === "pNuts" || name === "pDominated" || name.includes("Vulnerability")) {
-    return "vulnerability";
-  }
+  if (VULNERABILITY_FEATURES.has(name) || name.includes("Vulnerability")) return "vulnerability";
   if (name.startsWith("board")) return "texture";
-  if (
-    name.includes("Draw") ||
-    name.includes("OutCount") ||
-    name.includes("Flush") ||
-    name.includes("Straight") ||
-    name.startsWith("improvement") ||
-    name.startsWith("cleanImprovement") ||
-    name === "gutshotFlag"
-  ) {
-    return "draw";
-  }
+  if (isDrawFeature(name)) return "draw";
   if (name.startsWith("removal")) return "removal";
   if (name.startsWith("transition")) return "transition";
   return "meta";
+}
+
+function isDrawFeature(name: string): boolean {
+  return (
+    DRAW_FEATURES.has(name) ||
+    hasToken(name, DRAW_TOKENS) ||
+    name.startsWith("improvement") ||
+    name.startsWith("cleanImprovement")
+  );
 }
 
 function labelForFeature(name: string): string {
   return name.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 }
 
+function higherIsBetter(name: string): boolean {
+  return (
+    name === "equityVsRandom" ||
+    name === "pNuts" ||
+    hasToken(name, HIGHER_IS_BETTER_TOKENS)
+  );
+}
+
 export const FEATURE_SCHEMA: readonly FeatureDescriptor[] = COMPACT_FEATURE_ORDER.map((name) => ({
   name,
   label: labelForFeature(name),
   group: groupForFeature(name),
-  higherIsBetter:
-    name.includes("Equity") ||
-    name === "equityVsRandom" ||
-    name === "pNuts" ||
-    name.includes("Upgrade") ||
-    name.includes("FlushOrBetter") ||
-    name.includes("PairOrBetter"),
+  higherIsBetter: higherIsBetter(name),
 }));
 
 export function streetFromCommunityCount(count: number): Street {

@@ -11,28 +11,34 @@ from .config import EmbedConfig
 from .fit import FitResult
 
 
+FEATURE_GROUP_BY_SLUG = {
+    "streetIndex": "meta",
+    "pNuts": "vulnerability",
+    "pDominated": "vulnerability",
+    "gutshotFlag": "draw",
+}
+
+DRAW_TOKENS = ("Draw", "OutCount", "Flush", "Straight")
+
+
+def _contains_any(name: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in name for token in tokens)
+
+
 def feature_group(name: str) -> str:
-    if name == "streetIndex":
-        return "meta"
+    if name in FEATURE_GROUP_BY_SLUG:
+        return FEATURE_GROUP_BY_SLUG[name]
     if name.startswith("category"):
         return "category"
     if name.startswith("equity") and "Runout" not in name:
         return "equity"
     if "Runout" in name:
         return "runout"
-    if name in {"pNuts", "pDominated"} or "Vulnerability" in name:
+    if "Vulnerability" in name:
         return "vulnerability"
     if name.startswith("board"):
         return "texture"
-    if (
-        "Draw" in name
-        or "OutCount" in name
-        or "Flush" in name
-        or "Straight" in name
-        or name.startswith("improvement")
-        or name.startswith("cleanImprovement")
-        or name == "gutshotFlag"
-    ):
+    if _contains_any(name, DRAW_TOKENS) or name.startswith(("improvement", "cleanImprovement")):
         return "draw"
     if name.startswith("removal"):
         return "removal"

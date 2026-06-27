@@ -120,8 +120,7 @@ function assertNoForbiddenProvenance(streetDir) {
   }
 }
 
-function validateStreet(root, street) {
-  const streetDir = join(root, street);
+function assertRequiredFiles(streetDir) {
   if (!existsSync(streetDir)) throw new Error(`Missing street directory: ${streetDir}`);
 
   for (const file of REQUIRED_FILES) {
@@ -129,50 +128,73 @@ function validateStreet(root, street) {
     if (!existsSync(path)) throw new Error(`Missing required artifact: ${path}`);
     if (statSync(path).size === 0) throw new Error(`Artifact is empty: ${path}`);
   }
+}
 
-  assertNoForbiddenProvenance(streetDir);
+function readStreetArtifacts(streetDir) {
+  return {
+    manifest: readJson(join(streetDir, "viewer-manifest.json")),
+    metadata: readJson(join(streetDir, "browser-metadata.json")),
+    retained: readJson(join(streetDir, "retained-features.json")),
+    pointsCount: parsePointsCount(join(streetDir, "browser-points.bin")),
+    channelsCount: parseChannelsCount(join(streetDir, "browser-channels.bin")),
+    projection: parseProjectionIndexCount(join(streetDir, "projection-index.bin")),
+    dimensionProfile: readJson(join(streetDir, "dimension-profile.json")),
+  };
+}
 
-  const manifest = readJson(join(streetDir, "viewer-manifest.json"));
-  const metadata = readJson(join(streetDir, "browser-metadata.json"));
-  const retained = readJson(join(streetDir, "retained-features.json"));
-  const pointsCount = parsePointsCount(join(streetDir, "browser-points.bin"));
-  const channelsCount = parseChannelsCount(join(streetDir, "browser-channels.bin"));
-  const projection = parseProjectionIndexCount(join(streetDir, "projection-index.bin"));
+function validateStreetIdentity(street, artifacts) {
+  if (artifacts.manifest.street !== street) throw new Error(`${street}: manifest street mismatch.`);
+  if (artifacts.metadata.street !== street) throw new Error(`${street}: metadata street mismatch.`);
+}
 
-  if (manifest.street !== street) throw new Error(`${street}: manifest street mismatch.`);
-  if (metadata.street !== street) throw new Error(`${street}: metadata street mismatch.`);
-  if (manifest.pointCount !== pointsCount) throw new Error(`${street}: manifest pointCount != GOPK count.`);
-  if (metadata.count !== pointsCount) throw new Error(`${street}: metadata count != GOPK count.`);
-  if (!Array.isArray(metadata.points) || metadata.points.length !== pointsCount) {
+function validatePointCounts(street, artifacts) {
+  if (artifacts.manifest.pointCount !== artifacts.pointsCount) throw new Error(`${street}: manifest pointCount != GOPK count.`);
+  if (artifacts.metadata.count !== artifacts.pointsCount) throw new Error(`${street}: metadata count != GOPK count.`);
+  if (!Array.isArray(artifacts.metadata.points) || artifacts.metadata.points.length !== artifacts.pointsCount) {
     throw new Error(`${street}: metadata points length mismatch.`);
   }
-  if (channelsCount !== pointsCount) throw new Error(`${street}: GOPC count != GOPK count.`);
-  if (projection.count !== pointsCount) throw new Error(`${street}: GOPI count != GOPK count.`);
+  if (artifacts.channelsCount !== artifacts.pointsCount) throw new Error(`${street}: GOPC count != GOPK count.`);
+  if (artifacts.projection.count !== artifacts.pointsCount) throw new Error(`${street}: GOPI count != GOPK count.`);
+}
 
-  const manifestFeatures = manifest.retainedFeatures ?? [];
-  const retainedFeatures = retained.retained_features ?? retained.retainedFeatures ?? [];
-  if (!Array.isArray(manifestFeatures) || manifestFeatures.length !== projection.featureCount) {
+function validateFeatureArtifacts(street, artifacts) {
+  const manifestFeatures = artifacts.manifest.retainedFeatures ?? [];
+  const retainedFeatures = artifacts.retained.retained_features ?? artifacts.retained.retainedFeatures ?? [];
+  if (!Array.isArray(manifestFeatures) || manifestFeatures.length !== artifacts.projection.featureCount) {
     throw new Error(`${street}: manifest retainedFeatures length != GOPI feature count.`);
   }
-  if (!Array.isArray(retainedFeatures) || retainedFeatures.length !== projection.featureCount) {
+  if (!Array.isArray(retainedFeatures) || retainedFeatures.length !== artifacts.projection.featureCount) {
     throw new Error(`${street}: retained-features length != GOPI feature count.`);
   }
-  if (!manifest.artifacts?.projectionIndexBin) {
+  if (!artifacts.manifest.artifacts?.projectionIndexBin) {
     throw new Error(`${street}: viewer-manifest.json must include artifacts.projectionIndexBin.`);
   }
-  if (!manifest.artifacts?.dimensionProfileJson) {
+  if (!artifacts.manifest.artifacts?.dimensionProfileJson) {
     throw new Error(`${street}: viewer-manifest.json must include artifacts.dimensionProfileJson.`);
   }
-  const dimensionProfile = readJson(join(streetDir, "dimension-profile.json"));
-  if (dimensionProfile.street !== street) throw new Error(`${street}: dimension profile street mismatch.`);
-  if (dimensionProfile.pointCount !== pointsCount) {
+}
+
+function validateDimensionProfile(street, artifacts) {
+  if (artifacts.dimensionProfile.street !== street) throw new Error(`${street}: dimension profile street mismatch.`);
+  if (artifacts.dimensionProfile.pointCount !== artifacts.pointsCount) {
     throw new Error(`${street}: dimension profile pointCount != GOPK count.`);
   }
-  if (!dimensionProfile.interpretation?.axisCaveat?.includes("nonlinear")) {
+  if (!artifacts.dimensionProfile.interpretation?.axisCaveat?.includes("nonlinear")) {
     throw new Error(`${street}: dimension profile must describe nonlinear coordinate interpretation.`);
   }
+}
 
-  return { street, points: pointsCount, features: projection.featureCount };
+function validateStreet(root, street) {
+  const streetDir = join(root, street);
+  assertRequiredFiles(streetDir);
+  assertNoForbiddenProvenance(streetDir);
+  const artifacts = readStreetArtifacts(streetDir);
+  validateStreetIdentity(street, artifacts);
+  validatePointCounts(street, artifacts);
+  validateFeatureArtifacts(street, artifacts);
+  validateDimensionProfile(street, artifacts);
+
+  return { street, points: artifacts.pointsCount, features: artifacts.projection.featureCount };
 }
 
 function main() {

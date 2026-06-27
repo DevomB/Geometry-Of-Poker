@@ -34,75 +34,96 @@ Optional:
 `;
 }
 
-function main() {
+function parseOptions() {
   const releaseId = argValue("--release-id");
   if (!releaseId) {
     console.error(usage());
     process.exit(2);
   }
 
-  const region = argValue("--region") || process.env.AWS_REGION || "us-east-1";
   const projectName = argValue("--project-name") || "geometry-of-poker";
-  const jobQueue = argValue("--job-queue") || `${projectName}-release`;
-  const jobDefinition = argValue("--job-definition") || `${projectName}-release-worker`;
-  const bucket = argValue("--bucket");
-  const exactFeatureBudget = argValue("--exact-feature-budget");
-  const preflopCount = argValue("--preflop-count");
-  const flopCount = argValue("--flop-count");
-  const turnCount = argValue("--turn-count");
-  const riverCount = argValue("--river-count");
-  const streets = argValue("--streets");
-  const sourceReleaseId = argValue("--source-release-id");
-  const batchSize = argValue("--batch-size");
-  const vcpus = argValue("--vcpus");
-  const memoryMb = argValue("--memory-mb");
-  const skipUpload = process.argv.includes("--skip-upload");
-  const resume = process.argv.includes("--resume");
+  return {
+    releaseId,
+    region: argValue("--region") || process.env.AWS_REGION || "us-east-1",
+    projectName,
+    jobQueue: argValue("--job-queue") || `${projectName}-release`,
+    jobDefinition: argValue("--job-definition") || `${projectName}-release-worker`,
+    bucket: argValue("--bucket"),
+    exactFeatureBudget: argValue("--exact-feature-budget"),
+    preflopCount: argValue("--preflop-count"),
+    flopCount: argValue("--flop-count"),
+    turnCount: argValue("--turn-count"),
+    riverCount: argValue("--river-count"),
+    streets: argValue("--streets"),
+    sourceReleaseId: argValue("--source-release-id"),
+    batchSize: argValue("--batch-size"),
+    vcpus: argValue("--vcpus"),
+    memoryMb: argValue("--memory-mb"),
+    skipUpload: process.argv.includes("--skip-upload"),
+    resume: process.argv.includes("--resume"),
+  };
+}
 
-  const environment = [{ name: "GOP_RELEASE_ID", value: releaseId }];
-  if (bucket) environment.push({ name: "GOP_ARTIFACT_BUCKET", value: bucket });
-  if (skipUpload) environment.push({ name: "GOP_SKIP_UPLOAD", value: "1" });
-  if (resume) environment.push({ name: "GOP_RESUME", value: "1" });
-  if (exactFeatureBudget) {
-    environment.push({ name: "GOP_EXACT_FEATURE_BUDGET", value: exactFeatureBudget });
-  }
-  if (preflopCount) environment.push({ name: "GOP_PREFLOP_COUNT", value: preflopCount });
-  if (flopCount) environment.push({ name: "GOP_FLOP_COUNT", value: flopCount });
-  if (turnCount) environment.push({ name: "GOP_TURN_COUNT", value: turnCount });
-  if (riverCount) environment.push({ name: "GOP_RIVER_COUNT", value: riverCount });
-  if (streets) environment.push({ name: "GOP_STREETS", value: streets });
-  if (sourceReleaseId) environment.push({ name: "GOP_SOURCE_RELEASE_ID", value: sourceReleaseId });
-  if (batchSize) environment.push({ name: "GOP_BATCH_SIZE", value: batchSize });
+function pushEnv(environment, name, value) {
+  if (value) environment.push({ name, value });
+}
 
+function buildEnvironment(options) {
+  const environment = [{ name: "GOP_RELEASE_ID", value: options.releaseId }];
+  pushEnv(environment, "GOP_ARTIFACT_BUCKET", options.bucket);
+  pushEnv(environment, "GOP_SKIP_UPLOAD", options.skipUpload ? "1" : "");
+  pushEnv(environment, "GOP_RESUME", options.resume ? "1" : "");
+  pushEnv(environment, "GOP_EXACT_FEATURE_BUDGET", options.exactFeatureBudget);
+  pushEnv(environment, "GOP_PREFLOP_COUNT", options.preflopCount);
+  pushEnv(environment, "GOP_FLOP_COUNT", options.flopCount);
+  pushEnv(environment, "GOP_TURN_COUNT", options.turnCount);
+  pushEnv(environment, "GOP_RIVER_COUNT", options.riverCount);
+  pushEnv(environment, "GOP_STREETS", options.streets);
+  pushEnv(environment, "GOP_SOURCE_RELEASE_ID", options.sourceReleaseId);
+  pushEnv(environment, "GOP_BATCH_SIZE", options.batchSize);
+  return environment;
+}
+
+function buildResourceRequirements(options) {
   const resourceRequirements = [];
-  if (vcpus) resourceRequirements.push({ type: "VCPU", value: vcpus });
-  if (memoryMb) resourceRequirements.push({ type: "MEMORY", value: memoryMb });
+  if (options.vcpus) resourceRequirements.push({ type: "VCPU", value: options.vcpus });
+  if (options.memoryMb) resourceRequirements.push({ type: "MEMORY", value: options.memoryMb });
+  return resourceRequirements;
+}
 
+function containerOverrides(options) {
+  const resourceRequirements = buildResourceRequirements(options);
   const containerOverrides = JSON.stringify({
-    environment,
+    environment: buildEnvironment(options),
     ...(resourceRequirements.length > 0 ? { resourceRequirements } : {}),
   });
-  const jobName = `gop-${releaseId}`.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 128);
+  return containerOverrides;
+}
 
-  const result = spawnSync(
+function submitJob(options) {
+  const jobName = `gop-${options.releaseId}`.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 128);
+  return spawnSync(
     "aws",
     [
       "batch",
       "submit-job",
       "--region",
-      region,
+      options.region,
       "--job-name",
       jobName,
       "--job-queue",
-      jobQueue,
+      options.jobQueue,
       "--job-definition",
-      jobDefinition,
+      options.jobDefinition,
       "--container-overrides",
-      containerOverrides,
+      containerOverrides(options),
     ],
     { stdio: "inherit", shell: false },
   );
+}
 
+function main() {
+  const result = submitJob(parseOptions());
   if (result.error) {
     console.error(`Failed to run AWS CLI: ${result.error.message}`);
     console.error("Install and configure AWS CLI v2, then retry this command.");

@@ -17,6 +17,26 @@ const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const BUILD_DIR = join(ROOT, ".aws-build");
 const STAGE_DIR = join(BUILD_DIR, "release-worker-source");
 const ZIP_PATH = join(BUILD_DIR, "release-worker-source.zip");
+const SOURCE_ITEMS = [
+  ".dockerignore",
+  ".npmrc",
+  "apps",
+  "deploy",
+  "package.json",
+  "packages",
+  "pipeline",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "scripts",
+];
+const IGNORED_STAGE_SEGMENTS = new Set([
+  ".git",
+  ".next",
+  ".venv",
+  "dist",
+  "node_modules",
+  "__pycache__",
+]);
 
 function argValue(name) {
   const argv = process.argv.filter((arg) => arg !== "--");
@@ -78,45 +98,36 @@ function copySource() {
   rmSync(STAGE_DIR, { recursive: true, force: true });
   mkdirSync(STAGE_DIR, { recursive: true });
 
-  for (const item of [
-    ".dockerignore",
-    ".npmrc",
-    "apps",
-    "deploy",
-    "package.json",
-    "packages",
-    "pipeline",
-    "pnpm-lock.yaml",
-    "pnpm-workspace.yaml",
-    "scripts",
-  ]) {
+  for (const item of SOURCE_ITEMS) {
     const src = join(ROOT, item);
     if (!existsSync(src)) continue;
     cpSync(src, join(STAGE_DIR, item), {
       recursive: true,
-      filter: (path) => {
-        const normalized = path.replace(/\\/g, "/");
-        const relativePath = relative(ROOT, path).replace(/\\/g, "/");
-        const segments = relativePath.split("/");
-        if (segments.includes(".git")) return false;
-        if (segments.includes(".next")) return false;
-        if (segments.includes(".venv")) return false;
-        if (segments.includes("dist")) return false;
-        if (segments.includes("node_modules")) return false;
-        if (segments.includes("__pycache__")) return false;
-        if (relativePath === "artifacts" || relativePath.startsWith("artifacts/")) return false;
-        if (
-          relativePath === "apps/web/public/artifacts" ||
-          relativePath.startsWith("apps/web/public/artifacts/")
-        ) {
-          return false;
-        }
-        if (!normalized) return false;
-        return true;
-      },
+      filter: shouldCopyStagePath,
     });
   }
 
+}
+
+function shouldCopyStagePath(path) {
+  const normalized = path.replace(/\\/g, "/");
+  if (!normalized) return false;
+
+  const relativePath = relative(ROOT, path).replace(/\\/g, "/");
+  const segments = relativePath.split("/");
+  return (
+    !segments.some((segment) => IGNORED_STAGE_SEGMENTS.has(segment)) &&
+    !isGeneratedArtifactPath(relativePath)
+  );
+}
+
+function isGeneratedArtifactPath(relativePath) {
+  return (
+    relativePath === "artifacts" ||
+    relativePath.startsWith("artifacts/") ||
+    relativePath === "apps/web/public/artifacts" ||
+    relativePath.startsWith("apps/web/public/artifacts/")
+  );
 }
 
 const CRC_TABLE = new Uint32Array(256);

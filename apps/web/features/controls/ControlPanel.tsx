@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useViewerStore } from "@/stores/viewer-store";
 import { COLOR_MODES, STREETS } from "@/lib/types";
-import type { Street } from "@geometry-of-poker/shared";
-import { resetCameraView } from "@/features/scene/SceneShell";
+import type { Street } from "@/lib/types";
+import { resetCameraView } from "@/features/scene/camera-actions";
 import { CardPickerPanel } from "@/features/card-picker/CardPickerPanel";
 import { ColorLegend } from "@/components/ColorLegend";
 import { humanCategory } from "@/lib/poker/human-category";

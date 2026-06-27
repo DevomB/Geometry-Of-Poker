@@ -2,13 +2,13 @@ import { create } from "zustand";
 import { loadStreetDatasetProgressive, clearManifestCache } from "@/lib/artifacts/load-street";
 import { applyColorMode, applyFilters, buildLodIndices } from "@/lib/colors/color-modes";
 import { computeBounds } from "@/lib/artifacts/parse-points-bin";
-import type { Street } from "@geometry-of-poker/shared";
 import type {
   CameraFlyTarget,
   ColorMode,
   ManualMarker,
   RenderQuality,
   SelectionState,
+  Street,
   StreetDataset,
   ViewerFilters,
 } from "@/lib/types";

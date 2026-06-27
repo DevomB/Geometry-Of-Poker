@@ -74,6 +74,48 @@ function isBackdoorFlushPossible(hero: [string, string], board: string[], dead: 
   return false;
 }
 
+function leapfrogDeckSet(state: ValidatedState): Set<number> {
+  if (state.board.length < 3 || state.board.length > 4) return new Set();
+
+  try {
+    const leap = getPokerCalculations().exactVillainLeapfrogOutCounts(
+      state.hero,
+      state.board,
+      state.deadCards,
+    );
+    return new Set(leap.leapfrogDeckIndices);
+  } catch {
+    return new Set();
+  }
+}
+
+function collectDrawOuts(state: ValidatedState, remaining: number[]) {
+  const flushOutCards: string[] = [];
+  const straightOutCards: string[] = [];
+  const improveCards: string[] = [];
+  const cleanImproveCards: string[] = [];
+  const leapfrogSet = leapfrogDeckSet(state);
+
+  for (const idx of remaining) {
+    const card = indexToCard(idx);
+    if (completesFlushOnNext(state.hero, state.board, card)) flushOutCards.push(card);
+    if (completesStraightOnNext(state.hero, state.board, card)) straightOutCards.push(card);
+    if (!improvesHand(state.hero, state.board, card)) continue;
+    improveCards.push(card);
+    if (!leapfrogSet.has(idx)) cleanImproveCards.push(card);
+  }
+
+  return { flushOutCards, straightOutCards, improveCards, cleanImproveCards };
+}
+
+function backdoorFlushFlag(state: ValidatedState, flushOutCount: number) {
+  return state.street === "flop" &&
+    flushOutCount === 0 &&
+    isBackdoorFlushPossible(state.hero, state.board, state.deadCards)
+    ? 1
+    : 0;
+}
+
 function straightWindows(): number[][] {
   const windows: number[][] = [];
   for (let start = 0; start <= 8; start++) {
@@ -81,6 +123,35 @@ function straightWindows(): number[][] {
   }
   windows.push([12, 0, 1, 2, 3]);
   return windows;
+}
+
+function classifyEightOutStraightDraw(
+  outCards: string[],
+  currentCards: string[],
+): {
+  oesd: number;
+  gutshot: number;
+  doubleGutshot: number;
+} {
+  const outRanks = new Set(outCards.map(cardRankIndex));
+  const currentRanks = new Set(currentCards.map(cardRankIndex));
+  const edgeMisses = new Set<number>();
+  const internalMisses = new Set<number>();
+
+  for (const window of straightWindows()) {
+    const missing = window.filter((rank) => !currentRanks.has(rank));
+    if (missing.length !== 1 || !outRanks.has(missing[0]!)) continue;
+    const missingIndex = window.indexOf(missing[0]!);
+    if (missingIndex === 0 || missingIndex === window.length - 1) {
+      edgeMisses.add(missing[0]!);
+    } else {
+      internalMisses.add(missing[0]!);
+    }
+  }
+
+  if (edgeMisses.size >= 2) return { oesd: 1, gutshot: 0, doubleGutshot: 0 };
+  if (internalMisses.size >= 2) return { oesd: 0, gutshot: 0, doubleGutshot: 1 };
+  return { oesd: 0, gutshot: 0, doubleGutshot: 1 };
 }
 
 function classifyStraightDrawType(
@@ -96,29 +167,7 @@ function classifyStraightDrawType(
     return { oesd: 0, gutshot: 0, doubleGutshot: 0 };
   }
   if (straightOutCount === 8) {
-    const outRanks = new Set(outCards.map(cardRankIndex));
-    const currentRanks = new Set(currentCards.map(cardRankIndex));
-    const edgeMisses = new Set<number>();
-    const internalMisses = new Set<number>();
-
-    for (const window of straightWindows()) {
-      const missing = window.filter((rank) => !currentRanks.has(rank));
-      if (missing.length !== 1 || !outRanks.has(missing[0]!)) continue;
-      const missingIndex = window.indexOf(missing[0]!);
-      if (missingIndex === 0 || missingIndex === window.length - 1) {
-        edgeMisses.add(missing[0]!);
-      } else {
-        internalMisses.add(missing[0]!);
-      }
-    }
-
-    if (edgeMisses.size >= 2) {
-      return { oesd: 1, gutshot: 0, doubleGutshot: 0 };
-    }
-    if (internalMisses.size >= 2) {
-      return { oesd: 0, gutshot: 0, doubleGutshot: 1 };
-    }
-    return { oesd: 0, gutshot: 0, doubleGutshot: 1 };
+    return classifyEightOutStraightDraw(outCards, currentCards);
   }
   if (straightOutCount === 4) {
     return { oesd: 0, gutshot: 1, doubleGutshot: 0 };
@@ -135,45 +184,11 @@ export function computeDrawFeatures(state: ValidatedState): DrawFeatureResult {
   }
 
   const pc = getPokerCalculations();
-
   const known = [...state.hero, ...state.board, ...state.deadCards].map(deckIndex);
   const remaining = remainingDeckIndices(known);
   const unseen = remaining.length;
-
-  const flushOutCards: string[] = [];
-  const straightOutCards: string[] = [];
-  const improveCards: string[] = [];
-  const cleanImproveCards: string[] = [];
-
-  let leapfrogSet = new Set<number>();
-  if (state.board.length >= 3 && state.board.length <= 4) {
-    try {
-      const leap = pc.exactVillainLeapfrogOutCounts(
-        state.hero,
-        state.board,
-        state.deadCards,
-      );
-      leapfrogSet = new Set(leap.leapfrogDeckIndices);
-    } catch {
-      // unavailable — treat all improvements as clean
-    }
-  }
-
-  for (const idx of remaining) {
-    const card = indexToCard(idx);
-    if (completesFlushOnNext(state.hero, state.board, card)) {
-      flushOutCards.push(card);
-    }
-    if (completesStraightOnNext(state.hero, state.board, card)) {
-      straightOutCards.push(card);
-    }
-    if (improvesHand(state.hero, state.board, card)) {
-      improveCards.push(card);
-      if (!leapfrogSet.has(idx)) {
-        cleanImproveCards.push(card);
-      }
-    }
-  }
+  const { flushOutCards, straightOutCards, improveCards, cleanImproveCards } =
+    collectDrawOuts(state, remaining);
 
   const flushOutCount = flushOutCards.length;
   const straightOutCount = straightOutCards.length;
@@ -182,15 +197,6 @@ export function computeDrawFeatures(state: ValidatedState): DrawFeatureResult {
     straightOutCards,
     [...state.hero, ...state.board],
   );
-
-  const backdoorFlushFlag =
-    state.street === "flop" && flushOutCount === 0 && isBackdoorFlushPossible(
-      state.hero,
-      state.board,
-      state.deadCards,
-    )
-      ? 1
-      : 0;
 
   const improvementOutCount = improveCards.length;
   const cleanImprovementOutCount = cleanImproveCards.length;
@@ -201,7 +207,7 @@ export function computeDrawFeatures(state: ValidatedState): DrawFeatureResult {
 
   const values: Record<string, number> = {
     flushOutCount,
-    backdoorFlushFlag,
+    backdoorFlushFlag: backdoorFlushFlag(state, flushOutCount),
     straightOutCount,
     openEndedStraightDrawFlag: straightType.oesd,
     gutshotFlag: straightType.gutshot,
@@ -215,5 +221,4 @@ export function computeDrawFeatures(state: ValidatedState): DrawFeatureResult {
 
   return { values, available: 1 };
 }
-
 export const DRAW_FEATURE_NAMES = Object.keys(NEUTRAL_DRAWS);

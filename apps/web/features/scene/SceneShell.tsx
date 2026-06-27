@@ -159,10 +159,6 @@ export function SceneShell() {
   );
 }
 
-export function resetCameraView() {
-  (window as Window & { __resetGeometryView?: () => void }).__resetGeometryView?.();
-}
-
 function SceneOverlay({
   tone,
   title,

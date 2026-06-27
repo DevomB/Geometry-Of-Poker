@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Street } from "@geometry-of-poker/shared";
+import type { Street } from "@/lib/types";
 import { categoryIndexForLabel } from "@geometry-of-poker/shared";
 import { parseChannelsBin } from "@/lib/artifacts/parse-channels-bin";
 import { parsePointsBin } from "@/lib/artifacts/parse-points-bin";

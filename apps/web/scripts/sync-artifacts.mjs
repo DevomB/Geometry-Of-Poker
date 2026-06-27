@@ -122,32 +122,49 @@ function parseAnalysisReport(text) {
     knnOverlap: null,
   };
 
-  const pcaMatch = text.match(/PCA dimensions:\*\* (\d+) \(([\d.]+)% variance\)/);
-  if (pcaMatch) {
-    result.pcaDimensions = Number(pcaMatch[1]);
-    result.pcaVariance = Number(pcaMatch[2]) / 100;
-  }
+  applyPcaSummary(result, text);
 
   for (const line of text.split("\n")) {
-    const umapMatch = line.match(/^- `(\w+)`: (.+)$/);
-    if (umapMatch && line.includes("UMAP") === false) {
-      const key = umapMatch[1];
-      let val = umapMatch[2];
-      if (val === "euclidean") result.umap[key] = val;
-      else if (!Number.isNaN(Number(val))) result.umap[key] = Number(val);
-      else result.umap[key] = val.replace(/"/g, "");
-    }
-    const clusterMatch = line.match(/\*\*Clusters:\*\* (\d+)/);
-    if (clusterMatch) result.hdbscan.clusters = Number(clusterMatch[1]);
-    const noiseMatch = line.match(/\*\*Noise points:\*\* [\d,]+ \(([\d.]+)%\)/);
-    if (noiseMatch) result.hdbscan.noiseFraction = Number(noiseMatch[1]) / 100;
-    const trustMatch = line.match(/Trustworthiness.*: ([\d.]+)/);
-    if (trustMatch) result.trustworthiness = Number(trustMatch[1]);
-    const overlapMatch = line.match(/kNN overlap.*: ([\d.]+)/);
-    if (overlapMatch) result.knnOverlap = Number(overlapMatch[1]);
+    applyUmapParam(result, line);
+    applyClusterSummary(result, line);
+    applyQualitySummary(result, line);
   }
 
   return result;
+}
+
+function applyPcaSummary(result, text) {
+  const pcaMatch = text.match(/PCA dimensions:\*\* (\d+) \(([\d.]+)% variance\)/);
+  if (!pcaMatch) return;
+  result.pcaDimensions = Number(pcaMatch[1]);
+  result.pcaVariance = Number(pcaMatch[2]) / 100;
+}
+
+function applyUmapParam(result, line) {
+  const umapMatch = line.match(/^- `(\w+)`: (.+)$/);
+  if (!umapMatch || line.includes("UMAP")) return;
+
+  const key = umapMatch[1];
+  const value = umapMatch[2];
+  if (value === "euclidean") result.umap[key] = value;
+  else if (!Number.isNaN(Number(value))) result.umap[key] = Number(value);
+  else result.umap[key] = value.replace(/"/g, "");
+}
+
+function applyClusterSummary(result, line) {
+  const clusterMatch = line.match(/\*\*Clusters:\*\* (\d+)/);
+  if (clusterMatch) result.hdbscan.clusters = Number(clusterMatch[1]);
+
+  const noiseMatch = line.match(/\*\*Noise points:\*\* [\d,]+ \(([\d.]+)%\)/);
+  if (noiseMatch) result.hdbscan.noiseFraction = Number(noiseMatch[1]) / 100;
+}
+
+function applyQualitySummary(result, line) {
+  const trustMatch = line.match(/Trustworthiness.*: ([\d.]+)/);
+  if (trustMatch) result.trustworthiness = Number(trustMatch[1]);
+
+  const overlapMatch = line.match(/kNN overlap.*: ([\d.]+)/);
+  if (overlapMatch) result.knnOverlap = Number(overlapMatch[1]);
 }
 
 function computeClusterCentroids(points) {

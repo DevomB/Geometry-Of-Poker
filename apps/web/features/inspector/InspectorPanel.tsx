@@ -7,31 +7,25 @@ import { CardDisplay } from "@/components/CardDisplay";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
 import {
   compareManualToPoint,
-  countBlockerCollisions,
-  summarizeBlockerNeighbors,
-} from "@/lib/inspector/state-comparison";
-import {
+  computeCategoryTransitionSummary,
   computeClusterProfile,
+  computeDrawPressure,
+  computePopulationStanding,
+  computeRemovalPressure,
+  computeRunoutDistribution,
+  countBlockerCollisions,
+  enrichSummaryFromChannels,
   formatDelta,
   type ClusterProfile,
-} from "@/lib/inspector/cluster-profile";
-import {
-  computePopulationStanding,
   formatPercentile,
-  type PopulationStanding,
-} from "@/lib/inspector/population-standing";
-import { computeRemovalPressure } from "@/lib/inspector/removal-pressure";
-import { computeCategoryTransitionSummary } from "@/lib/inspector/category-transition";
-import { computeRunoutDistribution } from "@/lib/inspector/runout-distribution";
-import {
-  enrichSummaryFromChannels,
   isEquityVarianceDefined,
   isFeatureAvailable,
   isVulnerabilityDefined,
   mergeExactRunoutMetrics,
-} from "@/lib/inspector/resolve-summary";
-import { useExactRunoutMetrics } from "@/lib/inspector/use-exact-runout-metrics";
-import { computeDrawPressure } from "@/lib/inspector/draw-pressure";
+  type PopulationStanding,
+  summarizeBlockerNeighbors,
+  useExactRunoutMetrics,
+} from "@/lib/inspector";
 import {
   computeStateCombinatorics,
   formatBigInt,

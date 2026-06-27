@@ -13,61 +13,77 @@ export interface ValidatedState {
   street: ReturnType<typeof streetFromBoardLength>;
 }
 
-export function validatePokerStateInput(input: PokerStateInput): ValidatedState {
-  const errors: string[] = [];
+const VALID_BOARD_LENGTHS = new Set([0, 3, 4, 5]);
 
+function cardList(value: string[] | undefined): string[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function validateHeroShape(input: PokerStateInput, errors: string[]) {
   if (!Array.isArray(input.hero) || input.hero.length !== 2) {
     errors.push("Hero must have exactly two hole cards.");
   }
+}
 
-  for (const card of input.hero ?? []) {
+function validateCards(label: string, cards: string[], errors: string[]) {
+  for (const card of cards) {
     if (!isValidCardString(card)) {
-      errors.push(`Invalid hero card: ${card}`);
+      errors.push(`Invalid ${label} card: ${card}`);
     }
   }
+}
 
-  const board = input.board ?? [];
-  if (![0, 3, 4, 5].includes(board.length)) {
-    errors.push(`Board length must be 0, 3, 4, or 5 — got ${board.length}.`);
+function validateBoardLength(board: string[], errors: string[]) {
+  if (!VALID_BOARD_LENGTHS.has(board.length)) {
+    errors.push(`Board length must be 0, 3, 4, or 5 - got ${board.length}.`);
   }
+}
 
-  for (const card of board) {
-    if (!isValidCardString(card)) {
-      errors.push(`Invalid board card: ${card}`);
-    }
-  }
+function throwIfInvalid(errors: string[]) {
+  if (errors.length > 0) throw new GeometryFeatureError(errors[0]!, errors);
+}
 
-  const deadCards = input.deadCards ?? [];
-  for (const card of deadCards) {
-    if (!isValidCardString(card)) {
-      errors.push(`Invalid dead card: ${card}`);
-    }
-  }
+function normalizeHero(hero: string[]): [string, string] {
+  return [normalizeCard(hero[0]!), normalizeCard(hero[1]!)] as [string, string];
+}
 
-  if (errors.length > 0) {
-    throw new GeometryFeatureError(errors[0]!, errors);
-  }
-
-  const hero = [normalizeCard(input.hero[0]!), normalizeCard(input.hero[1]!)] as [string, string];
-  const normalizedBoard = board.map(normalizeCard);
-  const normalizedDead = deadCards.map(normalizeCard);
-
+function validateNoDuplicateCards(
+  hero: [string, string],
+  board: string[],
+  deadCards: string[],
+  errors: string[],
+) {
   const heroSet = new Set(hero);
-  for (const card of normalizedBoard) {
+  for (const card of board) {
     if (heroSet.has(card)) {
       errors.push(`Hero card ${card} cannot appear on the board.`);
     }
   }
 
-  const all = [...hero, ...normalizedBoard, ...normalizedDead];
-  const unique = new Set(all);
-  if (unique.size !== all.length) {
+  const all = [...hero, ...board, ...deadCards];
+  if (new Set(all).size !== all.length) {
     errors.push("Duplicate cards detected across hero, board, and dead cards.");
   }
+}
 
-  if (errors.length > 0) {
-    throw new GeometryFeatureError(errors[0]!, errors);
-  }
+export function validatePokerStateInput(input: PokerStateInput): ValidatedState {
+  const errors: string[] = [];
+  const heroInput = cardList(input.hero);
+  const boardInput = cardList(input.board);
+  const deadCardsInput = cardList(input.deadCards);
+
+  validateHeroShape(input, errors);
+  validateCards("hero", heroInput, errors);
+  validateBoardLength(boardInput, errors);
+  validateCards("board", boardInput, errors);
+  validateCards("dead", deadCardsInput, errors);
+  throwIfInvalid(errors);
+
+  const hero = normalizeHero(heroInput);
+  const normalizedBoard = boardInput.map(normalizeCard);
+  const normalizedDead = deadCardsInput.map(normalizeCard);
+  validateNoDuplicateCards(hero, normalizedBoard, normalizedDead, errors);
+  throwIfInvalid(errors);
 
   return {
     hero,

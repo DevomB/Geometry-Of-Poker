@@ -1,5 +1,3 @@
-import type { PointCloudBuffers } from "@geometry-of-poker/shared";
-
 export const BINARY_MAGIC = 0x4b504f47; // "GOPK" as little-endian u32
 export const BINARY_VERSION = 1;
 export const HEADER_BYTES = 16;
@@ -9,6 +7,13 @@ export interface ParsedPointsBin {
   count: number;
   dim: number;
   positions: Float32Array;
+}
+
+export interface PointCloudBuffers {
+  positions: Float32Array;
+  colors: Float32Array;
+  clusterIds?: Uint16Array;
+  count: number;
 }
 
 export function parsePointsBin(buffer: ArrayBuffer): ParsedPointsBin {

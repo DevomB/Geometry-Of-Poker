@@ -1,4 +1,4 @@
-import type { Street } from "@geometry-of-poker/shared";
+import type { Street } from "@/lib/types";
 import type { StreetManifest } from "@/lib/types";
 
 export interface ArtifactStreetDashboard {

@@ -1,4 +1,33 @@
-import type { Street } from "@geometry-of-poker/shared";
+export type CardString = string;
+export type Street = "preflop" | "flop" | "turn" | "river";
+
+export interface PokerState {
+  heroHoleCards: [CardString, CardString];
+  communityCards: CardString[];
+  street: Street;
+}
+
+export interface CardValidationResult {
+  valid: boolean;
+  errors: string[];
+  normalizedState?: PokerState;
+}
+
+export interface ProjectionIndex {
+  version: number;
+  count: number;
+  pcaDimension: number;
+  featureCount: number;
+  retainedFeatures: string[];
+  scalerMean: Float64Array;
+  scalerScale: Float64Array;
+  pcaMean: Float64Array;
+  pcaComponents: Float64Array;
+  ids: string[];
+  pcaTrain: Float32Array;
+  embeddingTrain: Float32Array;
+  labels: Int16Array;
+}
 
 export type ColorMode =
   | "equity"
@@ -169,7 +198,7 @@ export interface StreetDataset {
     boardPairedness: Float32Array;
   };
   idToIndex: Map<string, number>;
-  projectionIndex?: import("@/lib/artifacts/parse-projection-index").ProjectionIndex;
+  projectionIndex?: ProjectionIndex;
 }
 
 export interface ViewerFilters {

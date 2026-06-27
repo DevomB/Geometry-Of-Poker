@@ -50,6 +50,34 @@ const DOC_ORDER = [
   "research-notes",
 ];
 
+const CATEGORY_SLUGS: Record<Exclude<ResearchDocCategory, "Core">, readonly string[]> = {
+  Math: ["math-showpiece", "combinatorial-proofs"],
+  Statistics: [
+    "statistical-standing",
+    "street-atlas",
+    "cluster-profiles",
+    "topology-and-clustering-audit",
+  ],
+  Engineering: [
+    "architecture",
+    "dataset-generation",
+    "feature-schema",
+    "performance-analysis",
+    "pipeline",
+    "pipeline-embedding",
+    "release-dashboard",
+    "state-api",
+  ],
+  Limits: ["limitations"],
+  Notes: ["research-notes"],
+};
+
+const CATEGORY_BY_SLUG = new Map<string, ResearchDocCategory>(
+  Object.entries(CATEGORY_SLUGS).flatMap(([category, slugs]) =>
+    slugs.map((slug) => [slug, category as ResearchDocCategory]),
+  ),
+);
+
 export function getResearchDocs(): ResearchDocSummary[] {
   const docsDir = resolveDocsDir();
   return fs
@@ -104,35 +132,7 @@ function summarizeDoc(filename: string, markdown: string): ResearchDocSummary {
 }
 
 export function categoryForSlug(slug: string): ResearchDocCategory {
-  if (
-    slug === "math-showpiece" ||
-    slug === "combinatorial-proofs"
-  ) {
-    return "Math";
-  }
-  if (
-    slug === "statistical-standing" ||
-    slug === "street-atlas" ||
-    slug === "cluster-profiles" ||
-    slug === "topology-and-clustering-audit"
-  ) {
-    return "Statistics";
-  }
-  if (
-    slug === "architecture" ||
-    slug === "dataset-generation" ||
-    slug === "feature-schema" ||
-    slug === "performance-analysis" ||
-    slug === "pipeline" ||
-    slug === "pipeline-embedding" ||
-    slug === "release-dashboard" ||
-    slug === "state-api"
-  ) {
-    return "Engineering";
-  }
-  if (slug === "limitations") return "Limits";
-  if (slug === "research-notes") return "Notes";
-  return "Core";
+  return CATEGORY_BY_SLUG.get(slug) ?? "Core";
 }
 
 export function tagsForSlug(slug: string): string[] {

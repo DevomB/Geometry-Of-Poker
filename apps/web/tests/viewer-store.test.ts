@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { create } from "zustand";
-import type { Street } from "@geometry-of-poker/shared";
+import type { Street } from "@/lib/types";
 import type { ColorMode, ViewerFilters } from "@/lib/types";
 import { DEFAULT_FILTERS } from "@/lib/types";
 import {

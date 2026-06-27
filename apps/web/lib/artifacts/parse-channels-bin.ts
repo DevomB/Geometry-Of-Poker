@@ -1,85 +1,103 @@
-import type { StreetDataset } from "@/lib/types";
-
 const MAGIC = "GOPC";
 const VERSION = 1;
 const HEADER_BYTES = 16;
+const CHANNEL_COUNT = 10;
+const CHANNEL_BYTES = 4 + 2 + 1 + 4 + 4 + 4 + 1 + 1 + 1 + 4;
 
-export type BrowserChannels = StreetDataset["channels"];
+export interface BrowserChannels {
+  equity: Float32Array;
+  clusterId: Int16Array;
+  categoryIndex: Uint8Array;
+  pNuts: Float32Array;
+  equityVariance: Float32Array;
+  boardConnectivity: Float32Array;
+  boardRainbow: Uint8Array;
+  boardTwoTone: Uint8Array;
+  boardMonotone: Uint8Array;
+  boardPairedness: Float32Array;
+}
 
 export function parseChannelsBin(buffer: ArrayBuffer): { count: number; channels: BrowserChannels } {
   const view = new DataView(buffer);
-  if (buffer.byteLength < HEADER_BYTES) {
+  const count = readHeader(view, buffer.byteLength);
+  const reader = new ChannelReader(view, count);
+
+  return {
+    count,
+    channels: {
+      equity: reader.float32Array(),
+      clusterId: reader.int16Array(),
+      categoryIndex: reader.uint8Array(),
+      pNuts: reader.float32Array(),
+      equityVariance: reader.float32Array(),
+      boardConnectivity: reader.float32Array(),
+      boardRainbow: reader.uint8Array(),
+      boardTwoTone: reader.uint8Array(),
+      boardMonotone: reader.uint8Array(),
+      boardPairedness: reader.float32Array(),
+    },
+  };
+}
+
+function readHeader(view: DataView, byteLength: number): number {
+  if (byteLength < HEADER_BYTES) {
     throw new Error("Channel artifact is too small.");
   }
 
-  const magic = String.fromCharCode(
+  const magic = readMagic(view);
+  const version = view.getUint32(4, true);
+  const count = view.getUint32(8, true);
+  const channelCount = view.getUint32(12, true);
+  const expectedBytes = HEADER_BYTES + count * CHANNEL_BYTES;
+
+  if (magic !== MAGIC) throw new Error(`Invalid channel magic: ${magic}`);
+  if (version !== VERSION) throw new Error(`Unsupported channel version: ${version}`);
+  if (channelCount !== CHANNEL_COUNT) throw new Error(`Unsupported channel count: ${channelCount}`);
+  if (byteLength !== expectedBytes) {
+    throw new Error(`Channel artifact size mismatch: expected ${expectedBytes}, got ${byteLength}`);
+  }
+
+  return count;
+}
+
+function readMagic(view: DataView): string {
+  return String.fromCharCode(
     view.getUint8(0),
     view.getUint8(1),
     view.getUint8(2),
     view.getUint8(3),
   );
-  const version = view.getUint32(4, true);
-  const count = view.getUint32(8, true);
-  const channelCount = view.getUint32(12, true);
+}
 
-  if (magic !== MAGIC) throw new Error(`Invalid channel magic: ${magic}`);
-  if (version !== VERSION) throw new Error(`Unsupported channel version: ${version}`);
-  if (channelCount !== 10) throw new Error(`Unsupported channel count: ${channelCount}`);
+class ChannelReader {
+  private offset = HEADER_BYTES;
 
-  const expectedBytes =
-    HEADER_BYTES +
-    count * 4 +
-    count * 2 +
-    count +
-    count * 4 +
-    count * 4 +
-    count * 4 +
-    count +
-    count +
-    count +
-    count * 4;
-  if (buffer.byteLength !== expectedBytes) {
-    throw new Error(
-      `Channel artifact size mismatch: expected ${expectedBytes}, got ${buffer.byteLength}`,
-    );
+  constructor(
+    private readonly view: DataView,
+    private readonly count: number,
+  ) {}
+
+  float32Array(): Float32Array {
+    const values = new Float32Array(this.count);
+    for (let i = 0; i < this.count; i++, this.offset += 4) {
+      values[i] = this.view.getFloat32(this.offset, true);
+    }
+    return values;
   }
 
-  const equity = new Float32Array(count);
-  const clusterId = new Int16Array(count);
-  const categoryIndex = new Uint8Array(count);
-  const pNuts = new Float32Array(count);
-  const equityVariance = new Float32Array(count);
-  const boardConnectivity = new Float32Array(count);
-  const boardRainbow = new Uint8Array(count);
-  const boardTwoTone = new Uint8Array(count);
-  const boardMonotone = new Uint8Array(count);
-  const boardPairedness = new Float32Array(count);
+  int16Array(): Int16Array {
+    const values = new Int16Array(this.count);
+    for (let i = 0; i < this.count; i++, this.offset += 2) {
+      values[i] = this.view.getInt16(this.offset, true);
+    }
+    return values;
+  }
 
-  let offset = HEADER_BYTES;
-  for (let i = 0; i < count; i++, offset += 4) equity[i] = view.getFloat32(offset, true);
-  for (let i = 0; i < count; i++, offset += 2) clusterId[i] = view.getInt16(offset, true);
-  for (let i = 0; i < count; i++, offset += 1) categoryIndex[i] = view.getUint8(offset);
-  for (let i = 0; i < count; i++, offset += 4) pNuts[i] = view.getFloat32(offset, true);
-  for (let i = 0; i < count; i++, offset += 4) equityVariance[i] = view.getFloat32(offset, true);
-  for (let i = 0; i < count; i++, offset += 4) boardConnectivity[i] = view.getFloat32(offset, true);
-  for (let i = 0; i < count; i++, offset += 1) boardRainbow[i] = view.getUint8(offset);
-  for (let i = 0; i < count; i++, offset += 1) boardTwoTone[i] = view.getUint8(offset);
-  for (let i = 0; i < count; i++, offset += 1) boardMonotone[i] = view.getUint8(offset);
-  for (let i = 0; i < count; i++, offset += 4) boardPairedness[i] = view.getFloat32(offset, true);
-
-  return {
-    count,
-    channels: {
-      equity,
-      clusterId,
-      categoryIndex,
-      pNuts,
-      equityVariance,
-      boardConnectivity,
-      boardRainbow,
-      boardTwoTone,
-      boardMonotone,
-      boardPairedness,
-    },
-  };
+  uint8Array(): Uint8Array {
+    const values = new Uint8Array(this.count);
+    for (let i = 0; i < this.count; i++, this.offset += 1) {
+      values[i] = this.view.getUint8(this.offset);
+    }
+    return values;
+  }
 }

@@ -131,6 +131,11 @@ export function applyColorMode(
 }
 
 const HIDDEN_COLOR: [number, number, number] = [0.04, 0.04, 0.06];
+interface FilterContext {
+  categorySet: Set<string> | null;
+  clusterSet: Set<number> | null;
+  neighborIndices: Set<number> | null;
+}
 
 function insertTopK(top: { i: number; d: number }[], candidate: { i: number; d: number }, k: number) {
   if (top.length === k && candidate.d >= top[top.length - 1]!.d) return;
@@ -146,53 +151,76 @@ export function applyFilters(
   visible: Uint8Array,
   colors: Float32Array,
 ) {
-  const { count, channels } = dataset;
-  const categorySet =
-    filters.categories.length > 0 ? new Set(filters.categories) : null;
-  const clusterSet = filters.clusters.length > 0 ? new Set(filters.clusters) : null;
+  const context = buildFilterContext(dataset, filters);
 
-  let neighborIndices: Set<number> | null = null;
-  if (filters.searchNeighborOf) {
-    const idx = dataset.idToIndex.get(filters.searchNeighborOf);
-    if (idx !== undefined) {
-      neighborIndices = new Set([idx]);
-      const px = dataset.positions[idx * 3]!;
-      const py = dataset.positions[idx * 3 + 1]!;
-      const pz = dataset.positions[idx * 3 + 2]!;
-      const candidates: { i: number; d: number }[] = [];
-      for (let i = 0; i < count; i++) {
-        const d =
-          (dataset.positions[i * 3]! - px) ** 2 +
-          (dataset.positions[i * 3 + 1]! - py) ** 2 +
-          (dataset.positions[i * 3 + 2]! - pz) ** 2;
-        insertTopK(candidates, { i, d }, 25);
-      }
-      for (const c of candidates) neighborIndices.add(c.i);
-    }
-  }
-
-  for (let i = 0; i < count; i++) {
-    let show = true;
-    const eq = channels.equity[i]!;
-    if (eq < filters.equityMin || eq > filters.equityMax) show = false;
-    if (categorySet && !categorySet.has(INDEX_CATEGORY[channels.categoryIndex[i]!] ?? "highCard"))
-      show = false;
-    if (clusterSet && !clusterSet.has(channels.clusterId[i]!)) show = false;
-    if (filters.boardRainbow !== null && channels.boardRainbow[i] !== (filters.boardRainbow ? 1 : 0))
-      show = false;
-    if (filters.boardTwoTone !== null && channels.boardTwoTone[i] !== (filters.boardTwoTone ? 1 : 0))
-      show = false;
-    if (filters.boardMonotone !== null && channels.boardMonotone[i] !== (filters.boardMonotone ? 1 : 0))
-      show = false;
-    if (neighborIndices && !neighborIndices.has(i)) show = false;
-
+  for (let i = 0; i < dataset.count; i++) {
+    const show = isPointVisible(dataset, filters, context, i);
     visible[i] = show ? 1 : 0;
-    if (!show) {
-      colors[i * 3] = HIDDEN_COLOR[0];
-      colors[i * 3 + 1] = HIDDEN_COLOR[1];
-      colors[i * 3 + 2] = HIDDEN_COLOR[2];
-    }
+    if (!show) paintHidden(colors, i);
   }
+}
+
+function buildFilterContext(dataset: StreetDataset, filters: ViewerFilters): FilterContext {
+  return {
+    categorySet: filters.categories.length > 0 ? new Set(filters.categories) : null,
+    clusterSet: filters.clusters.length > 0 ? new Set(filters.clusters) : null,
+    neighborIndices: filters.searchNeighborOf
+      ? nearestNeighborSet(dataset, filters.searchNeighborOf, 25)
+      : null,
+  };
+}
+
+function nearestNeighborSet(dataset: StreetDataset, pointId: string, k: number) {
+  const idx = dataset.idToIndex.get(pointId);
+  if (idx === undefined) return null;
+
+  const neighborIndices = new Set([idx]);
+  const px = dataset.positions[idx * 3]!;
+  const py = dataset.positions[idx * 3 + 1]!;
+  const pz = dataset.positions[idx * 3 + 2]!;
+  const candidates: { i: number; d: number }[] = [];
+
+  for (let i = 0; i < dataset.count; i++) {
+    const d =
+      (dataset.positions[i * 3]! - px) ** 2 +
+      (dataset.positions[i * 3 + 1]! - py) ** 2 +
+      (dataset.positions[i * 3 + 2]! - pz) ** 2;
+    insertTopK(candidates, { i, d }, k);
+  }
+  for (const c of candidates) neighborIndices.add(c.i);
+  return neighborIndices;
+}
+
+function isPointVisible(
+  dataset: StreetDataset,
+  filters: ViewerFilters,
+  context: FilterContext,
+  index: number,
+) {
+  const { channels } = dataset;
+  const eq = channels.equity[index]!;
+  if (eq < filters.equityMin || eq > filters.equityMax) return false;
+  if (
+    context.categorySet &&
+    !context.categorySet.has(INDEX_CATEGORY[channels.categoryIndex[index]!] ?? "highCard")
+  ) {
+    return false;
+  }
+  if (context.clusterSet && !context.clusterSet.has(channels.clusterId[index]!)) return false;
+  if (!matchesBinaryFilter(channels.boardRainbow[index], filters.boardRainbow)) return false;
+  if (!matchesBinaryFilter(channels.boardTwoTone[index], filters.boardTwoTone)) return false;
+  if (!matchesBinaryFilter(channels.boardMonotone[index], filters.boardMonotone)) return false;
+  return !context.neighborIndices || context.neighborIndices.has(index);
+}
+
+function matchesBinaryFilter(value: number | undefined, expected: boolean | null) {
+  return expected === null || value === (expected ? 1 : 0);
+}
+
+function paintHidden(colors: Float32Array, index: number) {
+  colors[index * 3] = HIDDEN_COLOR[0];
+  colors[index * 3 + 1] = HIDDEN_COLOR[1];
+  colors[index * 3 + 2] = HIDDEN_COLOR[2];
 }
 
 export function buildLodIndices(count: number, sampleRate: number): number[] {

@@ -101,20 +101,31 @@ export async function readSegmentManifests(outputDir: string): Promise<DatasetSe
   }
 }
 
+function segmentMismatches(
+  candidate: Pick<
+    DatasetManifest | DatasetSegmentManifest,
+    "street" | "seed" | "mode" | "exactFeatureBudget" | "featureSchemaVersion" | "preflopMode"
+  >,
+  context: SegmentContext,
+): string[] {
+  const mismatches: string[] = [];
+  if (candidate.street !== context.street) mismatches.push("street");
+  if (candidate.seed !== context.seed) mismatches.push("seed");
+  if (candidate.mode !== context.mode) mismatches.push("mode");
+  if (candidate.exactFeatureBudget !== context.exactFeatureBudget) mismatches.push("exactFeatureBudget");
+  if (candidate.featureSchemaVersion !== FEATURE_SCHEMA_VERSION) mismatches.push("featureSchemaVersion");
+  if (context.street === "preflop" && candidate.preflopMode !== context.preflopMode) {
+    mismatches.push("preflopMode");
+  }
+  return mismatches;
+}
+
 export function validateSegmentCompatibility(
   segments: readonly DatasetSegmentManifest[],
   context: SegmentContext,
 ): void {
   for (const segment of segments) {
-    const mismatches: string[] = [];
-    if (segment.street !== context.street) mismatches.push("street");
-    if (segment.seed !== context.seed) mismatches.push("seed");
-    if (segment.mode !== context.mode) mismatches.push("mode");
-    if (segment.exactFeatureBudget !== context.exactFeatureBudget) mismatches.push("exactFeatureBudget");
-    if (segment.featureSchemaVersion !== FEATURE_SCHEMA_VERSION) mismatches.push("featureSchemaVersion");
-    if (context.street === "preflop" && segment.preflopMode !== context.preflopMode) {
-      mismatches.push("preflopMode");
-    }
+    const mismatches = segmentMismatches(segment, context);
     if (mismatches.length > 0) {
       throw new Error(
         `Dataset growth refused: segment ${segment.parquetFile} is incompatible (${mismatches.join(", ")}).`,
@@ -191,13 +202,7 @@ export async function importExtensionSource(
   }
 
   const sourceManifest = JSON.parse(await readFile(join(sourceDir, "manifest.json"), "utf8")) as DatasetManifest;
-  const mismatches: string[] = [];
-  if (sourceManifest.street !== context.street) mismatches.push("street");
-  if (sourceManifest.seed !== context.seed) mismatches.push("seed");
-  if (sourceManifest.mode !== context.mode) mismatches.push("mode");
-  if (sourceManifest.exactFeatureBudget !== context.exactFeatureBudget) mismatches.push("exactFeatureBudget");
-  if (sourceManifest.featureSchemaVersion !== FEATURE_SCHEMA_VERSION) mismatches.push("featureSchemaVersion");
-  if (context.street === "preflop" && sourceManifest.preflopMode !== context.preflopMode) mismatches.push("preflopMode");
+  const mismatches = segmentMismatches(sourceManifest, context);
   if (mismatches.length > 0) {
     throw new Error(`Dataset growth refused: source manifest mismatch (${mismatches.join(", ")}).`);
   }

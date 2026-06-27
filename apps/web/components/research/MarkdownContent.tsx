@@ -14,6 +14,12 @@ type Block =
   | { kind: "quote"; text: string }
   | { kind: "table"; rows: string[][] };
 
+interface MarkdownCursor {
+  lines: string[];
+  index: number;
+  headingIds: Map<string, number>;
+}
+
 export function MarkdownContent({ markdown }: MarkdownContentProps) {
   return (
     <div className="space-y-5 text-sm leading-7 text-zinc-300">
@@ -23,99 +29,135 @@ export function MarkdownContent({ markdown }: MarkdownContentProps) {
 }
 
 function parseBlocks(markdown: string): Block[] {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const cursor: MarkdownCursor = {
+    lines: markdown.replace(/\r\n/g, "\n").split("\n"),
+    index: 0,
+    headingIds: new Map(),
+  };
   const blocks: Block[] = [];
-  const headingIds = new Map<string, number>();
-  let i = 0;
 
-  while (i < lines.length) {
-    const line = lines[i]!;
-    if (line.trim() === "" || line.trim() === "---") {
-      i++;
-      continue;
-    }
-
-    const codeMatch = line.match(/^```(\w+)?/);
-    if (codeMatch) {
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i]!.startsWith("```")) {
-        code.push(lines[i]!);
-        i++;
-      }
-      blocks.push({ kind: "code", language: codeMatch[1] ?? "text", text: code.join("\n") });
-      i++;
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,4})\s+(.+)$/);
-    if (heading) {
-      const text = heading[2]!.trim();
-      const base = slugifyHeading(text);
-      const count = headingIds.get(base) ?? 0;
-      headingIds.set(base, count + 1);
-      blocks.push({
-        kind: "heading",
-        level: heading[1]!.length,
-        text,
-        id: count === 0 ? base : `${base}-${count + 1}`,
-      });
-      i++;
-      continue;
-    }
-
-    if (line.trim().startsWith(">")) {
-      const quote: string[] = [];
-      while (i < lines.length && lines[i]!.trim().startsWith(">")) {
-        quote.push(lines[i]!.replace(/^>\s?/, ""));
-        i++;
-      }
-      blocks.push({ kind: "quote", text: quote.join(" ") });
-      continue;
-    }
-
-    if (isTableStart(lines, i)) {
-      const rows: string[][] = [];
-      while (i < lines.length && isTableRow(lines[i]!)) {
-        if (!isTableSeparator(lines[i]!)) rows.push(splitTableRow(lines[i]!));
-        i++;
-      }
-      blocks.push({ kind: "table", rows });
-      continue;
-    }
-
-    const unordered = line.match(/^\s*[-*]\s+(.+)$/);
-    const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
-    if (unordered || ordered) {
-      const items: string[] = [];
-      const orderedList = Boolean(ordered);
-      while (i < lines.length) {
-        const item = lines[i]!.match(orderedList ? /^\s*\d+\.\s+(.+)$/ : /^\s*[-*]\s+(.+)$/);
-        if (!item) break;
-        items.push(item[1]!.trim());
-        i++;
-      }
-      blocks.push({ kind: "list", ordered: orderedList, items });
-      continue;
-    }
-
-    const paragraph: string[] = [];
-    while (
-      i < lines.length &&
-      lines[i]!.trim() !== "" &&
-      !lines[i]!.match(/^(#{1,4})\s+/) &&
-      !lines[i]!.match(/^```/) &&
-      !lines[i]!.match(/^\s*[-*]\s+/) &&
-      !lines[i]!.match(/^\s*\d+\.\s+/) &&
-      !isTableStart(lines, i)
-    ) {
-      paragraph.push(lines[i]!.trim());
-      i++;
-    }
-    blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
+  while (cursor.index < cursor.lines.length) {
+    const block = parseNextBlock(cursor);
+    if (block) blocks.push(block);
   }
 
   return blocks;
+}
+
+function parseNextBlock(cursor: MarkdownCursor): Block | null {
+  const line = cursor.lines[cursor.index]!;
+  if (isSkippableLine(line)) {
+    cursor.index++;
+    return null;
+  }
+
+  return (
+    parseCodeBlock(cursor, line) ??
+    parseHeadingBlock(cursor, line) ??
+    parseQuoteBlock(cursor, line) ??
+    parseTableBlock(cursor) ??
+    parseListBlock(cursor, line) ??
+    parseParagraphBlock(cursor)
+  );
+}
+
+function isSkippableLine(line: string) {
+  const trimmed = line.trim();
+  return trimmed === "" || trimmed === "---";
+}
+
+function parseCodeBlock(cursor: MarkdownCursor, line: string): Block | null {
+  const codeMatch = line.match(/^```(\w+)?/);
+  if (!codeMatch) return null;
+
+  const code: string[] = [];
+  cursor.index++;
+  while (cursor.index < cursor.lines.length && !cursor.lines[cursor.index]!.startsWith("```")) {
+    code.push(cursor.lines[cursor.index]!);
+    cursor.index++;
+  }
+  cursor.index++;
+  return { kind: "code", language: codeMatch[1] ?? "text", text: code.join("\n") };
+}
+
+function parseHeadingBlock(cursor: MarkdownCursor, line: string): Block | null {
+  const heading = line.match(/^(#{1,4})\s+(.+)$/);
+  if (!heading) return null;
+
+  const text = heading[2]!.trim();
+  const base = slugifyHeading(text);
+  const count = cursor.headingIds.get(base) ?? 0;
+  cursor.headingIds.set(base, count + 1);
+  cursor.index++;
+  return {
+    kind: "heading",
+    level: heading[1]!.length,
+    text,
+    id: count === 0 ? base : `${base}-${count + 1}`,
+  };
+}
+
+function parseQuoteBlock(cursor: MarkdownCursor, line: string): Block | null {
+  if (!line.trim().startsWith(">")) return null;
+
+  const quote: string[] = [];
+  while (cursor.index < cursor.lines.length && cursor.lines[cursor.index]!.trim().startsWith(">")) {
+    quote.push(cursor.lines[cursor.index]!.replace(/^>\s?/, ""));
+    cursor.index++;
+  }
+  return { kind: "quote", text: quote.join(" ") };
+}
+
+function parseTableBlock(cursor: MarkdownCursor): Block | null {
+  if (!isTableStart(cursor.lines, cursor.index)) return null;
+
+  const rows: string[][] = [];
+  while (cursor.index < cursor.lines.length && isTableRow(cursor.lines[cursor.index]!)) {
+    if (!isTableSeparator(cursor.lines[cursor.index]!)) {
+      rows.push(splitTableRow(cursor.lines[cursor.index]!));
+    }
+    cursor.index++;
+  }
+  return { kind: "table", rows };
+}
+
+function parseListBlock(cursor: MarkdownCursor, line: string): Block | null {
+  const unordered = line.match(/^\s*[-*]\s+(.+)$/);
+  const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+  if (!unordered && !ordered) return null;
+
+  const items: string[] = [];
+  const orderedList = Boolean(ordered);
+  const itemPattern = orderedList ? /^\s*\d+\.\s+(.+)$/ : /^\s*[-*]\s+(.+)$/;
+  while (cursor.index < cursor.lines.length) {
+    const item = cursor.lines[cursor.index]!.match(itemPattern);
+    if (!item) break;
+    items.push(item[1]!.trim());
+    cursor.index++;
+  }
+  return { kind: "list", ordered: orderedList, items };
+}
+
+function parseParagraphBlock(cursor: MarkdownCursor): Block {
+  const paragraph: string[] = [];
+  while (cursor.index < cursor.lines.length && isParagraphLine(cursor.lines, cursor.index)) {
+    paragraph.push(cursor.lines[cursor.index]!.trim());
+    cursor.index++;
+  }
+  return { kind: "paragraph", text: paragraph.join(" ") };
+}
+
+function isParagraphLine(lines: string[], index: number) {
+  const line = lines[index]!;
+  return (
+    line.trim() !== "" &&
+    !line.match(/^(#{1,4})\s+/) &&
+    !line.match(/^```/) &&
+    !line.match(/^\s*[-*]\s+/) &&
+    !line.match(/^\s*\d+\.\s+/) &&
+    !line.trim().startsWith(">") &&
+    !isTableStart(lines, index)
+  );
 }
 
 function renderBlock(block: Block, index: number) {

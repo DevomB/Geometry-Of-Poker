@@ -1,5 +1,4 @@
-import type { Street } from "@geometry-of-poker/shared";
-import type { CardValidationResult } from "@geometry-of-poker/shared";
+import type { CardValidationResult, Street } from "@/lib/types";
 import { isValidCardString, normalizeCard, validateHandInput } from "@/lib/cards/validate-hand";
 
 export const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"] as const;

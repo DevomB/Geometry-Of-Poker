@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Street } from "@geometry-of-poker/shared";
+import type { Street } from "@/lib/types";
 import type { BrowserPointMeta } from "@/lib/types";
 import {
   needsExactRunoutMetrics,

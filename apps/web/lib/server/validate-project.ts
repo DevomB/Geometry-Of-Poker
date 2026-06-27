@@ -1,5 +1,6 @@
-import type { ProjectRequest, Street } from "@geometry-of-poker/shared";
+import type { ProjectRequest } from "@geometry-of-poker/shared";
 import { isValidCardString, normalizeCard, streetFromBoardLength } from "@/lib/cards/validate-hand";
+import type { Street } from "@/lib/types";
 
 export interface ValidationFailure {
   status: number;
@@ -17,6 +18,7 @@ export interface ValidatedProjectRequest {
 
 const MAX_BODY_BYTES = 2048;
 const STREET_VALUES = new Set<Street>(["preflop", "flop", "turn", "river"]);
+const VALID_BOARD_LENGTHS = new Set([0, 3, 4, 5]);
 
 export async function readProjectBody(request: Request): Promise<ProjectRequest | ValidationFailure> {
   const text = await request.text();
@@ -39,6 +41,45 @@ export async function readProjectBody(request: Request): Promise<ProjectRequest 
 }
 
 export function validateProjectRequest(body: unknown): ValidatedProjectRequest | ValidationFailure {
+  const input = validateProjectShape(body);
+  if (isValidationFailure(input)) return input;
+
+  const cardFailure =
+    validateCardList(input.hero, "hero") ??
+    validateCardList(input.board, "board") ??
+    validateCardList(input.deadCards, "deadCards");
+  if (cardFailure) return cardFailure;
+
+  if (!VALID_BOARD_LENGTHS.has(input.board.length)) {
+    return failure("INVALID_BOARD_LENGTH", "Board length must be 0, 3, 4, or 5.", "board");
+  }
+  if (input.deadCards.length > 45) {
+    return failure("TOO_MANY_DEAD_CARDS", "deadCards contains too many cards.", "deadCards");
+  }
+
+  const hero = normalizeHero(input.hero);
+  const board = normalizeCards(input.board);
+  const deadCards = normalizeCards(input.deadCards);
+  const duplicateFailure = findDuplicateCardFailure(hero, board, deadCards);
+  if (duplicateFailure) return duplicateFailure;
+
+  const street = streetFromBoardLength(board.length);
+  if (input.street && input.street !== street) {
+    return failure(
+      "STREET_MISMATCH",
+      `Selected cards imply ${street}, but request street is ${input.street}.`,
+      "street",
+    );
+  }
+
+  return { hero, board, deadCards, street };
+}
+
+function validateProjectShape(body: unknown): Partial<ProjectRequest> & {
+  hero: unknown[];
+  board: unknown[];
+  deadCards: unknown[];
+} | ValidationFailure {
   if (!body || typeof body !== "object") {
     return failure("MALFORMED_BODY", "Request body must be an object.");
   }
@@ -56,35 +97,36 @@ export function validateProjectRequest(body: unknown): ValidatedProjectRequest |
     return failure("INVALID_STREET", "street must be preflop, flop, turn, or river.", "street");
   }
 
-  const heroRaw = input.hero;
-  const boardRaw = input.board;
-  const deadRaw = input.deadCards ?? [];
+  return { ...input, hero: input.hero, board: input.board, deadCards: input.deadCards ?? [] };
+}
 
-  for (let i = 0; i < heroRaw.length; i++) {
-    if (typeof heroRaw[i] !== "string" || !isValidCardString(heroRaw[i] as string)) {
-      return failure("MALFORMED_CARD", `Malformed hero card: ${String(heroRaw[i])}.`, `hero.${i}`);
+function validateCardList(cards: unknown[], field: "hero" | "board" | "deadCards") {
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    if (typeof card !== "string" || !isValidCardString(card)) {
+      return failure("MALFORMED_CARD", `Malformed ${fieldLabel(field)} card: ${String(card)}.`, `${field}.${i}`);
     }
   }
-  for (let i = 0; i < boardRaw.length; i++) {
-    if (typeof boardRaw[i] !== "string" || !isValidCardString(boardRaw[i] as string)) {
-      return failure("MALFORMED_CARD", `Malformed board card: ${String(boardRaw[i])}.`, `board.${i}`);
-    }
-  }
-  for (let i = 0; i < deadRaw.length; i++) {
-    if (typeof deadRaw[i] !== "string" || !isValidCardString(deadRaw[i] as string)) {
-      return failure("MALFORMED_CARD", `Malformed dead card: ${String(deadRaw[i])}.`, `deadCards.${i}`);
-    }
-  }
-  if (![0, 3, 4, 5].includes(boardRaw.length)) {
-    return failure("INVALID_BOARD_LENGTH", "Board length must be 0, 3, 4, or 5.", "board");
-  }
-  if (deadRaw.length > 45) {
-    return failure("TOO_MANY_DEAD_CARDS", "deadCards contains too many cards.", "deadCards");
-  }
+  return null;
+}
 
-  const hero = [normalizeCard(heroRaw[0] as string), normalizeCard(heroRaw[1] as string)] as [string, string];
-  const board = boardRaw.map((card) => normalizeCard(card as string));
-  const deadCards = deadRaw.map((card) => normalizeCard(card as string));
+function fieldLabel(field: "hero" | "board" | "deadCards") {
+  return field === "deadCards" ? "dead" : field;
+}
+
+function normalizeHero(hero: unknown[]): [string, string] {
+  return [normalizeCard(hero[0] as string), normalizeCard(hero[1] as string)];
+}
+
+function normalizeCards(cards: unknown[]): string[] {
+  return cards.map((card) => normalizeCard(card as string));
+}
+
+function findDuplicateCardFailure(
+  hero: [string, string],
+  board: string[],
+  deadCards: string[],
+) {
   const all = [...hero, ...board, ...deadCards];
   const seen = new Map<string, string>();
   for (const [index, card] of all.entries()) {
@@ -99,17 +141,7 @@ export function validateProjectRequest(body: unknown): ValidatedProjectRequest |
     }
     seen.set(card, field);
   }
-
-  const street = streetFromBoardLength(board.length);
-  if (input.street && input.street !== street) {
-    return failure(
-      "STREET_MISMATCH",
-      `Selected cards imply ${street}, but request street is ${input.street}.`,
-      "street",
-    );
-  }
-
-  return { hero, board, deadCards, street };
+  return null;
 }
 
 function failure(code: string, message: string, field?: string): ValidationFailure {
@@ -119,4 +151,3 @@ function failure(code: string, message: string, field?: string): ValidationFailu
 export function isValidationFailure(value: unknown): value is ValidationFailure {
   return Boolean(value && typeof value === "object" && "code" in value && "status" in value);
 }
-

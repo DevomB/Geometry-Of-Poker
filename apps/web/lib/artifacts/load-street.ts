@@ -1,8 +1,8 @@
-import type { Street } from "@geometry-of-poker/shared";
 import { categoryIndexForLabel, INDEX_CATEGORY } from "@geometry-of-poker/shared";
 import type {
   BrowserMetadata,
   BrowserPointMeta,
+  Street,
   StreetDataset,
   StreetManifest,
 } from "@/lib/types";

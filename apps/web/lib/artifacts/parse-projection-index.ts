@@ -1,30 +1,16 @@
+import type { ProjectionIndex } from "@/lib/types";
+
 export const PROJECTION_INDEX_MAGIC = "GOPI";
 export const PROJECTION_INDEX_VERSION = 1;
 export const PROJECTION_INDEX_HEADER_BYTES = 24;
 
-export interface ProjectionIndexMetadata {
+interface ProjectionIndexMetadata {
   retainedFeatures: string[];
   scalerMean: number[];
   scalerScale: number[];
   pcaMean: number[];
   pcaComponents: number[];
   ids: string[];
-}
-
-export interface ProjectionIndex {
-  version: number;
-  count: number;
-  pcaDimension: number;
-  featureCount: number;
-  retainedFeatures: string[];
-  scalerMean: Float64Array;
-  scalerScale: Float64Array;
-  pcaMean: Float64Array;
-  pcaComponents: Float64Array;
-  ids: string[];
-  pcaTrain: Float32Array;
-  embeddingTrain: Float32Array;
-  labels: Int16Array;
 }
 
 function readMagic(view: DataView): string {

@@ -101,20 +101,57 @@ export function resolveStateBatch(
   const end = Math.min(start + batchSize, targetCount);
   if (start >= targetCount) return [];
 
-  const count = end - start;
-
   if (street === "preflop") {
     const all = enumeratePreflopStates(preflopMode, targetCount, seed);
     return all.slice(start, end).map((s, i) => ({ ...s, index: start + i }));
   }
 
-  const batchSeed = seed + batchIndex * 1_000_003;
-  const rng = new SeededRng(batchSeed);
-  const states: SampledState[] = [];
-  for (let i = 0; i < count; i++) {
-    states.push(sampleRandomState(street, rng, start + i, seed));
+  return uniqueStatesThroughBatch(street, batchIndex, batchSize, seed).slice(start, end);
+}
+
+// Independent shuffles repeat a state now and then (seed 42, 25k flops: two exact repeats and a
+// dozen with the same cards in another order), which the shard merge rejects. Repeats are redrawn
+// from a separate stream, so every other state matches the plain per-batch shuffle. Batches are
+// resolved in order from zero, so an ordinal's state never depends on targetCount or on which
+// batch is asked for first.
+interface UniqueStateRun {
+  states: SampledState[];
+  keys: Set<string>;
+}
+
+const uniqueStateRuns = new Map<string, UniqueStateRun>();
+
+function unorderedStateKey(state: SampledState): string {
+  return `${[...state.hero].sort().join(",")}|${[...state.board].sort().join(",")}`;
+}
+
+function uniqueStatesThroughBatch(
+  street: Street,
+  batchIndex: number,
+  batchSize: number,
+  seed: number,
+): SampledState[] {
+  const runKey = `${street}:${seed}:${batchSize}`;
+  let run = uniqueStateRuns.get(runKey);
+  if (!run) {
+    run = { states: [], keys: new Set() };
+    uniqueStateRuns.set(runKey, run);
   }
-  return states;
+  for (let b = run.states.length / batchSize; b <= batchIndex; b++) {
+    const batchSeed = seed + b * 1_000_003;
+    const rng = new SeededRng(batchSeed);
+    const redraw = new SeededRng((batchSeed ^ 0x9e3779b9) >>> 0);
+    for (let i = 0; i < batchSize; i++) {
+      const index = b * batchSize + i;
+      let state = sampleRandomState(street, rng, index, seed);
+      while (run.keys.has(unorderedStateKey(state))) {
+        state = sampleRandomState(street, redraw, index, seed);
+      }
+      run.keys.add(unorderedStateKey(state));
+      run.states.push(state);
+    }
+  }
+  return run.states;
 }
 
 export function formatRecordId(street: Street, seed: number, index: number): string {

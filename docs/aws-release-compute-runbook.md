@@ -59,7 +59,7 @@ After CodeBuild pushes the new `latest` image, submit a new immutable release id
 
 The release-worker Docker base image is pinned to `node:22.20.0-bookworm`. Do not use a floating `node:22-bookworm` tag for release compute.
 
-The worker image should use the installed `poker-calculations@2.2.1` package prebuild from `pnpm install`. Do not rebuild or overwrite the package from a sibling native source checkout during release-worker construction. A stale sibling source build failed the native addon smoke test in CodeBuild with `Original error: Invalid argument`.
+The worker image should use the installed `poker-calculations` package prebuild from `pnpm install`. Do not rebuild or overwrite the package from a sibling native source checkout during release-worker construction. A stale sibling source build failed the native addon smoke test in CodeBuild with `Original error: Invalid argument`.
 
 ## Monitoring A Run
 

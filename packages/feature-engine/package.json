@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@geometry-of-poker/shared": "workspace:*",
-    "poker-calculations": "2.2.1"
+    "poker-calculations": "4.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

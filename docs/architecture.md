@@ -104,7 +104,7 @@ sequenceDiagram
 
 | Layer | Choice | Rationale |
 | --- | --- | --- |
-| Math primitives | `poker-calculations@2.2.1` (npm) | C++20 core, already covers equity/MC/vulnerability |
+| Math primitives | `poker-calculations@4.0.3` (npm) | C++20 core, already covers equity/MC/vulnerability |
 | Feature extraction | TypeScript in `feature-engine` | Same language as web; direct package import |
 | Embedding | Python (NumPy, sklearn, umap-learn) | Mature ML stack; joblib for scaler/UMAP persistence |
 | Web | Next.js 15 App Router | SSR for app and Node API routes |

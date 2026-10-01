@@ -1,6 +1,7 @@
 import { getPokerCalculations } from "../pc.js";
 import {
   cardRankIndex,
+  cardSuitIndex,
   deckIndex,
   indexToCard,
   remainingDeckIndices,
@@ -26,19 +27,17 @@ const NEUTRAL_DRAWS: Record<string, number> = {
   drawFeaturesAvailable: 0,
 };
 
-const STRAIGHT_CATEGORY_ORDER = 4;
-
+// Checked on the cards directly: comparing category order (>= flush / >= straight) also counted
+// full houses and quads, so a card that filled up two pair was scored as a flush and straight out.
 function hasFlush(hero: [string, string], board: string[]): boolean {
-  const pc = getPokerCalculations();
-  const category = pc.evaluateHandCategory(hero, board);
-  const order = pc.handRankCategoryOrder(category);
-  return order >= pc.handRankCategoryOrder("flush");
+  const counts = [0, 0, 0, 0];
+  for (const card of [...hero, ...board]) counts[cardSuitIndex(card)]!++;
+  return counts.some((n) => n >= 5);
 }
 
 function hasStraight(hero: [string, string], board: string[]): boolean {
-  const pc = getPokerCalculations();
-  const order = pc.handRankCategoryOrder(pc.evaluateHandCategory(hero, board));
-  return order >= STRAIGHT_CATEGORY_ORDER;
+  const ranks = new Set([...hero, ...board].map(cardRankIndex));
+  return straightWindows().some((window) => window.every((rank) => ranks.has(rank)));
 }
 
 function completesFlushOnNext(hero: [string, string], board: string[], nextCard: string): boolean {

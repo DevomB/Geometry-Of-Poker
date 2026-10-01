@@ -107,6 +107,20 @@ describe("extractGeometryFeatures", { skip: !nativeOk }, () => {
     assert.equal(result.groups.draws.flushOutCount, 0);
   });
 
+  it("filling up two pair is not a flush or straight out", () => {
+    const result = spot(["As", "Kd"], ["Ac", "Kh", "7s"]);
+    assert.equal(result.groups.draws.flushOutCount, 0);
+    assert.equal(result.groups.draws.straightOutCount, 0);
+    assert.equal(result.groups.draws.gutshotFlag, 0);
+    assert.equal(result.groups.draws.comboDrawFlag, 0);
+  });
+
+  it("preflop pocket pair is categorized as one pair", () => {
+    const result = spot(["7h", "7d"], []);
+    assert.equal(result.metadata.category, "onePair");
+    assert.equal(result.groups.core.categoryPair, 1);
+  });
+
   it("full house maps category one-hot", () => {
     const result = spot(["Qh", "Qd"], ["Qc", "2d", "2h"]);
     assert.equal(result.metadata.category, "fullHouse");

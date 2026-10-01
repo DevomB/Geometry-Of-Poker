@@ -43,6 +43,26 @@ describe("state sampling", () => {
     assert.deepEqual(full, batch);
   });
 
+  it("resolveStateBatch never repeats a state across batches", () => {
+    // Seed 42 at 25k flops drew ordinal 10092 as an exact repeat of 6439 before redraws.
+    const keys = new Set<string>();
+    for (let b = 0; b < 25; b++) {
+      for (const s of resolveStateBatch("flop", b, 1000, 25_000, 42, "random")) {
+        const key = `${[...s.hero].sort().join(",")}|${[...s.board].sort().join(",")}`;
+        assert.ok(!keys.has(key), `ordinal ${s.index} repeats ${key}`);
+        keys.add(key);
+      }
+    }
+    assert.equal(keys.size, 25_000);
+  });
+
+  it("resolveStateBatch does not depend on targetCount", () => {
+    const a = resolveStateBatch("turn", 3, 100, 400, 5, "random");
+    const b = resolveStateBatch("turn", 3, 100, 10_000, 5, "random");
+    assert.deepEqual(a, b);
+    assert.equal(a[0]!.index, 300);
+  });
+
   it("preflop enumerate1326 returns ordered hole combos", () => {
     const states = enumeratePreflopStates("enumerate1326", 1326, 1);
     assert.equal(states.length, 1326);

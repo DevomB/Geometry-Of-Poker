@@ -42,8 +42,8 @@ importers:
         specifier: ^15.3.2
         version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       poker-calculations:
-        specifier: 2.2.1
-        version: 2.2.1
+        specifier: 4.0.3
+        version: 4.0.3
       react:
         specifier: ^19.1.0
         version: 19.2.6
@@ -100,8 +100,8 @@ importers:
         specifier: ^0.11.2
         version: 0.11.2
       poker-calculations:
-        specifier: 2.2.1
-        version: 2.2.1
+        specifier: 4.0.3
+        version: 4.0.3
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -119,8 +119,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       poker-calculations:
-        specifier: 2.2.1
-        version: 2.2.1
+        specifier: 4.0.3
+        version: 4.0.3
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -1810,6 +1810,7 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -2449,8 +2450,8 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
-  poker-calculations@2.2.1:
-    resolution: {integrity: sha512-pUCNyUcZInl3ZwP6TZmRLszBMrfJ7kIFffXqn+62f1pbKfnF3GBfBmB2Mk2SxZkHhMAaU3qUILYwfIoDFrrvKg==}
+  poker-calculations@4.0.3:
+    resolution: {integrity: sha512-vpX+2nVuSGxbVd4+oGrbUSthEQ+/T5sLnkOQsxOB9ir7SAl0vcb9XCDWgjXUsFBHXR+h+MQCK2TIrfWaj+SyhA==}
     engines: {node: '>=18'}
 
   possible-typed-array-names@1.1.0:
@@ -5225,7 +5226,7 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  poker-calculations@2.2.1:
+  poker-calculations@4.0.3:
     dependencies:
       node-gyp-build: 4.8.4
 

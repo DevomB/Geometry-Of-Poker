@@ -65,6 +65,7 @@ function AxisLabel({
       center
       distanceFactor={14}
       style={{ pointerEvents: "none" }}
+      zIndexRange={[5, 0]}
     >
       <span
         className="gop-mono text-[10px] font-semibold tracking-wider"

@@ -219,7 +219,7 @@ function ViewTab() {
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Stat label="Target" value={`${targetFps}+ fps`} />
           <Stat label="Measured" value={fps > 0 ? `${fps} fps` : "—"} />
-          <Stat label="Quality" value={renderQuality.tier} />
+          <Stat label="Quality" value={QUALITY_LABEL[renderQuality.tier]} />
         </div>
         <p className="mt-2 text-[11.5px] leading-relaxed text-[var(--text-tertiary)]">
           Density adapts automatically to hold the frame-rate floor.
@@ -531,19 +531,19 @@ function FilterTab() {
         <div className="gop-card divide-y divide-[var(--border-subtle)]">
           <Switch
             label="Rainbow"
-            hint="Three or more suits on board"
+            hint="Every board card a different suit"
             checked={filters.boardRainbow === true}
             onChange={() => setFilters({ boardRainbow: filters.boardRainbow ? null : true })}
           />
           <Switch
             label="Two-tone"
-            hint="Exactly two suits represented"
+            hint="At most two cards share a suit"
             checked={filters.boardTwoTone === true}
             onChange={() => setFilters({ boardTwoTone: filters.boardTwoTone ? null : true })}
           />
           <Switch
             label="Monotone"
-            hint="Single-suit board"
+            hint="All board cards one suit"
             checked={filters.boardMonotone === true}
             onChange={() => setFilters({ boardMonotone: filters.boardMonotone ? null : true })}
           />
@@ -839,6 +839,8 @@ function Stat({
     </div>
   );
 }
+
+const QUALITY_LABEL = { high: "High", balanced: "Balanced", performance: "Reduced" } as const;
 
 function formatUnitInterval(value: number) {
   const clamped = Math.max(0, Math.min(1, value));

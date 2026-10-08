@@ -189,9 +189,14 @@ export function CardPickerPanel() {
               <span className="block text-[12.5px] font-medium text-[var(--text-primary)]">
                 {preset.label}
               </span>
-              <span className="mt-1.5 flex flex-wrap gap-[3px]">
-                {[...preset.hero, ...preset.board].map((card, i) => (
-                  <span key={card} className={i === 2 ? "ml-1" : ""}>
+              <span className="mt-2 flex items-center">
+                {preset.hero.map((card, i) => (
+                  <span key={card} className={i > 0 ? "-ml-2" : ""}>
+                    <PlayingCard card={card} size="xs" />
+                  </span>
+                ))}
+                {preset.board.map((card, i) => (
+                  <span key={card} className={i === 0 ? "ml-1.5" : "-ml-2"}>
                     <PlayingCard card={card} size="xs" />
                   </span>
                 ))}
@@ -235,7 +240,9 @@ export function CardPickerPanel() {
         <SlotsRow
           label="Dead"
           hint="optional"
-          slots={picker.deadCards.map((card, i) => ({ card, key: `dead-${i}` }))}
+          slots={picker.deadCards
+            .map((card, i) => ({ card, key: `dead-${i}`, index: i }))
+            .filter((slot, i, all) => slot.card !== null || i === all.findIndex((s) => s.card === null))}
           onClickSlot={(i) => removeFromDead(i)}
           isActive={activeTarget === "dead"}
           onSetActive={() => setTarget("dead")}
@@ -323,7 +330,7 @@ export function CardPickerPanel() {
 
       {ready && inferred && <PickerCombinatoricsPreview picker={picker} />}
 
-      <div className="sticky bottom-0 -mx-5 -mb-4 flex gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-glass-strong)] px-5 py-3 backdrop-blur">
+      <div className="sticky -bottom-4 -mx-5 -mb-4 flex gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-glass-strong)] px-5 py-3 backdrop-blur">
         <button
           type="button"
           onClick={submit}
@@ -430,7 +437,7 @@ function SlotsRow({
 }: {
   label: string;
   hint: string;
-  slots: { card: string | null; key: string }[];
+  slots: { card: string | null; key: string; index?: number }[];
   onClickSlot: (i: number) => void;
   isActive: boolean;
   onSetActive: () => void;
@@ -473,12 +480,12 @@ function SlotsRow({
         <span className="block text-[10.5px] text-[var(--text-tertiary)]">{hint}</span>
       </button>
       <div className="flex flex-wrap gap-1">
-        {slots.map(({ card, key }, i) =>
+        {slots.map(({ card, key, index }, i) =>
           card ? (
             <button
               key={key}
               type="button"
-              onClick={() => onClickSlot(i)}
+              onClick={() => onClickSlot(index ?? i)}
               className="transition hover:-translate-y-0.5"
               aria-label={`Remove ${card} from ${label}`}
               title="Click to remove"

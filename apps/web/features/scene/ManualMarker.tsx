@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { useViewerStore } from "@/stores/viewer-store";
+import { PlayingCard } from "@/components/ui/PlayingCard";
 import {
   MANUAL_MARKER_COLOR,
   MANUAL_MARKER_CORE,
@@ -38,13 +39,6 @@ export function ManualMarkerMesh() {
 
   if (!marker) return null;
 
-  const label = [
-    marker.hero.join(" "),
-    marker.board.length > 0 ? marker.board.join(" ") : null,
-  ]
-    .filter(Boolean)
-    .join(" | ");
-
   return (
     <group position={marker.position}>
       <mesh ref={ringRef}>
@@ -67,12 +61,28 @@ export function ManualMarkerMesh() {
       <Html
         position={[0, 0.46, 0]}
         center
-        distanceFactor={8}
-        style={{ pointerEvents: "none" }}
+        style={{ pointerEvents: "none", transform: "translateY(-28px)" }}
+        zIndexRange={[12, 0]}
       >
-        <div className="gop-mono whitespace-nowrap rounded border border-amber-300/30 bg-black/75 px-2 py-1 text-[10px] text-amber-100 shadow-xl">
-          <span className="mr-1 text-amber-300/70">projected</span>
-          {label}
+        <div className="flex items-center gap-2 whitespace-nowrap rounded-[12px] border border-amber-200/40 bg-[rgba(30,24,10,0.85)] px-2.5 py-2 shadow-2xl backdrop-blur-xl">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
+            Your hand
+          </span>
+          <span className="flex gap-[3px]">
+            {marker.hero.map((c) => (
+              <PlayingCard key={c} card={c} size="xs" />
+            ))}
+          </span>
+          {marker.board.length > 0 && (
+            <>
+              <span className="h-5 w-px bg-white/15" aria-hidden="true" />
+              <span className="flex gap-[3px]">
+                {marker.board.map((c) => (
+                  <PlayingCard key={c} card={c} size="xs" />
+                ))}
+              </span>
+            </>
+          )}
         </div>
       </Html>
     </group>

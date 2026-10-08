@@ -15,7 +15,7 @@ import type {
 import { DEFAULT_FILTERS as DEFAULT_FILTER_VALUES } from "@/lib/types";
 import { GridSpatialIndex } from "@/lib/spatial/grid-index";
 import {
-  CAMERA_FRAME_DISTANCE,
+  cameraFrameDistance,
   HOVER_COLOR,
   POINT_SIZES,
   SELECTION_COLOR,
@@ -376,7 +376,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
             position: [
               bounds.center[0],
               bounds.center[1],
-              bounds.center[2] + bounds.radius * CAMERA_FRAME_DISTANCE,
+              bounds.center[2] + cameraFrameDistance(bounds.radius),
             ],
             target: bounds.center,
           },
@@ -401,7 +401,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
           position: [
             bounds.center[0],
             bounds.center[1],
-            bounds.center[2] + bounds.radius * CAMERA_FRAME_DISTANCE,
+            bounds.center[2] + cameraFrameDistance(bounds.radius),
           ],
           target: bounds.center,
         },

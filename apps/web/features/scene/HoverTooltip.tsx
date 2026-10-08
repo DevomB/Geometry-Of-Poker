@@ -22,13 +22,14 @@ export function HoverTooltip() {
     <Html
       position={[point.x, point.y + 0.4, point.z]}
       center
-      style={{ pointerEvents: "none", transform: "translateY(-36px)" }}
+      style={{ pointerEvents: "none" }}
       zIndexRange={[15, 13]}
     >
+      {/* Offset on an inner node: a transform on Html's own style replaces its centring. */}
       <div
         role="status"
         aria-live="polite"
-        className={`gop-fade-in w-max min-w-[200px] max-w-[280px] rounded-[12px] border px-3 py-2.5 shadow-2xl backdrop-blur-xl ${
+        className={`gop-fade-in hidden w-max min-w-[200px] max-w-[280px] -translate-y-[calc(50%+18px)] rounded-[12px] md:block border px-3 py-2.5 shadow-2xl backdrop-blur-xl ${
           locked
             ? "border-amber-200/40 bg-[rgba(30,24,10,0.85)]"
             : "border-[var(--border-strong)] bg-[rgba(12,14,20,0.88)]"

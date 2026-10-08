@@ -12,6 +12,16 @@ export const SCENE_BACKGROUND = "#06070a";
  * for the floating top bar and toolbar that overlay the full-bleed canvas.
  */
 export const CAMERA_FRAME_DISTANCE = 3;
+
+/**
+ * Camera distance that fits a cloud of `radius` in the current viewport. The
+ * horizontal FOV shrinks with aspect, so portrait screens back off further.
+ */
+export function cameraFrameDistance(radius: number): number {
+  const aspect =
+    typeof window === "undefined" ? 1 : window.innerWidth / Math.max(1, window.innerHeight);
+  return (radius * CAMERA_FRAME_DISTANCE) / Math.min(1, aspect);
+}
 export const SCENE_FOG_NEAR = 30;
 export const SCENE_FOG_FAR = 80;
 

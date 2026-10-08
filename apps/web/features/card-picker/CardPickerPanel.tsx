@@ -24,14 +24,8 @@ import {
   formatBigInt,
 } from "@/lib/poker/combinatorics";
 import { useViewerStore } from "@/stores/viewer-store";
+import { EmptyCardSlot, PlayingCard, suitColor } from "@/components/ui/PlayingCard";
 import type { ApiErrorResponse, ProjectResponse, Street } from "@geometry-of-poker/shared";
-
-const SUIT_TONE: Record<string, string> = {
-  s: "text-zinc-100",
-  c: "text-emerald-300",
-  h: "text-rose-300",
-  d: "text-sky-300",
-};
 
 const STREET_LABEL: Record<Street, string> = {
   preflop: "Preflop",
@@ -54,7 +48,6 @@ export function CardPickerPanel() {
   const used = useMemo(() => cardsUsed(picker), [picker]);
   const heroFilled = picker.hero.filter(Boolean).length;
   const boardFilled = picker.board.filter(Boolean).length;
-  const deadFilled = picker.deadCards.filter(Boolean).length;
   const inferred = inferredStreet(picker);
   const ready = pickerReady(picker);
 
@@ -179,59 +172,56 @@ export function CardPickerPanel() {
   };
 
   return (
-    <section
-      aria-labelledby="picker-heading"
-      className="border-t border-[var(--border-subtle)] pt-4"
-    >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2
-          id="picker-heading"
-          className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500"
-        >
-          Manual hand input
-        </h2>
-        {inferred && (
-          <span className="gop-mono rounded border border-[var(--border-subtle)] bg-white/[0.02] px-1.5 py-0.5 text-[10px] text-zinc-400">
-            {STREET_LABEL[inferred]}
-          </span>
-        )}
-      </div>
-
-      <p className="mb-3 text-[10px] text-zinc-500">
-        Click cards to place them. Selected cards toggle off on click. Street is
-        inferred from the number of board cards.
-      </p>
-
-      <div className="mb-3">
-        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-zinc-500">
-          <span>Scenarios</span>
-          <span className="gop-mono text-zinc-600">load</span>
+    <section aria-label="Manual hand input" className="space-y-5">
+      <div>
+        <div className="mb-2.5 flex items-center justify-between">
+          <h3 className="gop-eyebrow">Quick scenarios</h3>
         </div>
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid grid-cols-2 gap-2">
           {HAND_SCENARIO_PRESETS.map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => loadPreset(preset.id)}
-              className="min-h-12 rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-1.5 text-left transition hover:border-cyan-300/30 hover:bg-white/[0.05]"
+              className="group rounded-[12px] border border-[var(--border-subtle)] bg-white/[0.02] p-2.5 text-left transition hover:border-[var(--accent-ring)] hover:bg-white/[0.04]"
               title={preset.detail}
             >
-              <span className="block text-[10px] font-medium text-zinc-300">
+              <span className="block text-[12.5px] font-medium text-[var(--text-primary)]">
                 {preset.label}
               </span>
-              <span className="gop-mono mt-0.5 block text-[9px] text-zinc-600">
-                {[...preset.hero, ...preset.board].join(" ")}
+              <span className="mt-2 flex items-center">
+                {preset.hero.map((card, i) => (
+                  <span key={card} className={i > 0 ? "-ml-2" : ""}>
+                    <PlayingCard card={card} size="xs" />
+                  </span>
+                ))}
+                {preset.board.map((card, i) => (
+                  <span key={card} className={i === 0 ? "ml-1.5" : "-ml-2"}>
+                    <PlayingCard card={card} size="xs" />
+                  </span>
+                ))}
               </span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="mb-3 space-y-2" role="group" aria-label="Selected cards">
+      <div className="gop-card space-y-3 p-3.5" role="group" aria-label="Selected cards">
+        <div className="flex items-center justify-between">
+          <h3 className="gop-eyebrow">Your hand</h3>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              inferred
+                ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "bg-white/[0.05] text-[var(--text-tertiary)]"
+            }`}
+          >
+            {inferred ? STREET_LABEL[inferred] : "Incomplete"}
+          </span>
+        </div>
         <SlotsRow
           label="Hero"
-          maxFilled={2}
-          filled={heroFilled}
+          hint="2 cards"
           slots={picker.hero.map((card, i) => ({ card, key: `hero-${i}` }))}
           onClickSlot={(i) => removeFromHero(i as 0 | 1)}
           isActive={activeTarget === "hero"}
@@ -240,8 +230,7 @@ export function CardPickerPanel() {
         />
         <SlotsRow
           label="Board"
-          maxFilled={5}
-          filled={boardFilled}
+          hint="0, 3, 4 or 5"
           slots={picker.board.map((card, i) => ({ card, key: `board-${i}` }))}
           onClickSlot={(i) => removeFromBoard(i)}
           isActive={activeTarget === "board"}
@@ -250,29 +239,42 @@ export function CardPickerPanel() {
         />
         <SlotsRow
           label="Dead"
-          maxFilled={picker.deadCards.length}
-          filled={deadFilled}
-          slots={picker.deadCards.map((card, i) => ({ card, key: `dead-${i}` }))}
+          hint="optional"
+          slots={picker.deadCards
+            .map((card, i) => ({ card, key: `dead-${i}`, index: i }))
+            .filter((slot, i, all) => slot.card !== null || i === all.findIndex((s) => s.card === null))}
           onClickSlot={(i) => removeFromDead(i)}
           isActive={activeTarget === "dead"}
           onSetActive={() => setTarget("dead")}
           accent="rose"
+          small
         />
       </div>
 
-      <div
-        className="mb-3 rounded border border-[var(--border-subtle)] bg-black/30 p-2"
-        aria-label="Card grid"
-      >
-        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wider text-zinc-500">
-          <span>Deck</span>
-          <span className="gop-mono text-zinc-400">{used.size}/52</span>
+      <div aria-label="Card grid">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h3 className="gop-eyebrow">
+            Deck · placing into{" "}
+            <span
+              className={
+                activeTarget === "hero"
+                  ? "text-[var(--accent)]"
+                  : activeTarget === "board"
+                    ? "text-amber-300"
+                    : "text-rose-300"
+              }
+            >
+              {activeTarget}
+            </span>
+          </h3>
+          <span className="gop-mono text-[11px] tabular-nums text-[var(--text-tertiary)]">
+            {52 - used.size} left
+          </span>
         </div>
         <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-[3px]" role="grid">
           {SUITS.map((suit) =>
             RANKS.map((rank) => {
               const card = cardKey(rank, suit);
-              const taken = used.has(card);
               const usedHere = picker.hero.includes(card)
                 ? "hero"
                 : picker.board.includes(card)
@@ -289,46 +291,36 @@ export function CardPickerPanel() {
                     usedHere ? `(in ${usedHere})` : "available"
                   }`}
                   onClick={() => handleCardClick(card)}
-                  className={`relative flex h-7 flex-col items-center justify-center gop-mono rounded text-[9px] leading-none transition ${
-                    usedHere === "hero"
-                      ? "border border-cyan-300/50 bg-cyan-500/15 ring-1 ring-cyan-300/30"
-                      : usedHere === "board"
-                        ? "border border-amber-300/50 bg-amber-500/15 ring-1 ring-amber-300/30"
-                        : usedHere === "dead"
-                          ? "border border-rose-300/50 bg-rose-500/15 ring-1 ring-rose-300/30"
-                        : "border border-[var(--border-subtle)] bg-white/[0.02] hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
-                  } ${taken && !usedHere ? "cursor-not-allowed opacity-25" : ""} ${SUIT_TONE[suit]}`}
-                  disabled={taken && !usedHere}
-                  title={`${rank}${SUIT_SYMBOLS[suit]}`}
+                  className={`relative flex h-[34px] flex-col items-center justify-center rounded-[4px] text-[10.5px] font-bold leading-none transition ${
+                    usedHere
+                      ? "bg-white/[0.03] opacity-30 ring-1 ring-inset " +
+                        (usedHere === "hero"
+                          ? "ring-[var(--accent)]"
+                          : usedHere === "board"
+                            ? "ring-amber-300"
+                            : "ring-rose-300")
+                      : "bg-[var(--card-face)] shadow-[0_1px_0_rgba(255,255,255,0.7)_inset,0_2px_4px_-2px_rgba(0,0,0,0.6)] hover:-translate-y-0.5 hover:shadow-[0_6px_12px_-4px_rgba(0,0,0,0.7)]"
+                  }`}
+                  style={{ color: usedHere ? "var(--text-tertiary)" : suitColor(suit) }}
+                  title={`${rank}${SUIT_SYMBOLS[suit]}${usedHere ? " · click to remove" : ""}`}
                 >
-                  <span className="text-[10px] font-semibold">{rank}</span>
-                  <span className="text-[10px]">{SUIT_SYMBOLS[suit]}</span>
+                  <span>{rank}</span>
+                  <span className="mt-[1px] text-[10px]">{SUIT_SYMBOLS[suit]}</span>
                 </button>
               );
             }),
           )}
         </div>
-        <div className="mt-2 flex items-center gap-3 text-[9px] text-zinc-500">
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm border border-cyan-300/60 bg-cyan-500/20" />
-            hero
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm border border-amber-300/60 bg-amber-500/20" />
-            board
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm border border-rose-300/60 bg-rose-500/20" />
-            dead
-          </span>
-          <span className="ml-auto">click again to remove</span>
-        </div>
+        <p className="mt-2 text-[11.5px] text-[var(--text-tertiary)]">
+          Click a card to place it, click a placed card to remove it. Street is inferred from
+          the board.
+        </p>
       </div>
 
       {errors.length > 0 && (
         <ul
           role="alert"
-          className="mb-2 space-y-0.5 rounded border border-rose-500/30 bg-rose-950/20 p-2 text-[11px] text-rose-200"
+          className="space-y-0.5 rounded-[12px] border border-rose-500/30 bg-rose-950/30 p-3 text-[12px] text-rose-200"
         >
           {errors.map((e) => (
             <li key={e}>{e}</li>
@@ -336,30 +328,27 @@ export function CardPickerPanel() {
         </ul>
       )}
 
-      {ready && inferred && (
-        <PickerCombinatoricsPreview picker={picker} />
-      )}
+      {ready && inferred && <PickerCombinatoricsPreview picker={picker} />}
 
-      <div className="flex gap-2">
+      <div className="sticky -bottom-4 -mx-5 -mb-4 flex gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-glass-strong)] px-5 py-3 backdrop-blur">
         <button
           type="button"
           onClick={submit}
           disabled={isSubmitting || !ready}
-          className="flex-1 rounded border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/60 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+          className="gop-btn gop-btn-primary h-10 flex-1"
           aria-busy={isSubmitting}
         >
-          {isSubmitting ? "Projecting..." : "Project hand"}
+          {isSubmitting ? "Projecting…" : "Project onto manifold"}
         </button>
         <button
           type="button"
           onClick={clearAll}
           disabled={used.size === 0 || isSubmitting}
-          className="rounded border border-[var(--border-default)] px-2.5 py-1.5 text-xs text-zinc-300 transition hover:bg-white/5 disabled:opacity-30"
+          className="gop-btn h-10"
         >
           Clear
         </button>
       </div>
-
     </section>
   );
 }
@@ -371,14 +360,14 @@ function PickerCombinatoricsPreview({ picker }: { picker: CardPickerState }) {
   const math = computeStateCombinatorics({ hero, board, deadCards });
 
   return (
-    <div className="mb-2 rounded border border-emerald-300/20 bg-emerald-500/[0.035] p-2">
-      <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-emerald-200/80">
-        <span>Combinatorics preview</span>
-        <span className="gop-mono text-emerald-300/70">
-          {math.remainingCards} live
+    <div className="gop-card p-3.5">
+      <div className="mb-2.5 flex items-center justify-between">
+        <h3 className="gop-eyebrow">Combinatorics preview</h3>
+        <span className="gop-mono text-[11px] text-emerald-300/80">
+          {math.remainingCards} live cards
         </span>
       </div>
-      <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         <PreviewRow label="Villain hands" value={formatBigInt(math.legalVillainHands)} />
         <PreviewRow label="Runouts/villain" value={formatBigInt(math.publicRunoutsAfterVillain)} />
         <PreviewRow label="Terminal leaves" value={formatBigInt(math.terminalLeaves)} />
@@ -428,8 +417,8 @@ function formatPercent(value: number) {
 function PreviewRow({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="gop-mono truncate text-right tabular-nums text-zinc-300">
+      <dt className="text-[var(--text-tertiary)]">{label}</dt>
+      <dd className="gop-mono truncate text-right tabular-nums text-[var(--text-primary)]">
         {value}
       </dd>
     </>
@@ -438,84 +427,82 @@ function PreviewRow({ label, value }: { label: string; value: string }) {
 
 function SlotsRow({
   label,
-  filled,
-  maxFilled,
+  hint,
   slots,
   onClickSlot,
   isActive,
   onSetActive,
   accent,
+  small,
 }: {
   label: string;
-  filled: number;
-  maxFilled: number;
-  slots: { card: string | null; key: string }[];
+  hint: string;
+  slots: { card: string | null; key: string; index?: number }[];
   onClickSlot: (i: number) => void;
   isActive: boolean;
   onSetActive: () => void;
   accent: "cyan" | "amber" | "rose";
+  small?: boolean;
 }) {
-  const accentBorder =
+  const accentText =
     accent === "cyan"
-      ? "border-cyan-300/40"
+      ? "text-[var(--accent)]"
       : accent === "amber"
-        ? "border-amber-300/40"
-        : "border-rose-300/40";
+        ? "text-amber-300"
+        : "text-rose-300";
   const accentRing =
     accent === "cyan"
-      ? "ring-cyan-300/40"
+      ? "ring-[var(--accent-ring)] bg-[var(--accent-soft)]"
       : accent === "amber"
-        ? "ring-amber-300/40"
-        : "ring-rose-300/40";
+        ? "ring-amber-300/35 bg-amber-400/[0.07]"
+        : "ring-rose-300/35 bg-rose-400/[0.07]";
+  const size = small ? "xs" : "sm";
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onSetActive}
-          className={`text-[10px] uppercase tracking-[0.18em] transition ${
-            isActive ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+    <div
+      className={`flex items-center gap-3 rounded-[10px] px-2 py-1.5 transition ${
+        isActive ? `ring-1 ${accentRing}` : ""
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onSetActive}
+        aria-pressed={isActive}
+        className="w-14 shrink-0 text-left"
+        title={`Place next cards into ${label.toLowerCase()}`}
+      >
+        <span
+          className={`block text-[12.5px] font-medium ${
+            isActive ? accentText : "text-[var(--text-secondary)]"
           }`}
-          aria-pressed={isActive}
         >
-          {label}{" "}
-          <span className="gop-mono ml-1 tabular-nums text-zinc-500">
-            {filled}/{maxFilled}
-          </span>
-        </button>
-      </div>
-      <div className={`flex flex-wrap gap-1 rounded border p-1 transition ${
-        isActive ? `${accentBorder} bg-white/[0.03] ring-1 ${accentRing}` : "border-[var(--border-subtle)] bg-transparent"
-      }`}>
-        {slots.map(({ card, key }, i) => {
-          const suit = card ? card.slice(-1) : null;
-          return (
+          {label}
+        </span>
+        <span className="block text-[10.5px] text-[var(--text-tertiary)]">{hint}</span>
+      </button>
+      <div className="flex flex-wrap gap-1">
+        {slots.map(({ card, key, index }, i) =>
+          card ? (
             <button
               key={key}
               type="button"
-              onClick={() => onClickSlot(i)}
-              disabled={!card}
-              className={`gop-mono min-w-[2.4rem] rounded border px-2 py-1 text-xs transition ${
-                card
-                  ? `border-[var(--border-default)] bg-white/[0.05] hover:bg-white/[0.1] ${
-                      suit ? SUIT_TONE[suit] : ""
-                    }`
-                  : "border-dashed border-[var(--border-subtle)] text-zinc-600"
-              }`}
-              aria-label={card ? `Remove ${card} from ${label}` : `${label} slot ${i + 1} empty`}
-              title={card ? "Click to remove" : "Empty slot"}
+              onClick={() => onClickSlot(index ?? i)}
+              className="transition hover:-translate-y-0.5"
+              aria-label={`Remove ${card} from ${label}`}
+              title="Click to remove"
             >
-              {card ? (
-                <>
-                  {card.slice(0, -1)}
-                  {SUIT_SYMBOLS[suit ?? ""] ?? ""}
-                </>
-              ) : (
-                "-"
-              )}
+              <PlayingCard card={card} size={size} />
             </button>
-          );
-        })}
+          ) : (
+            <button
+              key={key}
+              type="button"
+              onClick={onSetActive}
+              aria-label={`${label} slot ${i + 1} empty`}
+            >
+              <EmptyCardSlot size={size} active={isActive && slots.findIndex((s) => !s.card) === i} />
+            </button>
+          ),
+        )}
       </div>
     </div>
   );

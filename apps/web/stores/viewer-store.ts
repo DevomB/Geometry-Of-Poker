@@ -14,7 +14,12 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_FILTERS as DEFAULT_FILTER_VALUES } from "@/lib/types";
 import { GridSpatialIndex } from "@/lib/spatial/grid-index";
-import { HOVER_COLOR, POINT_SIZES, SELECTION_COLOR } from "@/lib/visualization-theme";
+import {
+  CAMERA_FRAME_DISTANCE,
+  HOVER_COLOR,
+  POINT_SIZES,
+  SELECTION_COLOR,
+} from "@/lib/visualization-theme";
 
 interface ViewerState {
   street: Street;
@@ -371,7 +376,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
             position: [
               bounds.center[0],
               bounds.center[1],
-              bounds.center[2] + bounds.radius * 2.2,
+              bounds.center[2] + bounds.radius * CAMERA_FRAME_DISTANCE,
             ],
             target: bounds.center,
           },
@@ -396,7 +401,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
           position: [
             bounds.center[0],
             bounds.center[1],
-            bounds.center[2] + bounds.radius * 2.2,
+            bounds.center[2] + bounds.radius * CAMERA_FRAME_DISTANCE,
           ],
           target: bounds.center,
         },

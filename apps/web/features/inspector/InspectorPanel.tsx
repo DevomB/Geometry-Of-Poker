@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useViewerStore } from "@/stores/viewer-store";
 import { CardDisplay } from "@/components/CardDisplay";
+import { PlayingCard } from "@/components/ui/PlayingCard";
+import { IconTarget } from "@/components/ui/Icons";
 import { MethodologyPanel } from "@/components/MethodologyPanel";
 import {
   compareManualToPoint,
@@ -55,21 +57,32 @@ export function InspectorPanel() {
   const point =
     selectedIndex !== undefined && dataset ? dataset.metadata[selectedIndex] : null;
 
+  const hasContent = !!manualMarker || !!point;
+
   return (
     <aside
       aria-label="State inspector"
-      className="gop-slide-in-right pointer-events-auto flex max-h-screen w-80 flex-col gap-4 overflow-y-auto border-l border-[var(--border-default)] bg-[var(--surface-glass)] p-4 backdrop-blur-md"
+      className="gop-float gop-slide-in-right pointer-events-auto absolute right-3 top-[76px] z-20 flex max-h-[calc(100vh-88px)] w-[384px] flex-col overflow-hidden"
     >
-      <header className="flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
-          Inspector
-        </h2>
-        <div className="flex gap-3 text-[10px]">
+      <header className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-5 py-3.5">
+        <div>
+          <h2 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+            Inspector
+          </h2>
+          <p className="text-[12px] text-[var(--text-tertiary)]">
+            {point
+              ? "Locked state"
+              : manualMarker
+                ? "Projected hand"
+                : "Nothing selected"}
+          </p>
+        </div>
+        <div className="flex gap-1">
           {manualMarker && (
             <button
               type="button"
               onClick={() => setManualMarker(null)}
-              className="text-amber-300/70 transition hover:text-amber-200"
+              className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12px] text-amber-200/90"
             >
               Clear projection
             </button>
@@ -78,53 +91,81 @@ export function InspectorPanel() {
             <button
               type="button"
               onClick={clearSelection}
-              className="text-zinc-500 transition hover:text-zinc-200"
+              className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12px]"
+              title="Clear selection (Esc)"
             >
-              Clear selection
+              Deselect <kbd className="gop-kbd">Esc</kbd>
             </button>
           )}
         </div>
       </header>
 
-      {manualMarker && <ManualProjectionCard />}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        {manualMarker && <ManualProjectionCard />}
 
-      {point && dataset ? (
-        <SelectedStateCard
-          point={point}
-          index={selectedIndex!}
-          dataset={dataset}
-          manualMarker={manualMarker}
-          neighborFocusActive={filters.searchNeighborOf === point.id}
-          onToggleNeighborFocus={() =>
-            setFilters({
-              searchNeighborOf:
-                filters.searchNeighborOf === point.id ? null : point.id,
-            })
-          }
-        />
-      ) : (
-        <EmptySelection hasManual={!!manualMarker} />
-      )}
+        {point && dataset ? (
+          <SelectedStateCard
+            key={point.id}
+            point={point}
+            index={selectedIndex!}
+            dataset={dataset}
+            manualMarker={manualMarker}
+            neighborFocusActive={filters.searchNeighborOf === point.id}
+            onToggleNeighborFocus={() =>
+              setFilters({
+                searchNeighborOf:
+                  filters.searchNeighborOf === point.id ? null : point.id,
+              })
+            }
+          />
+        ) : (
+          !hasContent && <EmptySelection />
+        )}
 
-      {dataset && <MethodologyPanel />}
+        {dataset && !point && <MethodologyPanel />}
+      </div>
     </aside>
   );
 }
 
-function EmptySelection({ hasManual }: { hasManual: boolean }) {
+function EmptySelection() {
   return (
-    <section className="rounded border border-dashed border-[var(--border-subtle)] bg-white/[0.01] p-4 text-[11px] leading-relaxed text-zinc-500">
-      <p className="mb-1 text-zinc-400">No state selected.</p>
-      <p>
-        Hover the manifold for tooltips. Click a point to lock selection and
-        view its full feature breakdown.
-      </p>
-      {hasManual && (
-        <p className="mt-2 text-amber-300/70">
-          A manually projected hand is active. Its card and metric summary is
-          shown above; neighbors are reference points from the manifold.
-        </p>
-      )}
+    <section className="space-y-4">
+      <div className="gop-card flex items-start gap-3 p-4">
+        <span
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]"
+          aria-hidden="true"
+        >
+          <IconTarget size={18} />
+        </span>
+        <div>
+          <p className="text-[13.5px] font-medium text-[var(--text-primary)]">
+            Pick a state to inspect
+          </p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
+            Hover the manifold for a preview, click a point to lock it and see its equity,
+            runout distribution, draws and neighbours. Or project your own hand from the{" "}
+            <span className="text-[var(--text-primary)]">Project</span> tab.
+          </p>
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 px-1 text-[12px] text-[var(--text-secondary)]">
+        {[
+          ["1 – 4", "Switch street"],
+          ["R", "Reset camera"],
+          ["L", "Neighbour links"],
+          ["C", "Cluster labels"],
+          ["Esc", "Clear selection"],
+          ["Drag", "Orbit · zoom"],
+        ].map(([k, v]) => (
+          <div key={k} className="flex items-center gap-2">
+            <dt>
+              <kbd className="gop-kbd">{k}</kbd>
+            </dt>
+            <dd className="truncate">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
@@ -147,13 +188,13 @@ function ManualProjectionCard() {
   return (
     <section
       aria-label="Manual projection"
-      className="gop-fade-in rounded border border-amber-300/30 bg-amber-500/5 p-3"
+      className="gop-fade-in rounded-[12px] border border-amber-300/30 bg-amber-500/[0.06] p-4"
     >
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-amber-200">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-200">
           Manual projection
         </p>
-        <span className="gop-mono text-[10px] tabular-nums text-amber-300/70">
+        <span className="gop-mono text-[12px] tabular-nums text-amber-300/70">
           {describeProjectionMethod(marker.method)}
         </span>
       </div>
@@ -166,7 +207,7 @@ function ManualProjectionCard() {
           <CardDisplay cards={marker.deadCards} label="Dead" />
         )}
       </div>
-      <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px]">
+      <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[12px]">
         {category && <Row label="Category" value={humanCategory(category)} />}
         {equity !== null && (
           <Row label="Equity" value={`${(equity * 100).toFixed(2)}%`} mono />
@@ -249,17 +290,17 @@ function ManualProjectionCard() {
           />
         )}
       </dl>
-      <p className="mt-2 rounded border border-amber-300/20 bg-black/20 px-2 py-1.5 text-[10px] leading-relaxed text-amber-100/70">
+      <p className="mt-2 rounded border border-amber-300/20 bg-black/20 px-2 py-1.5 text-[12px] leading-relaxed text-amber-100/70">
         {locality.detail}
       </p>
       {marker.warnings && marker.warnings.length > 0 && (
-        <ul className="mt-2 space-y-1 rounded border border-rose-400/30 bg-rose-950/20 p-2 text-[10px] leading-relaxed text-rose-100/80">
+        <ul className="mt-2 space-y-1 rounded border border-rose-400/30 bg-rose-950/20 p-2 text-[12px] leading-relaxed text-rose-100/80">
           {marker.warnings.map((warning) => (
             <li key={warning}>{warning}</li>
           ))}
         </ul>
       )}
-      <p className="mt-2 border-t border-amber-300/20 pt-2 text-[10px] leading-relaxed text-amber-100/70">
+      <p className="mt-2 border-t border-amber-300/20 pt-2 text-[12px] leading-relaxed text-amber-100/70">
         This marker is the projected custom hand. Neighbor rows are manifold
         references used to place it, not replacements for the input cards.
         {marker.deadCards.length > 0
@@ -268,7 +309,7 @@ function ManualProjectionCard() {
       </p>
       {marker.neighborIds.length > 0 && (
         <div className="mt-2 border-t border-amber-300/20 pt-2">
-          <p className="mb-1 text-[10px] uppercase tracking-wider text-amber-300/70">
+          <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-300/70">
             Nearest manifold neighbors
           </p>
           <ManualNeighborsList />
@@ -299,7 +340,7 @@ function ManualNeighborsList() {
               type="button"
               onClick={() => idx !== undefined && selectPoint(idx, true)}
               disabled={idx === undefined}
-              className="w-full rounded px-1 py-0.5 text-left text-[11px] transition hover:bg-white/5 disabled:opacity-30"
+              className="w-full rounded-[8px] px-2 py-1.5 text-left text-[11px] transition hover:bg-white/5 disabled:opacity-30"
             >
               <span className="gop-mono tabular-nums text-amber-300/70">
                 d={marker.neighborDistances[i]?.toFixed(3) ?? "-"}
@@ -350,7 +391,6 @@ function SelectedStateCard({
   neighborFocusActive: boolean;
   onToggleNeighborFocus: () => void;
 }) {
-  const [showAllFeatures, setShowAllFeatures] = useState(false);
   const standing = useMemo(
     () => computePopulationStanding(dataset, index),
     [dataset, index],
@@ -373,38 +413,15 @@ function SelectedStateCard({
     [baseSummary, exact],
   );
 
+  const [tab, setTab] = useState<InspectorTab>("overview");
+
   return (
-    <section className="gop-fade-in space-y-3">
-      <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-            Selected state
-          </p>
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={onToggleNeighborFocus}
-              className={`rounded border px-1.5 py-0.5 text-[10px] transition ${
-                neighborFocusActive
-                  ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-100"
-                  : "border-[var(--border-subtle)] text-zinc-500 hover:border-[var(--border-default)] hover:text-zinc-200"
-              }`}
-              title="Filter the cloud to this point and its nearest embedding neighbors"
-            >
-              {neighborFocusActive ? "Clear 25-NN" : "Focus 25-NN"}
-            </button>
-            <span className="gop-mono truncate text-[10px] text-zinc-500">
-              {point.id}
-            </span>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <CardDisplay cards={point.hero} label="Hero" />
-          {point.board.length > 0 && (
-            <CardDisplay cards={point.board} label="Board" />
-          )}
-        </div>
-      </div>
+    <section className="gop-fade-in space-y-4">
+      <StateHero
+        point={point}
+        neighborFocusActive={neighborFocusActive}
+        onToggleNeighborFocus={onToggleNeighborFocus}
+      />
 
       <KeyMetrics
         point={point}
@@ -413,65 +430,182 @@ function SelectedStateCard({
         exactError={exactError}
       />
 
-      <RunoutDistributionSection summary={resolvedSummary} />
+      <div role="tablist" aria-label="Inspector sections" className="gop-seg flex w-full">
+        {INSPECTOR_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className="flex-1 !px-2 text-center"
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {standing && <PopulationStandingSection standing={standing} />}
-
-      {clusterProfile && <ClusterProfileSection profile={clusterProfile} />}
-
-      <CombinatoricsSection point={point} dataset={dataset} />
-
-      {manualMarker && (
-        <ManualComparisonCard marker={manualMarker} point={point} />
-      )}
-
-      <BoardTextureSection point={point} />
-
-      <DrawsSection point={point} />
-
-      <RemovalPressureSection point={point} />
-
-      <CategoryTransitionSection point={point} />
-
-      <details
-        open={showAllFeatures}
-        onToggle={(e) => setShowAllFeatures((e.target as HTMLDetailsElement).open)}
-        className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3"
-      >
-        <summary className="cursor-pointer text-[10px] uppercase tracking-[0.18em] text-zinc-400 outline-none transition hover:text-zinc-200">
-          Feature breakdown
-        </summary>
-        <dl className="mt-2 max-h-56 space-y-0.5 overflow-y-auto pr-1 text-[11px]">
-          {Object.entries({ ...point.summary, equityVsRandom: point.equityVsRandom })
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => (
-              <div key={key} className="flex justify-between gap-2">
-                <dt className="truncate text-zinc-500">{key}</dt>
-                <dd className="gop-mono tabular-nums text-zinc-300">
-                  {typeof value === "number"
-                    ? Number.isInteger(value)
-                      ? value
-                      : value.toFixed(4)
-                    : String(value)}
-                </dd>
-              </div>
-            ))}
-        </dl>
-      </details>
-
-      <NearestNeighbors index={index} />
+      <div key={tab} className="gop-fade-in space-y-3" role="tabpanel">
+        {tab === "overview" && (
+          <>
+            <RunoutDistributionSection summary={resolvedSummary} />
+            {standing && <PopulationStandingSection standing={standing} />}
+            <BoardTextureSection point={point} />
+            {manualMarker && (
+              <ManualComparisonCard marker={manualMarker} point={point} />
+            )}
+          </>
+        )}
+        {tab === "draws" && (
+          <>
+            <DrawsSection point={point} />
+            <RemovalPressureSection point={point} />
+            <CategoryTransitionSection point={point} />
+          </>
+        )}
+        {tab === "context" && (
+          <>
+            <NearestNeighbors index={index} />
+            {clusterProfile && <ClusterProfileSection profile={clusterProfile} />}
+            <CombinatoricsSection point={point} dataset={dataset} />
+          </>
+        )}
+        {tab === "raw" && (
+          <div className="gop-card p-3.5">
+            <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Feature breakdown
+            </p>
+            <dl className="space-y-1 text-[12px]">
+              {Object.entries({ ...point.summary, equityVsRandom: point.equityVsRandom })
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, value]) => (
+                  <div key={key} className="flex justify-between gap-2 border-b border-white/[0.03] pb-1 last:border-0">
+                    <dt className="gop-mono truncate text-[11.5px] text-[var(--text-tertiary)]">{key}</dt>
+                    <dd className="gop-mono tabular-nums text-[var(--text-primary)]">
+                      {typeof value === "number"
+                        ? Number.isInteger(value)
+                          ? value
+                          : value.toFixed(4)
+                        : String(value)}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
+type InspectorTab = "overview" | "draws" | "context" | "raw";
+
+const INSPECTOR_TABS: { id: InspectorTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "draws", label: "Draws" },
+  { id: "context", label: "Context" },
+  { id: "raw", label: "Raw" },
+];
+
+function StateHero({
+  point,
+  neighborFocusActive,
+  onToggleNeighborFocus,
+}: {
+  point: BrowserPointMeta;
+  neighborFocusActive: boolean;
+  onToggleNeighborFocus: () => void;
+}) {
+  const eq = Math.max(0, Math.min(1, point.equityVsRandom));
+  return (
+    <div className="gop-card relative overflow-hidden p-4">
+      <div
+        className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full opacity-30 blur-3xl"
+        style={{ background: equityColor(eq) }}
+        aria-hidden="true"
+      />
+      <div className="relative flex items-end gap-4">
+        <div>
+          <p className="mb-1.5 text-[11px] text-[var(--text-tertiary)]">Hero</p>
+          <div className="flex gap-1.5">
+            {point.hero.map((c) => (
+              <PlayingCard key={c} card={c} size="lg" />
+            ))}
+          </div>
+        </div>
+        {point.board.length > 0 && (
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[11px] text-[var(--text-tertiary)]">Board</p>
+            <div className="flex flex-wrap gap-1">
+              {point.board.map((c) => (
+                <PlayingCard key={c} card={c} size="sm" />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="relative mt-4 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[17px] font-semibold tracking-tight text-[var(--text-primary)]">
+            {humanCategory(point.category)}
+          </p>
+          <p className="mt-0.5 flex items-center gap-2 text-[12px] text-[var(--text-tertiary)]">
+            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 gop-mono text-[11px] text-[var(--text-secondary)]">
+              {point.clusterId >= 0 ? `Cluster C${point.clusterId}` : "Noise"}
+            </span>
+            <span className="gop-mono truncate text-[11px]" title={point.id}>
+              {point.id}
+            </span>
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="gop-mono text-[26px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+            {(eq * 100).toFixed(1)}
+            <span className="text-[15px] text-[var(--text-tertiary)]">%</span>
+          </p>
+          <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">equity vs random</p>
+        </div>
+      </div>
+      <div className="relative mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.07]" aria-hidden="true">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${eq * 100}%`,
+            background: "linear-gradient(90deg, #1f3873, #385f9e, #7a87c0, #cf8b6f, #e64a3f)",
+            backgroundSize: `${eq > 0 ? 100 / eq : 100}% 100%`,
+          }}
+        />
+      </div>
+      <div className="relative mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={onToggleNeighborFocus}
+          aria-pressed={neighborFocusActive}
+          className={`gop-btn h-8 flex-1 text-[12px] ${
+            neighborFocusActive ? "!border-[var(--accent-ring)] !bg-[var(--accent-soft)] !text-[#ccfbf1]" : ""
+          }`}
+          title="Filter the cloud to this point and its nearest embedding neighbors"
+        >
+          {neighborFocusActive ? "Show all states" : "Isolate 25 nearest"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function equityColor(eq: number) {
+  const stops = ["#1f3873", "#385f9e", "#7a87c0", "#cf8b6f", "#e64a3f"];
+  return stops[Math.min(stops.length - 1, Math.floor(eq * stops.length))]!;
+}
+
 function ClusterProfileSection({ profile }: { profile: ClusterProfile }) {
   return (
-    <div className="rounded border border-sky-300/20 bg-sky-500/[0.035] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-sky-200/80">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-sky-200/80">
           Cluster profile
         </p>
-        <span className="gop-mono text-[10px] tabular-nums text-sky-300/70">
+        <span className="gop-mono text-[12px] tabular-nums text-sky-300/70">
           {profile.label} {formatShare(profile.share)}
         </span>
       </div>
@@ -480,10 +614,10 @@ function ClusterProfileSection({ profile }: { profile: ClusterProfile }) {
         {profile.metrics.map((metric) => (
           <div
             key={metric.id}
-            className="rounded border border-white/[0.06] bg-black/10 px-2 py-1.5"
+            className="rounded-[10px] bg-white/[0.03] px-2.5 py-2"
             title={`Cluster mean ${metric.clusterMean.toFixed(4)} vs street mean ${metric.streetMean.toFixed(4)}`}
           >
-            <div className="flex items-center justify-between gap-2 text-[10px]">
+            <div className="flex items-center justify-between gap-2 text-[12px]">
               <span className="text-zinc-500">{metric.label}</span>
               <span
                 className={`gop-mono tabular-nums ${
@@ -493,7 +627,7 @@ function ClusterProfileSection({ profile }: { profile: ClusterProfile }) {
                 {formatDelta(metric.delta, metric.format)}
               </span>
             </div>
-            <div className="mt-1 flex items-center justify-between gap-2 text-[9px] text-zinc-600">
+            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
               <span className="gop-mono tabular-nums">
                 cluster {formatClusterMetric(metric.clusterMean, metric.format)}
               </span>
@@ -506,14 +640,14 @@ function ClusterProfileSection({ profile }: { profile: ClusterProfile }) {
       </div>
 
       {profile.categories.length > 0 && (
-        <div className="mt-3 border-t border-sky-300/15 pt-2">
-          <p className="mb-1 text-[10px] uppercase tracking-wider text-sky-200/70">
+        <div className="mt-3 border-t border-[var(--border-subtle)] pt-2">
+          <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-sky-200/70">
             Category mix
           </p>
           <div className="space-y-1">
             {profile.categories.slice(0, 4).map((category) => (
               <div key={category.label}>
-                <div className="mb-0.5 flex items-center justify-between text-[10px]">
+                <div className="mb-0.5 flex items-center justify-between text-[12px]">
                   <span className="truncate text-zinc-400">
                     {humanCategory(category.label)}
                   </span>
@@ -561,12 +695,12 @@ function PopulationStandingSection({
   standing: PopulationStanding;
 }) {
   return (
-    <div className="rounded border border-violet-300/20 bg-violet-500/[0.035] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-violet-200/80">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-violet-200/80">
           Population standing
         </p>
-        <span className="gop-mono text-[10px] tabular-nums text-violet-300/70">
+        <span className="gop-mono text-[12px] tabular-nums text-violet-300/70">
           n={standing.streetCount.toLocaleString()}
         </span>
       </div>
@@ -574,7 +708,7 @@ function PopulationStandingSection({
       <div className="space-y-2">
         {standing.metrics.map((metric) => (
           <div key={metric.id} title={metric.detail}>
-            <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
+            <div className="mb-0.5 flex items-center justify-between gap-2 text-[12px]">
               <span className="text-zinc-500">{metric.label}</span>
               <span className="gop-mono tabular-nums text-zinc-300">
                 {formatPercentile(metric.percentile)}
@@ -586,14 +720,14 @@ function PopulationStandingSection({
                 style={{ width: `${Math.max(3, metric.percentile * 100)}%` }}
               />
             </div>
-            <div className="mt-0.5 text-right gop-mono text-[9px] tabular-nums text-zinc-600">
+            <div className="mt-0.5 text-right gop-mono text-[11px] tabular-nums text-zinc-500">
               {formatStandingValue(metric.value, metric.format)}
             </div>
           </div>
         ))}
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-0.5 border-t border-violet-300/15 pt-2 text-[10px]">
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-0.5 border-t border-[var(--border-subtle)] pt-2 text-[12px]">
         <Row
           label="Category share"
           value={`${humanCategory(standing.category.label)} ${formatShare(standing.category.share)}`}
@@ -632,19 +766,19 @@ function CombinatoricsSection({
   });
 
   return (
-    <div className="rounded border border-emerald-300/20 bg-emerald-500/[0.035] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/80">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-emerald-200/80">
           Exact combinatorics
         </p>
         <Link
           href="/research/combinatorial-proofs"
-          className="text-[10px] text-emerald-300/70 transition hover:text-emerald-200"
+          className="text-[12px] text-emerald-300/70 transition hover:text-emerald-200"
         >
           Proof notes
         </Link>
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         <Row label="Known cards" value={`${math.knownCards}/52`} mono />
         <Row label="Remaining deck" value={String(math.remainingCards)} mono />
         <Row
@@ -735,7 +869,7 @@ function CombinatoricsSection({
           />
         )}
       </dl>
-      <p className="mt-2 border-t border-emerald-300/15 pt-2 text-[10px] leading-relaxed text-emerald-100/65">
+      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-emerald-100/65">
         These counts are pure deck combinatorics. The street universe measures
         sampling coverage; the villain/runout leaves define the exact equity
         enumeration under the documented uniform-villain assumption.
@@ -768,7 +902,6 @@ function KeyMetrics({
   exactLoading: boolean;
   exactError: string | null;
 }) {
-  const eq = point.equityVsRandom;
   const boardLength = point.board.length;
   const showEquityVariance = isEquityVarianceDefined(boardLength);
   const showVulnerability = isVulnerabilityDefined(boardLength);
@@ -777,21 +910,10 @@ function KeyMetrics({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Metric label="Category" value={humanCategory(point.category)} />
-        <Metric
-          label="Cluster"
-          value={point.clusterId >= 0 ? `C${point.clusterId}` : "noise"}
-        />
-        <Metric
-          label="Equity vs random"
-          value={`${(eq * 100).toFixed(2)}%`}
-          sub={equityBarFromValue(eq)}
-          mono
-        />
+      <div className="grid grid-cols-3 gap-2 empty:hidden">
         {showEquityVariance && (
           <Metric
-            label="Equity variance"
+            label="Eq. variance"
             value={formatMetricValue(
               summary.equityVariance,
               exactLoading,
@@ -830,7 +952,7 @@ function KeyMetrics({
         )}
       </div>
       {exactError && (showEquityVariance || showVulnerability) && (
-        <p className="text-[10px] leading-relaxed text-rose-300/80" title={exactError}>
+        <p className="text-[12px] leading-relaxed text-rose-300/80" title={exactError}>
           Exact runout metrics unavailable: {exactError}
         </p>
       )}
@@ -843,16 +965,16 @@ function RunoutDistributionSection({ summary }: { summary: PointSummary }) {
   if (!runout) return null;
 
   return (
-    <div className="rounded border border-amber-300/20 bg-amber-500/[0.035] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-200/80">
           Runout distribution
         </p>
-        <span className="gop-mono text-[10px] tabular-nums text-amber-300/70">
+        <span className="gop-mono text-[12px] tabular-nums text-amber-300/70">
           exact
         </span>
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         {runout.hasRunoutQuantiles && (
           <>
             <Row label="Mean" value={formatPercent(runout.mean)} mono />
@@ -890,7 +1012,7 @@ function RunoutDistributionSection({ summary }: { summary: PointSummary }) {
           </>
         )}
       </dl>
-      <p className="mt-2 border-t border-amber-300/15 pt-2 text-[10px] leading-relaxed text-amber-100/65">
+      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-amber-100/65">
         Exact runout quantiles come from the engine. The viewer derives width =
         P95 - P05, tail skew = (P95 - P50) - (P50 - P05), and nuts edge =
         pNuts - pDominated.
@@ -910,25 +1032,25 @@ function BoardTextureSection({ point }: { point: BrowserPointMeta }) {
   if ((s.boardConnectivityScore ?? 0) > 0.5) texture.push("Connected");
 
   return (
-    <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
-      <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+    <div className="gop-card p-3.5">
+      <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Board texture
       </p>
       <div className="mb-1 flex flex-wrap gap-1">
         {texture.length === 0 ? (
-          <span className="text-[10px] text-zinc-500">-</span>
+          <span className="text-[12px] text-zinc-500">-</span>
         ) : (
           texture.map((t) => (
             <span
               key={t}
-              className="rounded border border-[var(--border-subtle)] bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-zinc-300"
+              className="rounded border border-[var(--border-subtle)] bg-white/[0.03] px-1.5 py-0.5 text-[12px] text-zinc-300"
             >
               {t}
             </span>
           ))
         )}
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         {s.boardConnectivityScore != null && (
           <Row
             label="Connectivity"
@@ -957,18 +1079,18 @@ function DrawsSection({ point }: { point: BrowserPointMeta }) {
   if (!pressure) return null;
 
   return (
-    <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
           Draw pressure
         </p>
         {pressure.drawClass && (
-          <span className="gop-mono text-[10px] text-zinc-400">
+          <span className="gop-mono text-[12px] text-zinc-400">
             {pressure.drawClass}
           </span>
         )}
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         <Row
           label="Improve outs"
           value={`${pressure.improvementOuts}/${pressure.unseenCardCount}`}
@@ -1035,7 +1157,7 @@ function DrawsSection({ point }: { point: BrowserPointMeta }) {
           />
         )}
       </dl>
-      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[10px] leading-relaxed text-zinc-500">
+      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-zinc-500">
         Exact one-card odds use P = outs / r over the unseen next-card deck.
         Dirty outs are improvement outs outside the clean subset; blanks are the
         complement r - improvementOutCount.
@@ -1053,16 +1175,16 @@ function RemovalPressureSection({ point }: { point: BrowserPointMeta }) {
   if (!pressure) return null;
 
   return (
-    <div className="rounded border border-rose-300/20 bg-rose-500/[0.035] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-rose-200/80">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-rose-200/80">
           Card-removal pressure
         </p>
-        <span className="gop-mono text-[10px] tabular-nums text-rose-300/70">
+        <span className="gop-mono text-[12px] tabular-nums text-rose-300/70">
           n={pressure.activeCardCount ?? "-"}
         </span>
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         <Row label="L1 mass" value={pressure.l1.toFixed(4)} mono title="sum |g_c|" />
         <Row label="L2 norm" value={pressure.l2.toFixed(4)} mono title="sqrt(sum g_c^2)" />
         <Row
@@ -1091,7 +1213,7 @@ function RemovalPressureSection({ point }: { point: BrowserPointMeta }) {
         <Row label="Std dev" value={pressure.stdDev.toFixed(4)} mono />
         <Row label="Min / max" value={`${pressure.min.toFixed(4)} / ${pressure.max.toFixed(4)}`} mono />
       </dl>
-      <p className="mt-2 border-t border-rose-300/15 pt-2 text-[10px] leading-relaxed text-rose-100/65">
+      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-rose-100/65">
         Engine gradient vector g is summarized over active unseen cards:
         ||g||1 = sum |g_c|, ||g||2 = sqrt(sum g_c^2), and signed mass =
         sum(g_c &gt; 0) - sum(|g_c| for g_c &lt; 0). Cauchy gives
@@ -1106,16 +1228,16 @@ function CategoryTransitionSection({ point }: { point: BrowserPointMeta }) {
   if (!transition) return null;
 
   return (
-    <div className="rounded border border-cyan-300/20 bg-cyan-500/[0.035] p-3">
+    <div className="gop-card p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-200/80">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-cyan-200/80">
           Category transition
         </p>
-        <span className="gop-mono text-[10px] tabular-nums text-cyan-300/70">
+        <span className="gop-mono text-[12px] tabular-nums text-cyan-300/70">
           9x9 exact
         </span>
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         <Row label="Entropy H" value={transition.entropy.toFixed(3)} mono />
         <Row
           label="H / log 81"
@@ -1144,7 +1266,7 @@ function CategoryTransitionSection({ point }: { point: BrowserPointMeta }) {
           mono
         />
       </dl>
-      <p className="mt-2 border-t border-cyan-300/15 pt-2 text-[10px] leading-relaxed text-cyan-100/65">
+      <p className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-cyan-100/65">
         The engine supplies a probability matrix p_ij for turn category i and
         river category j. H = -sum p_ij log(p_ij), H/log(81) lies in [0, 1],
         and upgrade edge = sum(j &gt; i)p_ij - sum(j &lt; i)p_ij.
@@ -1168,8 +1290,8 @@ function NearestNeighbors({ index }: { index: number }) {
   if (!dataset || top.length === 0) return null;
 
   return (
-    <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-3">
-      <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+    <div className="gop-card p-3.5">
+      <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
         Nearest neighbors
       </p>
       <ul className="space-y-0.5 text-[11px]">
@@ -1180,7 +1302,7 @@ function NearestNeighbors({ index }: { index: number }) {
               <button
                 type="button"
                 onClick={() => selectPoint(neighborIndex, true)}
-                className="w-full rounded px-1 py-0.5 text-left transition hover:bg-white/5"
+                className="w-full rounded-[8px] px-2 py-1.5 text-left transition hover:bg-white/5"
               >
                 <span className="gop-mono tabular-nums text-zinc-500">
                   {distance.toFixed(3)}
@@ -1212,13 +1334,10 @@ function Metric({
   title?: string;
 }) {
   return (
-    <div
-      title={title}
-      className="rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-1.5"
-    >
-      <p className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</p>
+    <div title={title} className="gop-card px-3 py-2.5">
+      <p className="truncate text-[11px] text-[var(--text-tertiary)]">{label}</p>
       <p
-        className={`text-[12px] text-zinc-200 ${
+        className={`mt-0.5 truncate text-[14px] font-medium text-[var(--text-primary)] ${
           mono ? "gop-mono tabular-nums" : ""
         }`}
       >
@@ -1242,31 +1361,13 @@ function Row({
 }) {
   return (
     <>
-      <dt className="text-zinc-500" title={title}>
+      <dt className="text-[var(--text-tertiary)]" title={title}>
         {label}
       </dt>
-      <dd className={`text-right text-zinc-300 ${mono ? "gop-mono tabular-nums" : ""}`}>
+      <dd className={`text-right text-[var(--text-primary)] ${mono ? "gop-mono tabular-nums" : ""}`}>
         {value}
       </dd>
     </>
-  );
-}
-
-function equityBarFromValue(eq: number) {
-  const pct = Math.max(0, Math.min(1, eq)) * 100;
-  return (
-    <div
-      className="mt-1 h-0.5 w-full overflow-hidden rounded bg-white/[0.05]"
-      aria-hidden="true"
-    >
-      <div
-        className="h-full"
-        style={{
-          width: `${pct}%`,
-          background: "linear-gradient(90deg, #385f9e, #cf8b6f, #e64a3f)",
-        }}
-      />
-    </div>
   );
 }
 
@@ -1314,11 +1415,11 @@ function ManualComparisonCard({
 }) {
   const comparison = compareManualToPoint(marker, point);
   return (
-    <div className="rounded border border-cyan-300/20 bg-cyan-500/[0.04] p-3">
-      <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-cyan-200/80">
+    <div className="gop-card p-3.5">
+      <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-cyan-200/80">
         Compared with manual hand
       </p>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
         <Row
           label="Reference"
           value={

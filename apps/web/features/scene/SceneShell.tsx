@@ -10,7 +10,12 @@ import { ClusterLabels } from "@/features/scene/ClusterLabels";
 import { HoverTooltip } from "@/features/scene/HoverTooltip";
 import { SceneAxes } from "@/features/scene/SceneAxes";
 import { useViewerStore } from "@/stores/viewer-store";
-import { SCENE_BACKGROUND, SCENE_FOG_FAR, SCENE_FOG_NEAR } from "@/lib/visualization-theme";
+import {
+  CAMERA_FRAME_DISTANCE,
+  SCENE_BACKGROUND,
+  SCENE_FOG_FAR,
+  SCENE_FOG_NEAR,
+} from "@/lib/visualization-theme";
 
 function CameraRig() {
   const controlsRef = useRef<ElementRef<typeof CameraControls>>(null);
@@ -33,7 +38,7 @@ function CameraRig() {
       void controlsRef.current.setLookAt(
         cx,
         cy,
-        cz + bounds.radius * 2.2,
+        cz + bounds.radius * CAMERA_FRAME_DISTANCE,
         cx,
         cy,
         cz,
@@ -92,8 +97,8 @@ export function SceneShell() {
   const showRefresh = isLoading && dataset;
 
   return (
-    <div className="absolute inset-x-0 bottom-0 top-14">
-      <div className="gop-grid-bg pointer-events-none absolute inset-0 opacity-40" />
+    <div className="absolute inset-0">
+      <div className="gop-grid-bg pointer-events-none absolute inset-0 opacity-60" />
 
       {webglAvailable === false && (
         <SceneOverlay tone="error" title="WebGL unavailable">
@@ -108,7 +113,7 @@ export function SceneShell() {
       {showSpinner && (
         <SceneOverlay tone="info" title={`Loading ${street} manifold`}>
           <LoadingProgress />
-          <p className="text-[10px] text-zinc-500">
+          <p className="text-[12px] text-[var(--text-tertiary)]">
             Streaming binary point positions and metadata…
           </p>
         </SceneOverlay>
@@ -116,11 +121,11 @@ export function SceneShell() {
 
       {loadError && !isLoading && (
         <SceneOverlay tone="error" title="Couldn't load manifold">
-          <p className="text-zinc-300">{summarizeError(loadError)}</p>
+          <p>{summarizeError(loadError)}</p>
           <button
             type="button"
             onClick={() => void loadStreet()}
-            className="mt-2 rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-100 transition hover:bg-white/[0.12]"
+            className="gop-btn gop-btn-primary mt-3"
           >
             Retry
           </button>
@@ -128,9 +133,9 @@ export function SceneShell() {
       )}
 
       {showRefresh && (
-        <div className="pointer-events-none absolute right-4 top-4 z-10 flex items-center gap-2 rounded border border-[var(--border-default)] bg-[var(--surface-glass-strong)] px-2.5 py-1 text-[11px] text-zinc-300 backdrop-blur">
-          <span className="gop-pulse-soft inline-block h-1.5 w-1.5 rounded-full bg-cyan-300" />
-          Refreshing {street}…
+        <div className="gop-float pointer-events-none absolute left-1/2 top-[84px] z-30 flex -translate-x-1/2 items-center gap-2 px-3.5 py-2 text-[12px] text-[var(--text-secondary)]">
+          <span className="gop-pulse-soft inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+          Streaming {street} states…
         </div>
       )}
 
@@ -155,6 +160,7 @@ export function SceneShell() {
           <CameraRig />
         </Canvas>
       )}
+      <div className="gop-vignette pointer-events-none absolute inset-0" aria-hidden="true" />
     </div>
   );
 }
@@ -168,18 +174,31 @@ function SceneOverlay({
   title: string;
   children: React.ReactNode;
 }) {
-  const ring =
-    tone === "error" ? "border-rose-500/30" : "border-cyan-400/30";
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-sm"
+      className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
     >
-      <div
-        className={`gop-fade-in max-w-md rounded-md border ${ring} bg-[var(--surface-glass-strong)] p-5 text-center shadow-2xl`}
-      >
-        <h3 className="mb-2 text-sm font-medium text-zinc-100">{title}</h3>
-        <div className="space-y-2 text-[12px] leading-relaxed text-zinc-400">
+      <div className="gop-float gop-fade-in w-full max-w-sm p-6 text-center">
+        <div
+          className={`mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full ${
+            tone === "error"
+              ? "bg-rose-500/15 text-rose-300"
+              : "bg-[var(--accent-soft)] text-[var(--accent)]"
+          }`}
+          aria-hidden="true"
+        >
+          {tone === "error" ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M12 8v5M12 16h.01" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+          ) : (
+            <span className="gop-pulse-soft h-2.5 w-2.5 rounded-full bg-current" />
+          )}
+        </div>
+        <h3 className="mb-2 text-[15px] font-semibold text-[var(--text-primary)]">{title}</h3>
+        <div className="space-y-2 text-[13px] leading-relaxed text-[var(--text-secondary)]">
           {children}
         </div>
       </div>
@@ -189,14 +208,11 @@ function SceneOverlay({
 
 function LoadingProgress() {
   return (
-    <div className="mx-auto mb-2 h-1 w-48 overflow-hidden rounded-full bg-white/[0.06]">
+    <div className="mx-auto mb-3 h-1 w-56 overflow-hidden rounded-full bg-white/[0.07]">
       <div
-        className="h-full w-1/3 rounded-full bg-cyan-400/60"
-        style={{
-          animation: "gop-loading-track 1.6s ease-in-out infinite",
-        }}
+        className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent"
+        style={{ animation: "gop-loading-track 1.4s ease-in-out infinite" }}
       />
-      <style>{`@keyframes gop-loading-track { 0% { transform: translateX(-50%);} 100% { transform: translateX(220%);} }`}</style>
     </div>
   );
 }

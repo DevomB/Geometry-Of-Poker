@@ -156,7 +156,7 @@ function EmptySelection() {
           ["L", "Neighbour links"],
           ["C", "Cluster labels"],
           ["Esc", "Clear selection"],
-          ["Drag", "Orbit · scroll to zoom"],
+          ["Drag", "Orbit · zoom"],
         ].map(([k, v]) => (
           <div key={k} className="flex items-center gap-2">
             <dt>

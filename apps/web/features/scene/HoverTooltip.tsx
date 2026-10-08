@@ -23,7 +23,7 @@ export function HoverTooltip() {
       position={[point.x, point.y + 0.4, point.z]}
       center
       style={{ pointerEvents: "none", transform: "translateY(-36px)" }}
-      zIndexRange={[15, 0]}
+      zIndexRange={[15, 13]}
     >
       <div
         role="status"

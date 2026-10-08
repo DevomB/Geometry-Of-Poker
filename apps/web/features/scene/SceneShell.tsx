@@ -11,7 +11,7 @@ import { HoverTooltip } from "@/features/scene/HoverTooltip";
 import { SceneAxes } from "@/features/scene/SceneAxes";
 import { useViewerStore } from "@/stores/viewer-store";
 import {
-  CAMERA_FRAME_DISTANCE,
+  cameraFrameDistance,
   SCENE_BACKGROUND,
   SCENE_FOG_FAR,
   SCENE_FOG_NEAR,
@@ -38,7 +38,7 @@ function CameraRig() {
       void controlsRef.current.setLookAt(
         cx,
         cy,
-        cz + bounds.radius * CAMERA_FRAME_DISTANCE,
+        cz + cameraFrameDistance(bounds.radius),
         cx,
         cy,
         cz,
@@ -133,7 +133,7 @@ export function SceneShell() {
       )}
 
       {showRefresh && (
-        <div className="gop-float pointer-events-none absolute left-1/2 top-[84px] z-30 flex -translate-x-1/2 items-center gap-2 px-3.5 py-2 text-[12px] text-[var(--text-secondary)]">
+        <div className="gop-float pointer-events-none absolute left-1/2 top-[116px] z-30 md:top-[84px] flex -translate-x-1/2 items-center gap-2 px-3.5 py-2 text-[12px] text-[var(--text-secondary)]">
           <span className="gop-pulse-soft inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
           Streaming {street} states…
         </div>
@@ -143,6 +143,7 @@ export function SceneShell() {
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
           dpr={[1, renderQuality.dprMax]}
+          style={{ touchAction: "none" }}
           gl={{ antialias: false, powerPreference: "high-performance" }}
         >
           <color attach="background" args={[SCENE_BACKGROUND]} />

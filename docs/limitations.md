@@ -51,7 +51,7 @@ Viewer artifacts are expected to come from real feature-engine datasets generate
 | --- | --- | --- |
 | Metadata JSON | Grows linearly with point count | Large releases need compact sidecars and lazy detail fetch. |
 | Hover picking | Uses Three.js point hit index with throttled fallback scan | Very large releases may need GPU picking. |
-| Mobile | Full viewer is blocked below desktop breakpoints | No full-fidelity phone experience yet. |
+| Mobile | Phones get a touch layout with bottom sheets, but load the same full-street artifacts | Large releases can be slow or memory-bound on low-end phones; adaptive quality lowers point density but does not page data. |
 | Native binding | Platform-specific prebuild | Dataset generation and non-exact manual projection require native availability. |
 | Cross-language scaler | sklearn fit consumed by TypeScript | Requires projection-index parity tests. |
 

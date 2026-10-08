@@ -7,6 +7,21 @@ import { useHealth } from "@/lib/hooks/use-health";
 import { Modal } from "@/components/Modal";
 import { AboutResearchContent } from "@/components/research/AboutResearchContent";
 import { STATUS } from "@/lib/visualization-theme";
+import { STREETS, type Street } from "@/lib/types";
+
+const STREET_LABEL: Record<Street, string> = {
+  preflop: "Preflop",
+  flop: "Flop",
+  turn: "Turn",
+  river: "River",
+};
+
+const STREET_BOARD: Record<Street, number> = {
+  preflop: 0,
+  flop: 3,
+  turn: 4,
+  river: 5,
+};
 
 function StatusDot({ color, pulsing }: { color: string; pulsing: boolean }) {
   return (
@@ -19,18 +34,94 @@ function StatusDot({ color, pulsing }: { color: string; pulsing: boolean }) {
       )}
       <span
         className="relative inline-flex h-2 w-2 rounded-full"
-        style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+        style={{ background: color, boxShadow: `0 0 8px ${color}` }}
       />
     </span>
   );
 }
+
+function BrandMark() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+      <defs>
+        <linearGradient id="gop-mark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#5eead4" />
+          <stop offset="1" stopColor="#a78bfa" />
+        </linearGradient>
+      </defs>
+      <rect x="0.5" y="0.5" width="27" height="27" rx="8" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" />
+      <path
+        d="M7 18c2.5-6 5.5-9 7-9s3 3 7 9"
+        fill="none"
+        stroke="url(#gop-mark)"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="7" cy="18" r="1.8" fill="#5eead4" />
+      <circle cx="14" cy="9" r="1.8" fill="#9bd5f0" />
+      <circle cx="21" cy="18" r="1.8" fill="#a78bfa" />
+    </svg>
+  );
+}
+
+/** Mini glyph showing how many board cards a street has. */
+function BoardGlyph({ count, active }: { count: number; active: boolean }) {
+  return (
+    <span className="flex items-center gap-[2px]" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span
+          key={i}
+          className={`h-[9px] w-[6px] rounded-[1.5px] transition ${
+            i < count
+              ? active
+                ? "bg-[var(--accent)]"
+                : "bg-zinc-500"
+              : "bg-white/[0.08]"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function StreetSwitcher() {
+  const street = useViewerStore((s) => s.street);
+  const setStreet = useViewerStore((s) => s.setStreet);
+  return (
+    <div role="radiogroup" aria-label="Street" className="gop-seg">
+      {STREETS.map((s, i) => {
+        const active = street === s;
+        return (
+          <button
+            key={s}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => !active && setStreet(s)}
+            title={`${STREET_LABEL[s]} · press ${i + 1}`}
+            className="flex items-center gap-2"
+          >
+            <BoardGlyph count={STREET_BOARD[s]} active={active} />
+            <span>{STREET_LABEL[s]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const NAV_LINKS = [
+  { href: "/research", label: "Research" },
+  { href: "/map", label: "Map" },
+  { href: "/release", label: "Release" },
+  { href: "/api-docs", label: "API" },
+];
 
 export function TopNav() {
   const fps = useViewerStore((s) => s.fps);
   const targetFps = useViewerStore((s) => s.targetFps);
   const renderQuality = useViewerStore((s) => s.renderQuality);
   const dataset = useViewerStore((s) => s.dataset);
-  const street = useViewerStore((s) => s.street);
   const isLoading = useViewerStore((s) => s.isLoading);
   const health = useHealth();
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -43,14 +134,14 @@ export function TopNav() {
         : STATUS.warn;
   const engineLabel =
     health.status === "loading"
-      ? "Connecting…"
+      ? "Connecting"
       : health.status === "error"
-        ? "Backend unreachable"
+        ? "Offline"
         : health.payload.status === "misconfigured"
           ? "Misconfigured"
           : health.payload.pokerCalculations.available
             ? "Engine ready"
-            : "Engine degraded";
+            : "Degraded";
   const statusTitle =
     health.status === "ok"
       ? `Status: ${health.payload.status} · Artifacts: ${health.payload.artifactMode} · NAPI ${health.payload.pokerCalculations.napi}`
@@ -60,105 +151,77 @@ export function TopNav() {
 
   return (
     <>
-      <header className="pointer-events-auto absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-between gap-4 overflow-hidden border-b border-[var(--border-default)] bg-[var(--surface-glass-strong)] px-5 backdrop-blur-md">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold tracking-tight text-zinc-100">
-            Geometry of Poker{" "}
-            <span className="ml-1 text-[10px] font-normal uppercase tracking-[0.2em] text-zinc-500">
-              research
-            </span>
-          </h1>
-          <p className="gop-mono truncate text-[10px] text-zinc-500">
-            Texas Hold&apos;em state-space manifold
-            <span className="mx-2 text-zinc-700">·</span>
-            <span className="text-zinc-400">{street}</span>
-            {dataset && (
-              <>
-                <span className="mx-2 text-zinc-700">·</span>
-                <span className="tabular-nums text-zinc-400">
-                  {dataset.count.toLocaleString()} states
-                </span>
-                <span className="mx-2 text-zinc-700">·</span>
-                <span className="text-zinc-500">
-                  {dataset.manifest.embeddingMethod.split(" ").pop() ?? "—"}
-                </span>
-              </>
-            )}
-          </p>
+      <header className="gop-float pointer-events-auto absolute inset-x-3 top-3 z-20 flex h-14 items-center gap-4 px-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandMark />
+          <div className="min-w-0 leading-tight">
+            <h1 className="truncate text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">
+              Geometry of Poker
+            </h1>
+            <p className="truncate text-[11.5px] text-[var(--text-tertiary)]">
+              {dataset ? (
+                <>
+                  <span className="gop-mono tabular-nums text-[var(--text-secondary)]">
+                    {dataset.count.toLocaleString()}
+                  </span>{" "}
+                  states
+                  {dataset.manifest.version && (
+                    <span className="gop-mono"> · v{dataset.manifest.version}</span>
+                  )}
+                </>
+              ) : (
+                "Hold'em state-space manifold"
+              )}
+            </p>
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3 gop-mono text-[11px] text-zinc-400">
-          {dataset?.manifest.version && (
-            <span
-              title="Active artifact version"
-              className="hidden rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-0.5 tabular-nums text-zinc-400 xl:inline-block"
-            >
-              v{dataset.manifest.version}
-            </span>
-          )}
+        <div className="flex flex-1 justify-center">
+          <StreetSwitcher />
+        </div>
 
+        <div className="flex shrink-0 items-center gap-1">
           <span
             title={statusTitle ?? undefined}
-            className="flex items-center gap-2"
+            className="mr-1 hidden items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-black/30 px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] lg:flex"
           >
             <StatusDot
               color={statusColor}
               pulsing={health.status === "loading" || isLoading}
             />
-            <span className="hidden text-zinc-400 xl:inline">{engineLabel}</span>
+            <span>{engineLabel}</span>
+            {!isLoading && fps > 0 && (
+              <span
+                className="gop-mono border-l border-[var(--border-subtle)] pl-2 tabular-nums text-[var(--text-tertiary)]"
+                title={`Render rate; target floor ${targetFps} fps; quality ${renderQuality.tier}`}
+              >
+                {fps} fps
+              </span>
+            )}
           </span>
 
-          {!isLoading && fps > 0 && (
-            <span
-              title={`Render rate; target floor ${targetFps} fps; quality ${renderQuality.tier}`}
-              className="hidden tabular-nums text-zinc-500 xl:inline-block"
-            >
-              {fps} fps / {renderQuality.tier}
-            </span>
-          )}
+          <nav aria-label="Pages" className="hidden items-center xl:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12.5px]"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
           <button
             type="button"
             onClick={() => setAboutOpen(true)}
-            className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
+            className="gop-btn h-8"
             aria-haspopup="dialog"
             aria-expanded={aboutOpen}
             title="About this research"
           >
             About
           </button>
-
-          <Link
-            href="/api-docs"
-            className="hidden rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06] md:inline-block"
-            title="Open API reference"
-          >
-            API
-          </Link>
-
-          <Link
-            href="/map"
-            className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
-            title="Open research map"
-          >
-            Map
-          </Link>
-
-          <Link
-            href="/release"
-            className="hidden rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1 text-zinc-200 transition hover:border-[var(--border-strong)] hover:bg-white/[0.06] xl:inline-block"
-            title="Open release dashboard"
-          >
-            Release
-          </Link>
-
-          <Link
-            href="/research"
-            className="hidden text-zinc-500 transition hover:text-zinc-200 2xl:inline-block"
-            title="Open full research page"
-          >
-            ↗
-          </Link>
         </div>
       </header>
 
@@ -169,6 +232,13 @@ export function TopNav() {
         widthClass="max-w-3xl"
       >
         <AboutResearchContent embed />
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-4 xl:hidden">
+          {NAV_LINKS.map((link) => (
+            <Link key={link.href} href={link.href} className="gop-btn">
+              {link.label}
+            </Link>
+          ))}
+        </div>
       </Modal>
     </>
   );

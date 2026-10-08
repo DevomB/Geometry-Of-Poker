@@ -61,10 +61,11 @@ export function ManualMarkerMesh() {
       <Html
         position={[0, 0.46, 0]}
         center
-        style={{ pointerEvents: "none", transform: "translateY(-28px)" }}
+        style={{ pointerEvents: "none" }}
         zIndexRange={[12, 0]}
       >
-        <div className="flex items-center gap-2 whitespace-nowrap rounded-[12px] border border-amber-200/40 bg-[rgba(30,24,10,0.85)] px-2.5 py-2 shadow-2xl backdrop-blur-xl">
+        {/* Hidden on phones, where the selection peek card shows the same cards. */}
+        <div className="hidden -translate-y-[calc(50%+14px)] items-center gap-2 whitespace-nowrap rounded-[12px] border border-amber-200/40 bg-[rgba(30,24,10,0.85)] px-2.5 py-2 shadow-2xl backdrop-blur-xl md:flex">
           <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-200/90">
             Your hand
           </span>

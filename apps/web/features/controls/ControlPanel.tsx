@@ -20,23 +20,23 @@ import {
   IconSidebar,
 } from "@/components/ui/Icons";
 
-type DockTab = "view" | "filter" | "hand" | "data";
+export type DockTab = "view" | "filter" | "hand" | "data";
 
-const TABS: { id: DockTab; label: string; icon: ReactNode }[] = [
+export const TABS: { id: DockTab; label: string; icon: ReactNode }[] = [
   { id: "view", label: "View", icon: <IconPalette size={18} /> },
   { id: "filter", label: "Filter", icon: <IconFilter size={18} /> },
   { id: "hand", label: "Project", icon: <IconCards size={18} /> },
   { id: "data", label: "Atlas", icon: <IconChart size={18} /> },
 ];
 
-const TAB_TITLE: Record<DockTab, { title: string; subtitle: string }> = {
+export const TAB_TITLE: Record<DockTab, { title: string; subtitle: string }> = {
   view: { title: "Appearance", subtitle: "How states are coloured and drawn" },
   filter: { title: "Filters", subtitle: "Narrow the manifold to a slice" },
   hand: { title: "Project a hand", subtitle: "Place your own cards on the map" },
   data: { title: "Street atlas", subtitle: "Distribution and embedding quality" },
 };
 
-function useFiltersActiveCount() {
+export function useFiltersActiveCount() {
   const filters = useViewerStore((s) => s.filters);
   let n = 0;
   if (filters.equityMin > 0 || filters.equityMax < 1) n++;
@@ -142,7 +142,7 @@ export function ControlPanel() {
 /* View                                                               */
 /* ------------------------------------------------------------------ */
 
-function ViewTab() {
+export function ViewTab() {
   const colorMode = useViewerStore((s) => s.colorMode);
   const setColorMode = useViewerStore((s) => s.setColorMode);
   const dataset = useViewerStore((s) => s.dataset);
@@ -341,7 +341,7 @@ function LegendBody({ mode, dataset }: { mode: ColorMode; dataset: StreetDataset
 /* Filter                                                             */
 /* ------------------------------------------------------------------ */
 
-function FilterTab() {
+export function FilterTab() {
   const filters = useViewerStore((s) => s.filters);
   const setFilters = useViewerStore((s) => s.setFilters);
   const resetFilters = useViewerStore((s) => s.resetFilters);
@@ -566,7 +566,7 @@ function FilterTab() {
 /* Atlas                                                              */
 /* ------------------------------------------------------------------ */
 
-function AtlasTab() {
+export function AtlasTab() {
   const dataset = useViewerStore((s) => s.dataset);
   const filters = useViewerStore((s) => s.filters);
   const setFilters = useViewerStore((s) => s.setFilters);

@@ -40,7 +40,7 @@ function StatusDot({ color, pulsing }: { color: string; pulsing: boolean }) {
   );
 }
 
-function BrandMark() {
+export function BrandMark() {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
       <defs>
@@ -84,11 +84,11 @@ function BoardGlyph({ count, active }: { count: number; active: boolean }) {
   );
 }
 
-export function StreetSwitcher() {
+export function StreetSwitcher({ compact = false }: { compact?: boolean }) {
   const street = useViewerStore((s) => s.street);
   const setStreet = useViewerStore((s) => s.setStreet);
   return (
-    <div role="radiogroup" aria-label="Street" className="gop-seg">
+    <div role="radiogroup" aria-label="Street" className={`gop-seg ${compact ? "flex w-full" : ""}`}>
       {STREETS.map((s, i) => {
         const active = street === s;
         return (
@@ -99,9 +99,9 @@ export function StreetSwitcher() {
             aria-checked={active}
             onClick={() => !active && setStreet(s)}
             title={`${STREET_LABEL[s]} · press ${i + 1}`}
-            className="flex items-center gap-2"
+            className={`flex items-center justify-center gap-2 ${compact ? "flex-1 !px-1" : ""}`}
           >
-            <BoardGlyph count={STREET_BOARD[s]} active={active} />
+            {!compact && <BoardGlyph count={STREET_BOARD[s]} active={active} />}
             <span>{STREET_LABEL[s]}</span>
           </button>
         );
@@ -110,7 +110,7 @@ export function StreetSwitcher() {
   );
 }
 
-const NAV_LINKS = [
+export const NAV_LINKS = [
   { href: "/research", label: "Research" },
   { href: "/map", label: "Map" },
   { href: "/release", label: "Release" },

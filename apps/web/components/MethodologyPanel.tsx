@@ -18,12 +18,12 @@ export function MethodologyPanel() {
   return (
     <section
       aria-label="Methodology"
-      className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2.5"
+      className="gop-card p-3.5"
     >
-      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-300">
+      <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
         Methodology
       </p>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[10px]">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
         <Row label="Street" value={STREET_LABEL[street] ?? street} />
         <Row label="Points" value={m.pointCount.toLocaleString()} mono />
         <Row
@@ -71,11 +71,11 @@ export function MethodologyPanel() {
       </dl>
       {m.dimensionProfile && (
         <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
-          <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+          <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
             Geometry interpretation
           </p>
           {m.dimensionProfile.topFeatureGroups.length > 0 && (
-            <p className="text-[10px] leading-relaxed text-zinc-400">
+            <p className="text-[12px] leading-relaxed text-zinc-400">
               Drivers:{" "}
               {m.dimensionProfile.topFeatureGroups
                 .slice(0, 3)
@@ -84,7 +84,7 @@ export function MethodologyPanel() {
             </p>
           )}
           {m.dimensionProfile.topPcaLoadings.length > 0 && (
-            <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+            <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
               PC1:{" "}
               {m.dimensionProfile.topPcaLoadings
                 .slice(0, 3)
@@ -93,7 +93,7 @@ export function MethodologyPanel() {
             </p>
           )}
           {m.dimensionProfile.axisCaveat && (
-            <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+            <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
               {m.dimensionProfile.axisCaveat}
             </p>
           )}

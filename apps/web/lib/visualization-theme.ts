@@ -5,7 +5,7 @@ import type { ColorMode } from "@/lib/types";
  * hardcoded color literals; pull palettes and explanations from here.
  */
 
-export const SCENE_BACKGROUND = "#08080c";
+export const SCENE_BACKGROUND = "#06070a";
 export const SCENE_FOG_NEAR = 30;
 export const SCENE_FOG_FAR = 80;
 

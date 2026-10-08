@@ -1,27 +1,150 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useViewerStore } from "@/stores/viewer-store";
-import { COLOR_MODES, STREETS } from "@/lib/types";
-import type { Street } from "@/lib/types";
-import { resetCameraView } from "@/features/scene/camera-actions";
+import { COLOR_MODES, CATEGORY_PALETTE, CLUSTER_PALETTE } from "@/lib/types";
+import type { ColorMode, StreetDataset } from "@/lib/types";
 import { CardPickerPanel } from "@/features/card-picker/CardPickerPanel";
-import { ColorLegend } from "@/components/ColorLegend";
 import { humanCategory } from "@/lib/poker/human-category";
+import { COLOR_MODE_META, rgbCss } from "@/lib/visualization-theme";
 import {
   computeStreetAtlas,
   formatAtlasValue,
   type AtlasSlice,
 } from "@/lib/atlas/street-atlas";
+import {
+  IconCards,
+  IconChart,
+  IconFilter,
+  IconPalette,
+  IconSidebar,
+} from "@/components/ui/Icons";
+
+type DockTab = "view" | "filter" | "hand" | "data";
+
+const TABS: { id: DockTab; label: string; icon: ReactNode }[] = [
+  { id: "view", label: "View", icon: <IconPalette size={18} /> },
+  { id: "filter", label: "Filter", icon: <IconFilter size={18} /> },
+  { id: "hand", label: "Project", icon: <IconCards size={18} /> },
+  { id: "data", label: "Atlas", icon: <IconChart size={18} /> },
+];
+
+const TAB_TITLE: Record<DockTab, { title: string; subtitle: string }> = {
+  view: { title: "Appearance", subtitle: "How states are coloured and drawn" },
+  filter: { title: "Filters", subtitle: "Narrow the manifold to a slice" },
+  hand: { title: "Project a hand", subtitle: "Place your own cards on the map" },
+  data: { title: "Street atlas", subtitle: "Distribution and embedding quality" },
+};
+
+function useFiltersActiveCount() {
+  const filters = useViewerStore((s) => s.filters);
+  let n = 0;
+  if (filters.equityMin > 0 || filters.equityMax < 1) n++;
+  if (filters.categories.length > 0) n++;
+  if (filters.clusters.length > 0) n++;
+  if (filters.boardRainbow !== null) n++;
+  if (filters.boardTwoTone !== null) n++;
+  if (filters.boardMonotone !== null) n++;
+  if (filters.searchNeighborOf !== null) n++;
+  return n;
+}
 
 export function ControlPanel() {
-  const street = useViewerStore((s) => s.street);
-  const setStreet = useViewerStore((s) => s.setStreet);
+  const [tab, setTab] = useState<DockTab>("view");
+  const [open, setOpen] = useState(true);
+  const activeFilters = useFiltersActiveCount();
+  const manualMarker = useViewerStore((s) => s.manualMarker);
+
+  const selectTab = (next: DockTab) => {
+    if (next === tab) {
+      setOpen((o) => !o);
+      return;
+    }
+    setTab(next);
+    setOpen(true);
+  };
+
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 top-[76px] z-20 flex items-start gap-2">
+      <nav
+        aria-label="Control panels"
+        className="gop-float gop-slide-in-left pointer-events-auto flex h-fit flex-col items-center gap-1 p-1.5"
+      >
+        {TABS.map((t) => {
+          const active = open && tab === t.id;
+          const badge =
+            t.id === "filter" && activeFilters > 0
+              ? activeFilters
+              : t.id === "hand" && manualMarker
+                ? "•"
+                : null;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => selectTab(t.id)}
+              aria-pressed={active}
+              title={t.label}
+              className={`relative flex w-14 flex-col items-center gap-1 rounded-[10px] py-2 text-[10.5px] font-medium transition ${
+                active
+                  ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "text-[var(--text-tertiary)] hover:bg-white/[0.06] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {t.icon}
+              <span>{t.label}</span>
+              {badge !== null && (
+                <span className="gop-mono absolute right-1.5 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9.5px] font-semibold text-[#032a25]">
+                  {badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+        <span className="my-1 h-px w-8 bg-[var(--border-default)]" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          title={open ? "Collapse panel" : "Expand panel"}
+          aria-label={open ? "Collapse panel" : "Expand panel"}
+          className="flex h-9 w-14 items-center justify-center rounded-[10px] text-[var(--text-tertiary)] transition hover:bg-white/[0.06] hover:text-[var(--text-primary)]"
+        >
+          <IconSidebar size={17} />
+        </button>
+      </nav>
+
+      {open && (
+        <aside
+          aria-label={TAB_TITLE[tab].title}
+          className="gop-float gop-slide-in-left pointer-events-auto flex max-h-full w-[340px] flex-col overflow-hidden"
+        >
+          <header className="border-b border-[var(--border-subtle)] px-5 pb-3.5 pt-4">
+            <h2 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+              {TAB_TITLE[tab].title}
+            </h2>
+            <p className="mt-0.5 text-[12px] text-[var(--text-tertiary)]">
+              {TAB_TITLE[tab].subtitle}
+            </p>
+          </header>
+          <div key={tab} className="gop-fade-in min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {tab === "view" && <ViewTab />}
+            {tab === "filter" && <FilterTab />}
+            {tab === "hand" && <CardPickerPanel />}
+            {tab === "data" && <AtlasTab />}
+          </div>
+        </aside>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* View                                                               */
+/* ------------------------------------------------------------------ */
+
+function ViewTab() {
   const colorMode = useViewerStore((s) => s.colorMode);
   const setColorMode = useViewerStore((s) => s.setColorMode);
-  const filters = useViewerStore((s) => s.filters);
-  const setFilters = useViewerStore((s) => s.setFilters);
-  const resetFilters = useViewerStore((s) => s.resetFilters);
   const dataset = useViewerStore((s) => s.dataset);
   const showNnLinks = useViewerStore((s) => s.showNnLinks);
   const showClusterLabels = useViewerStore((s) => s.showClusterLabels);
@@ -32,10 +155,199 @@ export function ControlPanel() {
   const fps = useViewerStore((s) => s.fps);
   const targetFps = useViewerStore((s) => s.targetFps);
   const renderQuality = useViewerStore((s) => s.renderQuality);
-  const atlas = useMemo(
-    () => (dataset && dataset.metadata.length > 0 ? computeStreetAtlas(dataset) : null),
-    [dataset],
+  const meta = COLOR_MODE_META[colorMode];
+
+  return (
+    <div className="space-y-6">
+      <Group label="Colour by">
+        <div role="radiogroup" aria-label="Color mode" className="grid grid-cols-2 gap-2">
+          {COLOR_MODES.map((mode) => (
+            <ColorModeTile
+              key={mode.id}
+              mode={mode.id}
+              label={mode.label}
+              active={mode.id === colorMode}
+              onSelect={() => setColorMode(mode.id)}
+            />
+          ))}
+        </div>
+        <div className="gop-card mt-3 p-3.5">
+          <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
+            {meta.description}
+          </p>
+          <LegendBody mode={colorMode} dataset={dataset} />
+        </div>
+      </Group>
+
+      <Group label="Layers">
+        <div className="gop-card divide-y divide-[var(--border-subtle)]">
+          <Switch
+            label="Nearest-neighbour links"
+            hint="Draw edges to embedding neighbours"
+            shortcut="L"
+            checked={showNnLinks}
+            onChange={toggleNnLinks}
+          />
+          <Switch
+            label="Cluster labels"
+            hint="Show HDBSCAN centroid tags"
+            shortcut="C"
+            checked={showClusterLabels}
+            onChange={toggleClusterLabels}
+          />
+        </div>
+      </Group>
+
+      <Group
+        label="Point density"
+        trailing={
+          <span className="gop-mono text-[12px] tabular-nums text-[var(--text-secondary)]">
+            {Math.round(lodSampleRate * 100)}%
+          </span>
+        }
+      >
+        <input
+          type="range"
+          min={10}
+          max={100}
+          value={Math.round(lodSampleRate * 100)}
+          onChange={(e) => setLodSampleRate(Number(e.target.value) / 100)}
+          aria-label="Point density"
+          className="gop-range"
+          style={{ ["--gop-fill" as string]: `${((lodSampleRate * 100 - 10) / 90) * 100}%` }}
+        />
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Stat label="Target" value={`${targetFps}+ fps`} />
+          <Stat label="Measured" value={fps > 0 ? `${fps} fps` : "—"} />
+          <Stat label="Quality" value={renderQuality.tier} />
+        </div>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-[var(--text-tertiary)]">
+          Density adapts automatically to hold the frame-rate floor.
+        </p>
+      </Group>
+    </div>
   );
+}
+
+function ColorModeTile({
+  mode,
+  label,
+  active,
+  onSelect,
+}: {
+  mode: ColorMode;
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const meta = COLOR_MODE_META[mode];
+  const preview =
+    meta.legendKind === "continuous" || meta.legendKind === "diverging"
+      ? `linear-gradient(90deg, ${meta.legend.stops.join(", ")})`
+      : meta.legendKind === "categorical"
+        ? `linear-gradient(90deg, ${Object.values(CATEGORY_PALETTE)
+            .slice(0, 6)
+            .map((rgb, i, arr) => `${rgbCss(rgb)} ${(i / arr.length) * 100}% ${((i + 1) / arr.length) * 100}%`)
+            .join(", ")})`
+        : `linear-gradient(90deg, ${CLUSTER_PALETTE.slice(0, 6)
+            .map((rgb, i, arr) => `${rgbCss(rgb)} ${(i / arr.length) * 100}% ${((i + 1) / arr.length) * 100}%`)
+            .join(", ")})`;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onSelect}
+      className={`rounded-[12px] border p-2.5 text-left transition ${
+        active
+          ? "border-[var(--accent-ring)] bg-[var(--accent-soft)]"
+          : "border-[var(--border-subtle)] bg-white/[0.02] hover:border-[var(--border-strong)] hover:bg-white/[0.04]"
+      }`}
+    >
+      <span className="block h-1.5 w-full rounded-full" style={{ background: preview }} aria-hidden="true" />
+      <span
+        className={`mt-2 block truncate text-[12.5px] font-medium ${
+          active ? "text-[#ccfbf1]" : "text-[var(--text-secondary)]"
+        }`}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function LegendBody({ mode, dataset }: { mode: ColorMode; dataset: StreetDataset | null }) {
+  const meta = COLOR_MODE_META[mode];
+  if (meta.legendKind === "continuous" || meta.legendKind === "diverging") {
+    return (
+      <div className="mt-3">
+        <div
+          className="h-2.5 w-full rounded-full"
+          style={{ background: `linear-gradient(90deg, ${meta.legend.stops.join(", ")})` }}
+          aria-hidden="true"
+        />
+        <div className="gop-mono mt-1.5 flex justify-between text-[11px] text-[var(--text-tertiary)]">
+          <span>{meta.legend.labels[0]}</span>
+          <span>{meta.legend.labels[1]}</span>
+        </div>
+      </div>
+    );
+  }
+  if (meta.legendKind === "categorical") {
+    const present = new Set(dataset?.manifest.categories ?? []);
+    const entries = Object.entries(CATEGORY_PALETTE).filter(([name]) =>
+      present.size === 0 ? true : present.has(name),
+    );
+    return (
+      <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
+        {entries.map(([name, rgb]) => (
+          <li key={name} className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: rgbCss(rgb) }} aria-hidden="true" />
+            <span className="truncate">{humanCategory(name)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  const clusters = dataset?.manifest.clusters ?? [];
+  if (clusters.length === 0) {
+    return (
+      <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
+        No HDBSCAN clusters available for this street.
+      </p>
+    );
+  }
+  return (
+    <ul className="mt-3 grid grid-cols-3 gap-x-3 gap-y-1.5">
+      {clusters.map((c) => (
+        <li key={c.id} className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ background: rgbCss(CLUSTER_PALETTE[c.id % CLUSTER_PALETTE.length]!) }}
+            aria-hidden="true"
+          />
+          <span className="gop-mono">C{c.id}</span>
+        </li>
+      ))}
+      <li className="flex items-center gap-2 text-[12px] text-[var(--text-tertiary)]">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[rgb(64,64,72)]" aria-hidden="true" />
+        noise
+      </li>
+    </ul>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Filter                                                             */
+/* ------------------------------------------------------------------ */
+
+function FilterTab() {
+  const filters = useViewerStore((s) => s.filters);
+  const setFilters = useViewerStore((s) => s.setFilters);
+  const resetFilters = useViewerStore((s) => s.resetFilters);
+  const dataset = useViewerStore((s) => s.dataset);
+  useViewerStore((s) => s.visualizationRevision);
+  const activeCount = useFiltersActiveCount();
 
   const categories = dataset?.manifest.categories ?? [];
   const clusters = dataset?.manifest.clusters ?? [];
@@ -45,586 +357,332 @@ export function ControlPanel() {
       if (dataset.visible[i]) visibleCount++;
     }
   }
-  const filtersActive =
-    filters.equityMin > 0 ||
-    filters.equityMax < 1 ||
-    filters.categories.length > 0 ||
-    filters.clusters.length > 0 ||
-    filters.boardRainbow !== null ||
-    filters.boardTwoTone !== null ||
-    filters.boardMonotone !== null ||
-    filters.searchNeighborOf !== null;
+  const share = dataset && dataset.count > 0 ? visibleCount / dataset.count : 0;
 
-  const toggleCategory = (category: string) => {
+  const toggleCategory = (category: string) =>
     setFilters({
       categories: filters.categories.includes(category)
         ? filters.categories.filter((c) => c !== category)
         : [...filters.categories, category],
     });
-  };
 
-  const toggleCluster = (cluster: number) => {
+  const toggleCluster = (cluster: number) =>
     setFilters({
       clusters: filters.clusters.includes(cluster)
         ? filters.clusters.filter((c) => c !== cluster)
         : [...filters.clusters, cluster],
     });
-  };
+
+  const minPct = Math.round(filters.equityMin * 100);
+  const maxPct = Math.round(filters.equityMax * 100);
 
   return (
-    <aside
-      aria-label="Visualization controls"
-      className="gop-slide-in-left pointer-events-auto flex max-h-screen w-72 flex-col gap-3 overflow-y-auto border-r border-[var(--border-default)] bg-[var(--surface-glass)] p-4 backdrop-blur-md"
-    >
-      <Section title="Street" defaultOpen>
-        <div
-          role="radiogroup"
-          aria-label="Street selector"
-          className="grid grid-cols-2 gap-1"
-        >
-          {STREETS.map((s) => {
-            const active = street === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setStreet(s as Street)}
-                className={`gop-mono rounded border px-2 py-1.5 text-[11px] uppercase tracking-wider transition ${
-                  active
-                    ? "border-cyan-300/40 bg-cyan-500/15 text-cyan-100"
-                    : "border-[var(--border-subtle)] bg-white/[0.02] text-zinc-400 hover:border-[var(--border-default)] hover:text-zinc-200"
-                }`}
-              >
-                {s}
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Color mode" defaultOpen>
-        <ColorModePicker value={colorMode} onChange={setColorMode} />
-        <ColorLegend mode={colorMode} dataset={dataset} />
-      </Section>
-
-      <Section title="Filters" defaultOpen>
-        <fieldset className="space-y-2">
-          <legend className="sr-only">Filters</legend>
-          {dataset && (
-            <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] px-2 py-1.5 text-[10px] text-zinc-400">
-              <div className="flex items-center justify-between">
-                <span>Visible states</span>
-                <span className="gop-mono tabular-nums text-zinc-300">
-                  {visibleCount.toLocaleString()}/{dataset.count.toLocaleString()}
-                </span>
-              </div>
-              {filters.searchNeighborOf && (
-                <div className="mt-1 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-1">
-                  <span className="truncate">Focused on 25-NN</span>
-                  <button
-                    type="button"
-                    onClick={() => setFilters({ searchNeighborOf: null })}
-                    className="text-cyan-300/80 transition hover:text-cyan-200"
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          <label className="block text-[11px] text-zinc-400">
-            <span className="flex justify-between">
-              <span>Equity range</span>
-              <span className="gop-mono tabular-nums text-zinc-500">
-                {Math.round(filters.equityMin * 100)}-{Math.round(filters.equityMax * 100)}%
-              </span>
-            </span>
-            <div className="mt-1 flex items-center gap-2">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round(filters.equityMin * 100)}
-                onChange={(e) =>
-                  setFilters({
-                    equityMin: Math.min(
-                      Number(e.target.value) / 100,
-                      filters.equityMax,
-                    ),
-                  })
-                }
-                className="w-full accent-cyan-400"
-                aria-label="Minimum equity"
-              />
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round(filters.equityMax * 100)}
-                onChange={(e) =>
-                  setFilters({
-                    equityMax: Math.max(
-                      Number(e.target.value) / 100,
-                      filters.equityMin,
-                    ),
-                  })
-                }
-                className="w-full accent-cyan-400"
-                aria-label="Maximum equity"
-              />
-            </div>
-          </label>
-
-          {categories.length > 0 && (
-            <div className="text-[11px] text-zinc-400">
-              <div className="mb-1 flex items-center justify-between">
-                <span>Hand category</span>
-                {filters.categories.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFilters({ categories: [] })}
-                    className="text-[10px] text-zinc-500 transition hover:text-zinc-300"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {categories.map((c) => (
-                  <FilterChip
-                    key={c}
-                    label={humanCategory(c)}
-                    active={filters.categories.includes(c)}
-                    onClick={() => toggleCategory(c)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {clusters.length > 0 && (
-            <div className="text-[11px] text-zinc-400">
-              <div className="mb-1 flex items-center justify-between">
-                <span>Cluster</span>
-                {filters.clusters.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFilters({ clusters: [] })}
-                    className="text-[10px] text-zinc-500 transition hover:text-zinc-300"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {clusters.slice(0, 12).map((c) => (
-                  <FilterChip
-                    key={c.id}
-                    label={`C${c.id}`}
-                    active={filters.clusters.includes(c.id)}
-                    onClick={() => toggleCluster(c.id)}
-                    title={`${c.size.toLocaleString()} states`}
-                  />
-                ))}
-                <FilterChip
-                  label="noise"
-                  active={filters.clusters.includes(-1)}
-                  onClick={() => toggleCluster(-1)}
-                />
-              </div>
-              {clusters.length > 12 && (
-                <p className="mt-1 text-[10px] text-zinc-600">
-                  Showing the first 12 manifest clusters.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1 text-[11px] text-zinc-300">
-            <BoardFlagToggle
-              label="Rainbow board"
-              value={filters.boardRainbow}
-              onChange={(v) => setFilters({ boardRainbow: v })}
-            />
-            <BoardFlagToggle
-              label="Two-tone board"
-              value={filters.boardTwoTone}
-              onChange={(v) => setFilters({ boardTwoTone: v })}
-            />
-            <BoardFlagToggle
-              label="Monotone board"
-              value={filters.boardMonotone}
-              onChange={(v) => setFilters({ boardMonotone: v })}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={resetFilters}
-            disabled={!filtersActive}
-            className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-zinc-400 transition hover:border-[var(--border-default)] hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            Reset filters
-          </button>
-        </fieldset>
-      </Section>
-
-      <Section title="Layers">
-        <Toggle
-          label="Nearest-neighbor links"
-          checked={showNnLinks}
-          onChange={toggleNnLinks}
-        />
-        <Toggle
-          label="Cluster centroid labels"
-          checked={showClusterLabels}
-          onChange={toggleClusterLabels}
-        />
-      </Section>
-
-      <Section title="Density">
-        <label className="block text-[11px] text-zinc-400">
-          <span className="flex justify-between">
-            <span>Sample rate</span>
-            <span className="gop-mono tabular-nums text-zinc-500">
-              {Math.round(lodSampleRate * 100)}%
-            </span>
-          </span>
-          <input
-            type="range"
-            min={10}
-            max={100}
-            value={Math.round(lodSampleRate * 100)}
-            onChange={(e) => setLodSampleRate(Number(e.target.value) / 100)}
-            aria-label="Point density"
-            className="mt-1 w-full accent-cyan-400"
-          />
-        </label>
-        <div className="mt-2 grid grid-cols-2 gap-1 text-[10px] text-zinc-500">
-          <span>Target</span>
-          <span className="gop-mono text-right tabular-nums">{targetFps}+ fps</span>
-          <span>Measured</span>
-          <span className="gop-mono text-right tabular-nums">
-            {fps > 0 ? `${fps} fps` : "pending"}
-          </span>
-          <span>Quality</span>
-          <span className="gop-mono text-right uppercase tracking-wider">
-            {renderQuality.tier}
-          </span>
-        </div>
-      </Section>
-
+    <div className="space-y-6">
       {dataset && (
-        <Section title="Diagnostics">
-          <div className="space-y-2 rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2 text-[10px] text-zinc-500">
-            <MetricRow
-              label="Embedding"
-              value={dataset.manifest.embeddingMethod || "unknown"}
-            />
-            <MetricRow
-              label="Points"
-              value={dataset.count.toLocaleString()}
-              mono
-            />
-            <MetricRow
-              label="Feature dims"
-              value={`${dataset.manifest.retainedDimension ?? dataset.manifest.retainedFeatures.length}/${dataset.manifest.originalDimension ?? "?"}`}
-              mono
-              title="Retained dimensions after preprocessing compared with original feature dimensions"
-            />
-            {dataset.manifest.pcaDimensions != null && (
-              <MetricRow
-                label="PCA dims"
-                value={String(dataset.manifest.pcaDimensions)}
-                mono
-              />
-            )}
-            {dataset.manifest.pcaVariance != null && (
-              <MetricRow
-                label="PCA variance"
-                value={formatUnitInterval(dataset.manifest.pcaVariance)}
-                mono
-              />
-            )}
-            {dataset.manifest.trustworthiness != null && (
-              <MetricRow
-                label="Trustworthiness"
-                value={formatUnitInterval(dataset.manifest.trustworthiness)}
-                mono
-                title="How often embedding neighbors remain neighbors in source feature space"
-              />
-            )}
-            {dataset.manifest.knnOverlap != null && (
-              <MetricRow
-                label="kNN overlap"
-                value={formatUnitInterval(dataset.manifest.knnOverlap)}
-                mono
-                title="Shared-neighbor overlap between feature space and 3D embedding"
-              />
-            )}
-            {dataset.manifest.hdbscan && (
-              <>
-                <MetricRow
-                  label="Clusters"
-                  value={String(dataset.manifest.hdbscan.clusters ?? "unknown")}
-                  mono
-                />
-                {dataset.manifest.hdbscan.noiseFraction != null && (
-                  <MetricRow
-                    label="Noise"
-                    value={formatUnitInterval(dataset.manifest.hdbscan.noiseFraction)}
-                    mono
-                  />
-                )}
-              </>
-            )}
+        <div className="gop-card p-3.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[12px] text-[var(--text-tertiary)]">Visible states</span>
+            <span className="gop-mono text-[13px] tabular-nums text-[var(--text-primary)]">
+              {visibleCount.toLocaleString()}
+              <span className="text-[var(--text-tertiary)]"> / {dataset.count.toLocaleString()}</span>
+            </span>
           </div>
-        </Section>
-      )}
-
-      {atlas && (
-        <Section title="Street atlas">
-          <div className="space-y-3">
-            <div className="space-y-2 rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2">
-              {atlas.metrics.map((metric) => (
-                <div key={metric.id}>
-                  <div className="mb-1 flex items-center justify-between text-[10px]">
-                    <span className="text-zinc-500">{metric.label}</span>
-                    <span className="gop-mono tabular-nums text-zinc-300">
-                      med {formatAtlasValue(metric.median, metric.format)}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-[9px] text-zinc-600">
-                    <span className="gop-mono tabular-nums">
-                      min {formatAtlasValue(metric.min, metric.format)}
-                    </span>
-                    <span className="gop-mono text-center tabular-nums">
-                      iqr {formatAtlasValue(metric.q25, metric.format)}-
-                      {formatAtlasValue(metric.q75, metric.format)}
-                    </span>
-                    <span className="gop-mono text-right tabular-nums">
-                      max {formatAtlasValue(metric.max, metric.format)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
+            <div
+              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+              style={{ width: `${share * 100}%` }}
+            />
+          </div>
+          {filters.searchNeighborOf && (
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3 text-[12px]">
+              <span className="text-[var(--text-secondary)]">Focused on 25 nearest neighbours</span>
+              <button
+                type="button"
+                onClick={() => setFilters({ searchNeighborOf: null })}
+                className="font-medium text-[var(--accent)] hover:underline"
+              >
+                Clear
+              </button>
             </div>
-
-            <AtlasSliceList
-              title="Categories"
-              slices={atlas.categories.slice(0, 5)}
-              activeIds={filters.categories}
-              onSelect={(id) => setFilters({ categories: [id] })}
-              onClear={() => setFilters({ categories: [] })}
-            />
-
-            <AtlasSliceList
-              title="Clusters"
-              slices={atlas.clusters.slice(0, 6)}
-              activeIds={filters.clusters.map(String)}
-              onSelect={(id) => setFilters({ clusters: [Number(id)] })}
-              onClear={() => setFilters({ clusters: [] })}
-            />
-          </div>
-        </Section>
+          )}
+        </div>
       )}
 
-      <Section title="Camera">
-        <button
-          type="button"
-          onClick={resetCameraView}
-          className="w-full rounded border border-[var(--border-default)] bg-white/[0.04] px-2 py-1.5 text-[11px] text-zinc-200 transition hover:bg-white/[0.08]"
-        >
-          Reset view
-        </button>
-      </Section>
+      <Group
+        label="Equity vs random"
+        trailing={
+          <span className="gop-mono text-[12px] tabular-nums text-[var(--text-secondary)]">
+            {minPct}% – {maxPct}%
+          </span>
+        }
+      >
+        <div className="relative">
+          <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/[0.1]" aria-hidden="true" />
+          <div
+            className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
+            style={{
+              left: `${minPct}%`,
+              right: `${100 - maxPct}%`,
+              background: `linear-gradient(90deg, ${COLOR_MODE_META.equity.legend.stops.join(", ")})`,
+            }}
+            aria-hidden="true"
+          />
+          <div className="gop-dual-range">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={minPct}
+              onChange={(e) =>
+                setFilters({ equityMin: Math.min(Number(e.target.value) / 100, filters.equityMax) })
+              }
+              aria-label="Minimum equity"
+            />
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={maxPct}
+              onChange={(e) =>
+                setFilters({ equityMax: Math.max(Number(e.target.value) / 100, filters.equityMin) })
+              }
+              aria-label="Maximum equity"
+            />
+          </div>
+        </div>
+      </Group>
 
-      <CardPickerPanel />
-    </aside>
+      {categories.length > 0 && (
+        <Group
+          label="Hand category"
+          trailing={
+            filters.categories.length > 0 ? (
+              <ClearButton onClick={() => setFilters({ categories: [] })} />
+            ) : null
+          }
+        >
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className="gop-chip"
+                aria-pressed={filters.categories.includes(c)}
+                onClick={() => toggleCategory(c)}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: rgbCss(CATEGORY_PALETTE[c] ?? [0.5, 0.5, 0.5]) }}
+                  aria-hidden="true"
+                />
+                {humanCategory(c)}
+              </button>
+            ))}
+          </div>
+        </Group>
+      )}
+
+      {clusters.length > 0 && (
+        <Group
+          label="Cluster"
+          trailing={
+            filters.clusters.length > 0 ? (
+              <ClearButton onClick={() => setFilters({ clusters: [] })} />
+            ) : null
+          }
+        >
+          <div className="flex flex-wrap gap-1.5">
+            {clusters.slice(0, 24).map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="gop-chip gop-mono"
+                aria-pressed={filters.clusters.includes(c.id)}
+                onClick={() => toggleCluster(c.id)}
+                title={`${c.size.toLocaleString()} states`}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: rgbCss(CLUSTER_PALETTE[c.id % CLUSTER_PALETTE.length]!) }}
+                  aria-hidden="true"
+                />
+                C{c.id}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="gop-chip"
+              aria-pressed={filters.clusters.includes(-1)}
+              onClick={() => toggleCluster(-1)}
+            >
+              <span className="h-2 w-2 rounded-full bg-[rgb(64,64,72)]" aria-hidden="true" />
+              noise
+            </button>
+          </div>
+          {clusters.length > 24 && (
+            <p className="mt-2 text-[11.5px] text-[var(--text-tertiary)]">
+              Showing the first 24 manifest clusters.
+            </p>
+          )}
+        </Group>
+      )}
+
+      <Group label="Board texture">
+        <div className="gop-card divide-y divide-[var(--border-subtle)]">
+          <Switch
+            label="Rainbow"
+            hint="Three or more suits on board"
+            checked={filters.boardRainbow === true}
+            onChange={() => setFilters({ boardRainbow: filters.boardRainbow ? null : true })}
+          />
+          <Switch
+            label="Two-tone"
+            hint="Exactly two suits represented"
+            checked={filters.boardTwoTone === true}
+            onChange={() => setFilters({ boardTwoTone: filters.boardTwoTone ? null : true })}
+          />
+          <Switch
+            label="Monotone"
+            hint="Single-suit board"
+            checked={filters.boardMonotone === true}
+            onChange={() => setFilters({ boardMonotone: filters.boardMonotone ? null : true })}
+          />
+        </div>
+      </Group>
+
+      <button
+        type="button"
+        onClick={resetFilters}
+        disabled={activeCount === 0}
+        className="gop-btn w-full"
+      >
+        Reset all filters
+      </button>
+    </div>
   );
 }
 
-function ColorModePicker({
-  value,
-  onChange,
-}: {
-  value: (typeof COLOR_MODES)[number]["id"];
-  onChange: (mode: (typeof COLOR_MODES)[number]["id"]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const activeMode = COLOR_MODES.find((mode) => mode.id === value) ?? COLOR_MODES[0]!;
+/* ------------------------------------------------------------------ */
+/* Atlas                                                              */
+/* ------------------------------------------------------------------ */
 
-  useEffect(() => {
-    if (!open) return;
+function AtlasTab() {
+  const dataset = useViewerStore((s) => s.dataset);
+  const filters = useViewerStore((s) => s.filters);
+  const setFilters = useViewerStore((s) => s.setFilters);
+  const atlas = useMemo(
+    () => (dataset && dataset.metadata.length > 0 ? computeStreetAtlas(dataset) : null),
+    [dataset],
+  );
 
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+  if (!dataset) {
+    return <p className="text-[13px] text-[var(--text-tertiary)]">Waiting for the street to load…</p>;
+  }
+  const m = dataset.manifest;
 
   return (
-    <div ref={rootRef} className="relative mb-2">
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label="Color mode"
-        onClick={() => setOpen((next) => !next)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setOpen(false);
-        }}
-        className="flex min-h-9 w-full items-center justify-between rounded border border-[var(--border-default)] bg-black/50 px-2.5 py-1.5 text-left text-xs text-zinc-100 shadow-[0_0_0_1px_rgba(0,0,0,0.3)] transition hover:border-[var(--border-strong)] hover:bg-black/60 focus:border-cyan-300/50 focus:outline-none"
-      >
-        <span className="truncate">{activeMode.label}</span>
-        <span className="gop-mono pl-2 text-[10px] text-zinc-500" aria-hidden="true">
-          {open ? "^" : "v"}
-        </span>
-      </button>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 overflow-hidden rounded border border-cyan-300/25 bg-[#101018] shadow-2xl shadow-black/60">
-          <ul role="listbox" aria-label="Color mode options" className="py-1">
-            {COLOR_MODES.map((mode) => {
-              const active = mode.id === value;
-              return (
-                <li key={mode.id} role="option" aria-selected={active}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChange(mode.id);
-                      setOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition ${
-                      active
-                        ? "bg-cyan-500/15 text-cyan-100"
-                        : "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100"
-                    }`}
-                  >
-                    <span>{mode.label}</span>
-                    {active && (
-                      <span className="gop-mono text-[10px] text-cyan-200" aria-hidden="true">
-                        on
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+    <div className="space-y-6">
+      <Group label="Embedding">
+        <div className="grid grid-cols-2 gap-2">
+          <Stat label="Points" value={dataset.count.toLocaleString()} large />
+          <Stat
+            label="Feature dims"
+            value={`${m.retainedDimension ?? m.retainedFeatures.length}/${m.originalDimension ?? "?"}`}
+            large
+            title="Retained dimensions after preprocessing compared with original feature dimensions"
+          />
+          {m.trustworthiness != null && (
+            <Stat
+              label="Trustworthiness"
+              value={formatUnitInterval(m.trustworthiness)}
+              large
+              title="How often embedding neighbours remain neighbours in source feature space"
+            />
+          )}
+          {m.knnOverlap != null && (
+            <Stat
+              label="kNN overlap"
+              value={formatUnitInterval(m.knnOverlap)}
+              large
+              title="Shared-neighbour overlap between feature space and 3D embedding"
+            />
+          )}
+          {m.pcaDimensions != null && <Stat label="PCA dims" value={String(m.pcaDimensions)} />}
+          {m.pcaVariance != null && <Stat label="PCA variance" value={formatUnitInterval(m.pcaVariance)} />}
+          {m.hdbscan && <Stat label="Clusters" value={String(m.hdbscan.clusters ?? "—")} />}
+          {m.hdbscan?.noiseFraction != null && (
+            <Stat label="Noise" value={formatUnitInterval(m.hdbscan.noiseFraction)} />
+          )}
         </div>
+        <p className="gop-mono mt-3 text-[11px] leading-relaxed text-[var(--text-tertiary)]">
+          {m.embeddingMethod || "unknown pipeline"}
+        </p>
+      </Group>
+
+      {atlas && (
+        <>
+          <Group label="Distribution">
+            <div className="space-y-3">
+              {atlas.metrics.map((metric) => (
+                <QuantileBar key={metric.id} metric={metric} />
+              ))}
+            </div>
+          </Group>
+
+          <AtlasSliceList
+            title="Top categories"
+            slices={atlas.categories.slice(0, 6)}
+            activeIds={filters.categories}
+            onSelect={(id) => setFilters({ categories: [id] })}
+            onClear={() => setFilters({ categories: [] })}
+          />
+
+          <AtlasSliceList
+            title="Largest clusters"
+            slices={atlas.clusters.slice(0, 6)}
+            activeIds={filters.clusters.map(String)}
+            onSelect={(id) => setFilters({ clusters: [Number(id)] })}
+            onClear={() => setFilters({ clusters: [] })}
+          />
+        </>
       )}
     </div>
   );
 }
 
-function Section({
-  title,
-  defaultOpen = false,
-  children,
+function QuantileBar({
+  metric,
 }: {
-  title: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
+  metric: ReturnType<typeof computeStreetAtlas>["metrics"][number];
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const span = metric.max - metric.min;
+  const pos = (v: number) => (span > 0 ? ((v - metric.min) / span) * 100 : 50);
   return (
-    <section>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="mb-1.5 flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 transition hover:text-zinc-300"
-      >
-        <span>{title}</span>
-        <span aria-hidden="true" className="text-zinc-600">
-          {open ? "-" : "+"}
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between text-[12px]">
+        <span className="text-[var(--text-secondary)]">{metric.label}</span>
+        <span className="gop-mono tabular-nums text-[var(--text-primary)]">
+          {formatAtlasValue(metric.median, metric.format)}
+          <span className="text-[var(--text-tertiary)]"> median</span>
         </span>
-      </button>
-      {open && <div className="gop-fade-in">{children}</div>}
-    </section>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-  title,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`min-h-6 rounded border px-1.5 py-0.5 text-[10px] transition ${
-        active
-          ? "border-cyan-300/50 bg-cyan-500/15 text-cyan-100"
-          : "border-[var(--border-subtle)] bg-white/[0.02] text-zinc-400 hover:border-[var(--border-default)] hover:text-zinc-200"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <label className="mb-1 flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="accent-cyan-400"
-      />
-      {label}
-    </label>
-  );
-}
-
-function MetricRow({
-  label,
-  value,
-  mono,
-  title,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  title?: string;
-}) {
-  return (
-    <div className="flex justify-between gap-2" title={title}>
-      <span>{label}</span>
-      <span
-        className={`max-w-[9rem] truncate text-right text-zinc-300 ${
-          mono ? "gop-mono tabular-nums" : ""
-        }`}
-      >
-        {value}
-      </span>
+      </div>
+      <div className="relative h-2 rounded-full bg-white/[0.06]" aria-hidden="true">
+        <div
+          className="absolute inset-y-0 rounded-full bg-[var(--accent)]/40"
+          style={{ left: `${pos(metric.q25)}%`, right: `${100 - pos(metric.q75)}%` }}
+        />
+        <div
+          className="absolute -top-0.5 h-3 w-0.5 rounded-full bg-[var(--accent)]"
+          style={{ left: `calc(${pos(metric.median)}% - 1px)` }}
+        />
+      </div>
+      <div className="gop-mono mt-1 flex justify-between text-[10.5px] tabular-nums text-[var(--text-tertiary)]">
+        <span>{formatAtlasValue(metric.min, metric.format)}</span>
+        <span>
+          IQR {formatAtlasValue(metric.q25, metric.format)}–{formatAtlasValue(metric.q75, metric.format)}
+        </span>
+        <span>{formatAtlasValue(metric.max, metric.format)}</span>
+      </div>
     </div>
   );
 }
@@ -642,21 +700,11 @@ function AtlasSliceList({
   onSelect: (id: string) => void;
   onClear: () => void;
 }) {
-  const hasActive = activeIds.length > 0;
   return (
-    <div className="rounded border border-[var(--border-subtle)] bg-white/[0.02] p-2">
-      <div className="mb-1.5 flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-wider text-zinc-500">{title}</p>
-        {hasActive && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-[10px] text-zinc-500 transition hover:text-zinc-300"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+    <Group
+      label={title}
+      trailing={activeIds.length > 0 ? <ClearButton onClick={onClear} /> : null}
+    >
       <div className="space-y-1">
         {slices.map((slice) => {
           const active = activeIds.includes(slice.id);
@@ -665,22 +713,22 @@ function AtlasSliceList({
               key={slice.id}
               type="button"
               onClick={() => onSelect(slice.id)}
-              className={`w-full rounded px-1.5 py-1 text-left transition ${
-                active
-                  ? "bg-cyan-500/15 text-cyan-100"
-                  : "hover:bg-white/[0.05]"
+              className={`w-full rounded-[10px] px-2.5 py-2 text-left transition ${
+                active ? "bg-[var(--accent-soft)]" : "hover:bg-white/[0.04]"
               }`}
-              title={`${slice.count.toLocaleString()} states`}
+              title={`${slice.count.toLocaleString()} states · click to filter`}
             >
-              <div className="flex items-center justify-between gap-2 text-[10px]">
-                <span className="truncate text-zinc-300">{slice.label}</span>
-                <span className="gop-mono tabular-nums text-zinc-500">
+              <div className="flex items-center justify-between gap-2 text-[12.5px]">
+                <span className={`truncate ${active ? "text-[#ccfbf1]" : "text-[var(--text-secondary)]"}`}>
+                  {slice.label}
+                </span>
+                <span className="gop-mono tabular-nums text-[var(--text-tertiary)]">
                   {(slice.share * 100).toFixed(1)}%
                 </span>
               </div>
-              <div className="mt-1 h-1 overflow-hidden rounded bg-white/[0.06]">
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
                 <div
-                  className="h-full rounded bg-cyan-300/55"
+                  className="h-full rounded-full bg-[var(--accent)]/70"
                   style={{ width: `${Math.max(2, slice.share * 100)}%` }}
                 />
               </div>
@@ -688,6 +736,106 @@ function AtlasSliceList({
           );
         })}
       </div>
+    </Group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Primitives                                                         */
+/* ------------------------------------------------------------------ */
+
+function Group({
+  label,
+  trailing,
+  children,
+}: {
+  label: string;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-2.5 flex items-center justify-between">
+        <h3 className="gop-eyebrow">{label}</h3>
+        {trailing}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ClearButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-[12px] font-medium text-[var(--accent)] hover:underline"
+    >
+      Clear
+    </button>
+  );
+}
+
+function Switch({
+  label,
+  hint,
+  shortcut,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  shortcut?: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 px-3.5 py-3">
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-[13px] text-[var(--text-primary)]">
+          {label}
+          {shortcut && <kbd className="gop-kbd">{shortcut}</kbd>}
+        </span>
+        {hint && <span className="block text-[11.5px] text-[var(--text-tertiary)]">{hint}</span>}
+      </span>
+      <input type="checkbox" checked={checked} onChange={onChange} className="peer sr-only" />
+      <span
+        aria-hidden="true"
+        className={`relative h-5 w-9 shrink-0 rounded-full transition peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent-ring)] ${
+          checked ? "bg-[var(--accent-strong)]" : "bg-white/[0.12]"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+            checked ? "left-[18px]" : "left-0.5"
+          }`}
+        />
+      </span>
+    </label>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  large,
+  title,
+}: {
+  label: string;
+  value: string;
+  large?: boolean;
+  title?: string;
+}) {
+  return (
+    <div className="gop-card px-3 py-2.5" title={title}>
+      <p className="truncate text-[11px] text-[var(--text-tertiary)]">{label}</p>
+      <p
+        className={`gop-mono mt-0.5 truncate tabular-nums text-[var(--text-primary)] ${
+          large ? "text-[15px]" : "text-[13px]"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -695,26 +843,4 @@ function AtlasSliceList({
 function formatUnitInterval(value: number) {
   const clamped = Math.max(0, Math.min(1, value));
   return `${(clamped * 100).toFixed(1)}%`;
-}
-
-function BoardFlagToggle({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean | null;
-  onChange: (v: boolean | null) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2">
-      <input
-        type="checkbox"
-        checked={value === true}
-        onChange={(e) => onChange(e.target.checked ? true : null)}
-        className="accent-cyan-400"
-      />
-      {label}
-    </label>
-  );
 }

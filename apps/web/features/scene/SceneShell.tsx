@@ -10,7 +10,12 @@ import { ClusterLabels } from "@/features/scene/ClusterLabels";
 import { HoverTooltip } from "@/features/scene/HoverTooltip";
 import { SceneAxes } from "@/features/scene/SceneAxes";
 import { useViewerStore } from "@/stores/viewer-store";
-import { SCENE_BACKGROUND, SCENE_FOG_FAR, SCENE_FOG_NEAR } from "@/lib/visualization-theme";
+import {
+  CAMERA_FRAME_DISTANCE,
+  SCENE_BACKGROUND,
+  SCENE_FOG_FAR,
+  SCENE_FOG_NEAR,
+} from "@/lib/visualization-theme";
 
 function CameraRig() {
   const controlsRef = useRef<ElementRef<typeof CameraControls>>(null);
@@ -33,7 +38,7 @@ function CameraRig() {
       void controlsRef.current.setLookAt(
         cx,
         cy,
-        cz + bounds.radius * 2.2,
+        cz + bounds.radius * CAMERA_FRAME_DISTANCE,
         cx,
         cy,
         cz,

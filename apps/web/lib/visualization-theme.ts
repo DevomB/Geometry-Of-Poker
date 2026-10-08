@@ -6,6 +6,12 @@ import type { ColorMode } from "@/lib/types";
  */
 
 export const SCENE_BACKGROUND = "#06070a";
+/**
+ * Default camera distance from the cloud centre, in bounding radii. With the
+ * 45° FOV the centre plane shows ±0.41·d vertically, so 3 radii leaves margin
+ * for the floating top bar and toolbar that overlay the full-bleed canvas.
+ */
+export const CAMERA_FRAME_DISTANCE = 3;
 export const SCENE_FOG_NEAR = 30;
 export const SCENE_FOG_FAR = 80;
 

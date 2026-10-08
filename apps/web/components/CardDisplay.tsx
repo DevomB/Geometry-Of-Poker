@@ -1,4 +1,4 @@
-import { formatCard } from "@/lib/cards/card-picker";
+import { PlayingCard } from "@/components/ui/PlayingCard";
 
 interface CardDisplayProps {
   cards: string[];
@@ -8,26 +8,19 @@ interface CardDisplayProps {
 
 export function CardDisplay({ cards, label, compact }: CardDisplayProps) {
   return (
-    <div className={compact ? "inline-flex items-center gap-1" : "space-y-1"}>
+    <div className={compact ? "inline-flex items-center gap-1" : "space-y-1.5"}>
       {label && !compact && (
-        <span className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</span>
+        <span className="block text-[11px] text-[var(--text-tertiary)]">{label}</span>
       )}
-      <div className="flex flex-wrap gap-0.5">
-        {cards.map((card) => {
-          const { rank, symbol, suit } = formatCard(card);
-          const color =
-            suit === "h" ? "text-rose-400" : suit === "d" ? "text-sky-400" : suit === "c" ? "text-emerald-400" : "text-zinc-100";
-          return (
-            <span
-              key={card}
-              className={`inline-flex items-center rounded border border-white/10 bg-white/5 px-1 py-0.5 font-mono text-[11px] ${color}`}
-              title={label ? `${label}: ${card}` : card}
-            >
-              {rank}
-              {symbol}
-            </span>
-          );
-        })}
+      <div className="flex flex-wrap gap-1">
+        {cards.map((card) => (
+          <PlayingCard
+            key={card}
+            card={card}
+            size={compact ? "xs" : "sm"}
+            title={label ? `${label}: ${card}` : card}
+          />
+        ))}
       </div>
     </div>
   );

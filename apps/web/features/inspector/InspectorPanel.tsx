@@ -44,21 +44,89 @@ import {
 } from "@/lib/visualization-theme";
 import { humanCategory } from "@/lib/poker/human-category";
 
-export function InspectorPanel() {
+function useInspectorState() {
   const dataset = useViewerStore((s) => s.dataset);
   const selection = useViewerStore((s) => s.selection);
   const manualMarker = useViewerStore((s) => s.manualMarker);
-  const clearSelection = useViewerStore((s) => s.clearSelection);
-  const setManualMarker = useViewerStore((s) => s.setManualMarker);
-  const filters = useViewerStore((s) => s.filters);
-  const setFilters = useViewerStore((s) => s.setFilters);
-
   const selectedIndex = selection?.index;
   const point =
     selectedIndex !== undefined && dataset ? dataset.metadata[selectedIndex] : null;
+  return { dataset, selection, manualMarker, selectedIndex, point };
+}
 
+/** One-line status under the inspector title. */
+export function useInspectorSubtitle(): string {
+  const { point, manualMarker } = useInspectorState();
+  return point ? "Locked state" : manualMarker ? "Projected hand" : "Nothing selected";
+}
+
+/** Clear-projection / deselect buttons shown in the inspector header. */
+export function InspectorActions({ showShortcut = true }: { showShortcut?: boolean }) {
+  const { selection, manualMarker } = useInspectorState();
+  const clearSelection = useViewerStore((s) => s.clearSelection);
+  const setManualMarker = useViewerStore((s) => s.setManualMarker);
+  return (
+    <div className="flex gap-1">
+      {manualMarker && (
+        <button
+          type="button"
+          onClick={() => setManualMarker(null)}
+          className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12px] text-amber-200/90"
+        >
+          Clear projection
+        </button>
+      )}
+      {selection && (
+        <button
+          type="button"
+          onClick={clearSelection}
+          className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12px]"
+          title="Clear selection (Esc)"
+        >
+          Deselect {showShortcut && <kbd className="gop-kbd">Esc</kbd>}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Scrollable inspector content, shared by the desktop panel and the mobile sheet. */
+export function InspectorBody({ showShortcuts = true }: { showShortcuts?: boolean }) {
+  const { dataset, manualMarker, selectedIndex, point } = useInspectorState();
+  const filters = useViewerStore((s) => s.filters);
+  const setFilters = useViewerStore((s) => s.setFilters);
   const hasContent = !!manualMarker || !!point;
 
+  return (
+    <>
+      {manualMarker && <ManualProjectionCard />}
+
+      {point && dataset ? (
+        <SelectedStateCard
+          key={point.id}
+          point={point}
+          index={selectedIndex!}
+          dataset={dataset}
+          manualMarker={manualMarker}
+          neighborFocusActive={filters.searchNeighborOf === point.id}
+          onToggleNeighborFocus={() =>
+            setFilters({
+              searchNeighborOf:
+                filters.searchNeighborOf === point.id ? null : point.id,
+            })
+          }
+        />
+      ) : (
+        !hasContent && <EmptySelection showShortcuts={showShortcuts} />
+      )}
+
+      {dataset && !point && <MethodologyPanel />}
+    </>
+  );
+}
+
+export function InspectorPanel() {
+  const subtitle = useInspectorSubtitle();
   return (
     <aside
       aria-label="State inspector"
@@ -69,66 +137,19 @@ export function InspectorPanel() {
           <h2 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
             Inspector
           </h2>
-          <p className="text-[12px] text-[var(--text-tertiary)]">
-            {point
-              ? "Locked state"
-              : manualMarker
-                ? "Projected hand"
-                : "Nothing selected"}
-          </p>
+          <p className="text-[12px] text-[var(--text-tertiary)]">{subtitle}</p>
         </div>
-        <div className="flex gap-1">
-          {manualMarker && (
-            <button
-              type="button"
-              onClick={() => setManualMarker(null)}
-              className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12px] text-amber-200/90"
-            >
-              Clear projection
-            </button>
-          )}
-          {selection && (
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="gop-btn gop-btn-ghost h-8 px-2.5 text-[12px]"
-              title="Clear selection (Esc)"
-            >
-              Deselect <kbd className="gop-kbd">Esc</kbd>
-            </button>
-          )}
-        </div>
+        <InspectorActions />
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-        {manualMarker && <ManualProjectionCard />}
-
-        {point && dataset ? (
-          <SelectedStateCard
-            key={point.id}
-            point={point}
-            index={selectedIndex!}
-            dataset={dataset}
-            manualMarker={manualMarker}
-            neighborFocusActive={filters.searchNeighborOf === point.id}
-            onToggleNeighborFocus={() =>
-              setFilters({
-                searchNeighborOf:
-                  filters.searchNeighborOf === point.id ? null : point.id,
-              })
-            }
-          />
-        ) : (
-          !hasContent && <EmptySelection />
-        )}
-
-        {dataset && !point && <MethodologyPanel />}
+        <InspectorBody />
       </div>
     </aside>
   );
 }
 
-function EmptySelection() {
+function EmptySelection({ showShortcuts }: { showShortcuts: boolean }) {
   return (
     <section className="space-y-4">
       <div className="gop-card flex items-start gap-3 p-4">
@@ -143,29 +164,32 @@ function EmptySelection() {
             Pick a state to inspect
           </p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
-            Hover the manifold for a preview, click a point to lock it and see its equity,
-            runout distribution, draws and neighbours. Or project your own hand from the{" "}
+            {showShortcuts
+              ? "Hover the manifold for a preview, click a point to lock it and see its equity, runout distribution, draws and neighbours. Or project your own hand from the "
+              : "Tap a point to lock it and see its equity, runout distribution, draws and neighbours. Drag to orbit, pinch to zoom. Or project your own hand from the "}
             <span className="text-[var(--text-primary)]">Project</span> tab.
           </p>
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 px-1 text-[12px] text-[var(--text-secondary)]">
-        {[
-          ["1 – 4", "Switch street"],
-          ["R", "Reset camera"],
-          ["L", "Neighbour links"],
-          ["C", "Cluster labels"],
-          ["Esc", "Clear selection"],
-          ["Drag", "Orbit · zoom"],
-        ].map(([k, v]) => (
-          <div key={k} className="flex items-center gap-2">
-            <dt>
-              <kbd className="gop-kbd">{k}</kbd>
-            </dt>
-            <dd className="truncate">{v}</dd>
-          </div>
-        ))}
-      </dl>
+      {showShortcuts && (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 px-1 text-[12px] text-[var(--text-secondary)]">
+          {[
+            ["1 – 4", "Switch street"],
+            ["R", "Reset camera"],
+            ["L", "Neighbour links"],
+            ["C", "Cluster labels"],
+            ["Esc", "Clear selection"],
+            ["Drag", "Orbit · zoom"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center gap-2">
+              <dt>
+                <kbd className="gop-kbd">{k}</kbd>
+              </dt>
+              <dd className="truncate">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </section>
   );
 }

@@ -5,20 +5,23 @@ import { SceneShell } from "@/features/scene/SceneShell";
 import { SceneToolbar } from "@/features/scene/SceneToolbar";
 import { ControlPanel } from "@/features/controls/ControlPanel";
 import { InspectorPanel } from "@/features/inspector/InspectorPanel";
+import { MobileViewer } from "@/features/mobile/MobileViewer";
 import { TopNav } from "@/components/TopNav";
-import { MobileFallback } from "@/components/MobileFallback";
 import { useViewerShortcuts } from "@/lib/hooks/use-viewer-shortcuts";
 
-function useDesktopViewport(): boolean {
-  const [desktop, setDesktop] = useState(false);
+type ViewportKind = "desktop" | "mobile";
+
+/** Resolves after mount so only one viewer (and one WebGL canvas) ever mounts. */
+function useViewportKind(): ViewportKind | null {
+  const [kind, setKind] = useState<ViewportKind | null>(null);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    const update = () => setDesktop(mq.matches);
+    const update = () => setKind(mq.matches ? "desktop" : "mobile");
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
-  return desktop;
+  return kind;
 }
 
 function DesktopViewer() {
@@ -35,12 +38,12 @@ function DesktopViewer() {
 }
 
 export default function HomePage() {
-  const desktop = useDesktopViewport();
+  const kind = useViewportKind();
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)]">
-      {!desktop && <MobileFallback />}
-      {desktop && <DesktopViewer />}
+    <main className="relative h-[100dvh] w-screen overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)]">
+      {kind === "desktop" && <DesktopViewer />}
+      {kind === "mobile" && <MobileViewer />}
     </main>
   );
 }

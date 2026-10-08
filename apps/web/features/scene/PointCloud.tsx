@@ -184,6 +184,12 @@ function attachPointPicking(options: PointPickingOptions): () => void {
   };
 
   const handlePointerUp = (event: PointerEvent) => {
+    // Touch and pen taps arrive without a preceding hover, so pick at the tap
+    // point (bypassing the hover throttle) with a finger-sized tolerance.
+    if (event.pointerType !== "mouse") {
+      options.lastHoverAt.current = 0;
+      updateHoverFromPointer(event, options, TOUCH_PICK_SCALE);
+    }
     dragStart = selectHoveredPoint(event, dragStart, options.selectPoint);
   };
 
@@ -205,7 +211,13 @@ function attachPointPicking(options: PointPickingOptions): () => void {
   };
 }
 
-function updateHoverFromPointer(event: PointerEvent, options: PointPickingOptions) {
+const TOUCH_PICK_SCALE = 1.8;
+
+function updateHoverFromPointer(
+  event: PointerEvent,
+  options: PointPickingOptions,
+  thresholdScale = 1,
+) {
   const now = performance.now();
   if (now - options.lastHoverAt.current < options.renderQuality.hoverIntervalMs) return;
   options.lastHoverAt.current = now;
@@ -221,7 +233,7 @@ function updateHoverFromPointer(event: PointerEvent, options: PointPickingOption
     count: options.dataset.count,
     rayOrigin: options.raycaster.ray.origin.toArray() as [number, number, number],
     rayDirection: options.raycaster.ray.direction.toArray() as [number, number, number],
-    threshold: pickingThreshold(options.bounds, options.renderQuality),
+    threshold: pickingThreshold(options.bounds, options.renderQuality) * thresholdScale,
     sizes: options.dataset.sizes,
     sampleStep: pickingSampleStep(options.renderQuality, options.lodSampleRate),
   });
